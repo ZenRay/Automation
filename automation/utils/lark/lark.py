@@ -103,5 +103,6 @@ class LarkRobot:
 		}
 		headers['Content-Type'] = multi_form.content_type
 		response = requests.request("POST", url, headers=headers, data=multi_form)
-		print(response.headers['X-Tt-Logid'])  # for debug or oncall
-		print(response.content)  # Print Response
+		# print(response.headers['X-Tt-Logid'])  # for debug or oncall
+		# print(response.content)  # Print Response
+		return response.json()
