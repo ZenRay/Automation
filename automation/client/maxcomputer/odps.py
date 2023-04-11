@@ -15,12 +15,15 @@ class MaxComputerClient:
         logger.info("Load Macomputer Client Success")
 
     
-    def execute_sql(self, sent, hints=None, **kwargs):
+    def execute_sql(self, sent, hints=None, is_async=False, **kwargs):
         """Execute SQL Sentence"""
-        if hints is None:
-            self._client.execute_sql(sent)
-        else:
-            self._clli.execute_sql(sent, hints=hints)
 
-        logger.info("SQL Sentence Executed")
+        if not is_async:
+            instance = self._client.execute_sql(sent, hints=hints)
+            logger.info("SQL Sentence Executed in blocking model")
+            return instance
+        else:
+            self._client.run_sql(sent, hints=hints)
+            logger.info("SQL Sentence Executed in ascync model")
+            return self._client
     
