@@ -28,3 +28,11 @@ else:
 
 del file, template
 logger.info("Load Maxcomputer Configuration Success")
+
+
+# load token configuration
+file = path.join(path.dirname(__file__), "_token.ini")
+token = ConfigParser()
+token.read(file)
+del file
+logger.info("Load token Configuration Success")
