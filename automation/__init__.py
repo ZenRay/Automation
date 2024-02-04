@@ -26,3 +26,13 @@ logger.addHandler(handler)
 
 
 client = MaxComputerClient(**conf)
+
+hints = {
+    "odps.sql.allow.fullscan": True,
+    "odps.sql.type.system.odps2": True,
+    "odps.sql.decimal.odps2": True,
+    "odps.sql.hive.compatible": True,
+    "odps.odtimizer.dynamic.filter.dpp.enable": True,
+    "odps.odtimizer.enable.dynamic.filter": True,
+    "odps.sql.python.version": "cp37",
+}
