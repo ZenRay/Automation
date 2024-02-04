@@ -133,3 +133,9 @@ dmypy.json
 *.xlsx
 *.csv
 *.ipynb
+
+*/conf/\_*.ini
+*/conf/\_*.yml
+*/conf/\_*.yaml
+
+*DS_Store
