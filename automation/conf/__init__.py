@@ -12,12 +12,11 @@ logger = logging.getLogger("automation.conf")
 
 # read maxcomputer configuer file
 file = path.join(path.dirname(__file__), "_maxcomputer.ini")
-template = """prod:
-  conf:
-    access_id: {access_id}
-    secret_acccess_key: {secret_acccess_key}
-    project: {project}
-    endpoint: {endpoint}
+template = """[prod]
+access_id: {access_id}
+secret_access_key: {secret_acccess_key}
+project: {project}
+endpoint: {endpoint}
 """
 maxcomputer = ConfigParser()
 if path.exists(file):
