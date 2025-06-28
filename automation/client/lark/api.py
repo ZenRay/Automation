@@ -2,12 +2,15 @@
 import datetime
 from typing import List
 
+import logging
 import sys
 
 
 from .base import request
 from ..exceptions import LarkException
 
+
+logger = logging.getLogger("automation.lark.api")
 
 class LarkClient(object):
     def __init__(self, lark_host="https://open.feishu.cn"):
@@ -30,8 +33,8 @@ class LarkClient(object):
             }
             resp = request("POST", url, headers, payload)
             self._tenant_access_token = resp['tenant_access_token']
+            logger.info("Initial Access Token Success.")
 
         return self._tenant_access_token
-
 
 
