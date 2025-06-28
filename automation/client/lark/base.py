@@ -2,7 +2,7 @@
 """Lark Client Base Class"""
 import logging
 import requests
-import json
+
 
 
 from ..exceptions import LarkException
@@ -10,16 +10,30 @@ from ..exceptions import LarkException
 logger = logging.getLogger("automation.lark.base")
 
 
+class AccessToken:
+    """Lark Access Token"""
+    def __init__(self, tenant_access_token=None, app_access_token=None, expire_time=None):
+        """Access Token Information
+
+        Args:
+        tenant_access_token, str Lark tenant access token
+        app_access_token, str Lark application access token
+        expire_time, datetime token expire datetime
+        """
+        self.tenant_access_token = tenant_access_token
+        self.app_access_token = app_access_token
+        self.expire_time = expire_time
+
+
+
+
+
 def request(method, url, headers, payload={}, params=None):
     response = requests.request(method, url, headers=headers, json=payload, params=params)
-    logger.info("URL: " + url)
-    logger.info("X-Tt-Logid: " + response.headers['X-Tt-Logid'])
-    logger.info("headers:\n"+json.dumps(headers,indent=2, ensure_ascii=False))
-    logger.info("payload:\n"+json.dumps(payload,indent=2, ensure_ascii=False))
+
     resp = {}
     if response.text[0] == '{':
         resp = response.json()
-        logger.info("response:\n"+json.dumps(resp,indent=2, ensure_ascii=False))
     else:
         logger.info("response:\n"+response.text)
     code = resp.get("code", -1)

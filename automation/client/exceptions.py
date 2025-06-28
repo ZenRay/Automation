@@ -1,6 +1,10 @@
 #coding:utf8
+"""Exceptions Class"""
 
+class RegexException(Exception):
+    """Regular Expession Exception"""
 
+    
 
 class LarkException(Exception):
     def __init__(self, code=0, msg=None):
