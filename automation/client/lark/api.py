@@ -203,3 +203,37 @@ class LarkMultiDimTable(LarkClient):
             has_more = resp.get("data").get("has_more")
             params["page_token"] = resp.get("data").get("page_token")
 
+
+
+    def delete_record(self, record_id: str, *, table_id: str=None, url: str=None):
+        """Delete Specified Single Record"""
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+        
+        if table_id is not None:
+            logger.debug("Specify Table Id, Don't Use the URL address Table id")
+        elif table_id is None and _table_id is not None:
+            table_id = _table_id
+        else:
+            logger.error("There isn't specified Table. URL address: {url}".format(url=url))
+            raise LarkException(msg="There isn't specified Table.")
+        
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records/{record_id}"
+                	
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer '+ self.access_token,
+        }
+
+        if record_id is  None:
+            raise LarkException(msg="Multi Dimention Table Delete Records Failed, Because There isn't records")
+
+
+        resp = request("DELETE", url, headers)
+        
+        if resp.get("code", -1) == 0:
+            logger.info(f"Delete Record {record_id} From Table {table_id} Success.")
