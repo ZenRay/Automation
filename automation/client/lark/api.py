@@ -237,3 +237,59 @@ class LarkMultiDimTable(LarkClient):
         
         if resp.get("code", -1) == 0:
             logger.info(f"Delete Record {record_id} From Table {table_id} Success.")
+        
+    
+
+
+
+    def delete_batch_records(self, records_id: List[str], *, table_id: str=None, url: str=None):
+        """Batch Delete Multiple Records
+        
+        Args:
+        -----------------
+        records_id: List[str], list of record ids to delete
+        table_id: str, table id, if it's None, url address must exist.
+        url: str, table url, if it's None, table id must exist.
+        
+        Result:
+        -----------------
+        Dict, return successful response with deleted record information.
+        """
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+        
+        if table_id is not None:
+            logger.debug("Specify Table Id, Don't Use the URL address Table id")
+        elif table_id is None and _table_id is not None:
+            table_id = _table_id
+        else:
+            logger.error("There isn't specified Table. URL address: {url}".format(url=url))
+            raise LarkException(msg="There isn't specified Table.")
+
+        if not records_id:
+            raise LarkException(msg="Record IDs list cannot be empty")
+
+        # If get single record, use delete_record
+        if isinstance(records_id, str):
+            self.delete_record(record_id=records_id, url=url)
+            return
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records/batch_delete"
+        
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer '+ self.access_token,
+        }
+        
+        payload = {
+            'records': records_id
+        }
+
+        resp = request("POST", url, headers, payload)
+        
+        if resp.get("code", -1) == 0:
+            result = [item.get("record_id") for item in resp.get("data", {}).get("records", [])]
+            logger.info(f"Batch Delete {len(result)}/{len(records_id)} Records From Table {table_id} Success.")
+        
