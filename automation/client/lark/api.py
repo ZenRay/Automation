@@ -293,3 +293,115 @@ class LarkMultiDimTable(LarkClient):
             result = [item.get("record_id") for item in resp.get("data", {}).get("records", [])]
             logger.info(f"Batch Delete {len(result)}/{len(records_id)} Records From Table {table_id} Success.")
         
+        
+
+    def add_record(self, fields: dict, *, table_id: str=None, url: str=None):
+        """Add Single Record
+        
+        Args:
+        -----------------
+        fields: dict, record fields data, format: {"字段名": "值"}
+        table_id: str, table id, if it's None, url address must exist.
+        url: str, table url, if it's None, table id must exist.
+        
+        Result:
+        -----------------
+        Dict, return created record information.
+        """
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+        
+        if table_id is not None:
+            logger.debug("Specify Table Id, Don't Use the URL address Table id")
+        elif table_id is None and _table_id is not None:
+            table_id = _table_id
+        else:
+            logger.error("There isn't specified Table. URL address: {url}".format(url=url))
+            raise LarkException(msg="There isn't specified Table.")
+
+        if not fields:
+            raise LarkException(msg="Fields data cannot be empty")
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records"
+        
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer '+ self.access_token,
+        }
+        
+        payload = {
+            'fields': fields
+        }
+
+        resp = request("POST", url, headers, payload)
+        
+        if resp.get("code", -1) == 0:
+            record_id = resp.get("data", {}).get("record", {}).get("record_id")
+            logger.info(f"Create Record {record_id} In Table {table_id} Success.")
+        else:
+            logger.error(f"Create Record In Table {table_id} Failed: {resp}")
+            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Create record failed"))
+        
+        return resp
+
+
+    def add_batch_records(self, records: List[dict], *, table_id: str=None, url: str=None):
+        """Batch Add Multiple Records
+        
+        Args:
+        -----------------
+        records: List[dict], list of record data, each item format: {"fields": {"字段名": "值"}}
+        table_id: str, table id, if it's None, url address must exist.
+        url: str, table url, if it's None, table id must exist.
+        
+        Result:
+        -----------------
+        Dict, return created records information.
+        """
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+        
+        if table_id is not None:
+            logger.debug("Specify Table Id, Don't Use the URL address Table id")
+        elif table_id is None and _table_id is not None:
+            table_id = _table_id
+        else:
+            logger.error("There isn't specified Table. URL address: {url}".format(url=url))
+            raise LarkException(msg="There isn't specified Table.")
+
+        if not records:
+            raise LarkException(msg="Records data cannot be empty")
+
+        # If get single record, use create_record
+        if isinstance(records, dict):
+            return self.add_record(fields=records, table_id=table_id, url=url)
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records/batch_create"
+        
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer '+ self.access_token,
+        }
+        
+        payload = {
+            'records': records
+        }
+
+        resp = request("POST", url, headers, payload)
+        
+        if resp.get("code", -1) == 0:
+            created_records = resp.get("data", {}).get("records", [])
+            logger.info(f"Batch Create {len(created_records)}/{len(records)} Records In Table {table_id} Success.")
+        else:
+            logger.error(f"Batch Create Records In Table {table_id} Failed: {resp}")
+            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Batch create records failed"))
+        
+        return resp
+
+
+
+ 
