@@ -8,9 +8,11 @@ import logging
 from os import path
 from configparser import ConfigParser
 
+
+from .utils import parse_conf
 logger = logging.getLogger("automation.conf")
 
-# read maxcomputer configuer file
+# read maxcomputer configurate file
 file = path.join(path.dirname(__file__), "_maxcomputer.ini")
 template = """[prod]
 access_id: {access_id}
@@ -19,12 +21,16 @@ project: {project}
 endpoint: {endpoint}
 """
 maxcomputer = ConfigParser()
-if path.exists(file):
-    maxcomputer.read(file)
-else:
-    with open(file, "w", encoding="utf8") as writer:
-        writer.write(template)
-    maxcomputer.read(file)
+parse_conf(maxcomputer, file, template=template)
+logger.info("Load Maxcomputer Configuration Success.")
 
-del file, template
-logger.info("Load Maxcomputer Configuration Success")
+# read lark configurate file
+file = path.join(path.dirname(__file__), "_lark.ini")
+template = """[prod]
+APP_ID: {APP_ID}
+APP_SECRET: {APP_SECRET}
+"""
+
+lark = ConfigParser()
+parse_conf(lark, file, template=template)
+logger.info("Load Lark Configuration Successs.")

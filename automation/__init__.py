@@ -3,8 +3,8 @@
 import logging
 
 
-from automation.conf import maxcomputer
-from automation.client import MaxComputerClient
+from automation.conf import maxcomputer, lark
+from automation.client import MaxComputerClient, LarkClient, LarkMultiDimTable
 conf = {
     "access_id": maxcomputer.get("dev", "access_id"),
     "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
@@ -25,7 +25,7 @@ logger.addHandler(handler)
 
 
 
-client = MaxComputerClient(**conf)
+max_compute_client = MaxComputerClient(**conf)
 
 hints = {
     "odps.sql.allow.fullscan": True,
@@ -36,3 +36,10 @@ hints = {
     "odps.odtimizer.enable.dynamic.filter": True,
     "odps.sql.python.version": "cp37",
 }
+
+
+lark_multi_table_client = LarkMultiDimTable(
+    app_id=lark.get("prod", "APP_ID")
+    ,app_secret=lark.get("prod", "APP_SECRET")
+    ,lark_host=lark.get("prod", "LARK_HOST")
+)
