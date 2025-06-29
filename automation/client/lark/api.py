@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 import datetime
+import time
 from typing import List
 
 import logging
@@ -14,15 +15,17 @@ from ..exceptions import LarkException, RegexException
 logger = logging.getLogger("automation.lark.api")
 
 class LarkClient(object):
-    def __init__(self, lark_host="https://open.feishu.cn"):
+    def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
         """Init Lark Object"""
         self._host = lark_host
         self._token = AccessToken()
+        self.__app_id = app_id
+        self.__app_secret = app_secret
 
+        logger.info("Lark Client Load Success.")
 
-    # FIXME: 最后需要删除下面app_id 和 app_secret 信息
     @property
-    def tenant_access_token(self, app_id="cli_a8d27f9bf635500e", app_secret="w7xAfJLTfEoUR2pJnbVz7c2luiXww7zn"):
+    def tenant_access_token(self):
         """Get Tenant Access Token"""
         if self._token.tenant_access_token is None or datetime.now() >= self._token.expire_time:
             url = self._host+"/open-apis/auth/v3/app_access_token/internal/"
@@ -30,8 +33,8 @@ class LarkClient(object):
                 'Content-Type': 'application/json; charset=utf-8'
             }
             payload = {
-                'app_id': app_id,
-                'app_secret': app_secret
+                'app_id': self.__app_id,
+                'app_secret': self.__app_secret
             }
             resp = request("POST", url, headers, payload)
             # self._token = resp['tenant_access_token']
@@ -47,7 +50,7 @@ class LarkClient(object):
 
 
     @property
-    def app_access_token(self, app_id="cli_a8d27f9bf635500e", app_secret="w7xAfJLTfEoUR2pJnbVz7c2luiXww7zn"):
+    def app_access_token(self):
         """Get Application Access Token"""
         if self._token.app_access_token is None or datetime.now() >= self._token.expire_time:
             url = self._host+"/open-apis/auth/v3/app_access_token/internal/"
@@ -55,11 +58,11 @@ class LarkClient(object):
                 'Content-Type': 'application/json; charset=utf-8'
             }
             payload = {
-                'app_id': app_id,
-                'app_secret': app_secret
+                'app_id': self.__app_id,
+                'app_secret': self.__app_secret
             }
             resp = request("POST", url, headers, payload)
-            # self._token = resp['tenant_access_token']
+            
             self._token = AccessToken(
                 app_access_token=resp['app_access_token'],
                 tenant_access_token=resp['tenant_access_token'],
@@ -75,8 +78,8 @@ class LarkClient(object):
 class LarkMultiDimTable(LarkClient):
     """Lark Multi Dimention Table Process"""
 
-    def __init__(self, lark_host="https://open.feishu.cn"):
-        super().__init__(lark_host)
+    def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
+        super().__init__(app_id, app_secret, lark_host)
         self._table_name = None
         self._app_token = None
         
@@ -88,6 +91,10 @@ class LarkMultiDimTable(LarkClient):
         """Tenant Access Token"""
         return super().tenant_access_token
     
+    @property
+    def app_type(self):
+        """App Type (base/wiki/docx/sheets)"""
+        return self._app_type
 
 
     def extract_app_information(self, url: str):
@@ -100,37 +107,43 @@ class LarkMultiDimTable(LarkClient):
             logger.error("URL Address Is invalid, get url: {url}".format(url=url))
             raise RegexException("URL Address Is invalid, get url: {url}".format(url=url))
         
-
-        # Request to get table name
-        app_token = match.group('app_token')
-        app_type = match.group("app_type")
-        
-        # if the app type is diversity, the API address is different
-        # FIXME: 待解决多类型文档的请求
-        if app_type == "base":
-            url = f"{self._host}/open-apis/bitable/v1/apps/{app_token}"
-            payload = {}
-        elif app_type == "wiki":
-            url = f"{self._host}/open-apis/wiki/v2/spaces/get_node"
-            payload = {
-                "obj_type": "bitable"
-                ,"token": app_token
-            }
-        
-            
         headers = {
             'Content-Type': 'application/json; charset=utf-8',
             'Authorization': 'Bearer '+ self.access_token,
         }
-        resp =  request("GET", url, headers, payload=payload)
+
+        # Request to get table name
+        self._app_type = match.group("app_type")
+        
+        # if the app type is diversity, the API address is different
+        # FIXME: 待解决多类型文档的请求
+        if self._app_type == "base":
+            app_token = match.group('app_token')
+            
+        elif self._app_type == "wiki":
+            # Wiki Multi Dimention Table Node Information
+            wiki_app_token = match.group('app_token')
+            url = f"{self._host}/open-apis/wiki/v2/spaces/get_node"
+            params = {
+                "obj_type": "wiki",
+                "token": wiki_app_token
+            }
+            resp = request("GET", url, headers, params=params)
+            # Extract Table Name And App Token, if request success
+            if resp["code"] == 0:
+                app_token = resp["data"]["node"]["obj_token"]
+            else:
+                logger.error(f"Extract Table Information Fail, Origin URL: {raw_url}")
+                
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{app_token}"
+        resp = request("GET", url, headers)
         
         if resp["msg"] == "success":
             logger.info(f"Extract Table Information Success, Origin URL: {raw_url}\nGet Table App Information: {resp}")
-            # FIXME: 待解决多类型文档的请求
-            if app_type == "base":
-                self._table_name = resp["data"]["app"]["name"]
-                self._app_token = resp["data"]["app"]["app_token"]
-
+            self._table_name = resp["data"]["app"]["name"]
+            self._app_token = resp["data"]["app"]["app_token"]
+            
         else:
             logger.error(f"Extract Table Information Fail, Origin URL: {raw_url}")
             raise LarkException(code=resp["code"], msg=resp["msg"])
@@ -202,6 +215,7 @@ class LarkMultiDimTable(LarkClient):
             # update continue boolean
             has_more = resp.get("data").get("has_more")
             params["page_token"] = resp.get("data").get("page_token")
+            time.sleep(3)
 
 
 
