@@ -25,7 +25,7 @@ logger.addHandler(handler)
 
 
 
-client = MaxComputerClient(**conf)
+max_compute_client = MaxComputerClient(**conf)
 
 hints = {
     "odps.sql.allow.fullscan": True,
