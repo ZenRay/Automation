@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 import re
 
 
-from .base import AccessToken, request
+from .base import AccessToken
+from .utils import request
 from ..exceptions import LarkException, RegexException
 
 
