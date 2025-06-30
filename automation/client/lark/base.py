@@ -1,9 +1,8 @@
 #coding:utf8
 """Lark Client Base Class"""
 import logging
-import requests
 
-
+from datetime import datetime
 
 from ..exceptions import LarkException
 
@@ -22,26 +21,22 @@ class AccessToken:
         """
         self.tenant_access_token = tenant_access_token
         self.app_access_token = app_access_token
-        self.expire_time = expire_time
+        self.expire_time = expire_time or datetime.min
 
 
+    @property
+    def is_valid(self):
+        """Check Token Validate"""
+        has_tokens = (
+            self.app_access_token is not None and 
+            self.tenant_access_token is not None
+        )
+
+        is_not_expired = (
+            self.expire_time is not None and 
+            datetime.now() < self.expire_time
+        )
+
+        return has_tokens and is_not_expired
 
 
-
-def request(method, url, headers, payload={}, params=None):
-    response = requests.request(method, url, headers=headers, json=payload, params=params)
-
-    resp = {}
-    if response.text[0] == '{':
-        resp = response.json()
-    else:
-        logger.info("response:\n"+response.text)
-    code = resp.get("code", -1)
-    if code == -1:
-        code = resp.get("StatusCode", -1)
-    if code == -1 and response.status_code != 200:
-         response.raise_for_status()
-    if code != 0:
-        logger.error("Error Response: {0}".format(resp.text))
-        raise LarkException(code=code, msg=resp.get("msg", ""))
-    return resp

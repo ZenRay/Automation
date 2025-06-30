@@ -4,8 +4,9 @@ import time
 from typing import List
 
 import logging
-from datetime import datetime, timedelta
 import re
+import threading
+from datetime import datetime, timedelta
 
 
 from .base import AccessToken
@@ -15,37 +16,51 @@ from ..exceptions import LarkException, RegexException
 
 logger = logging.getLogger("automation.lark.api")
 
+
+
 class LarkClient(object):
-    def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
+    _instances = {}
+    _instances_lock = threading.Lock() 
+
+    def __new__(cls, *args, **kwargs):
+        app_id = kwargs.get("app_id")
+        app_secret = kwargs.get("app_secret")
+        lark_host = kwargs.get("lark_host", "https://open.feishu.cn")
+
+        if not app_id or not app_secret:
+            raise ValueError("app_id and app_secret are required parameters")
+        
+        key = (app_id, app_secret, lark_host)
+
+
+        with cls._instances_lock:
+            if key not in cls._instances:
+                instance = super().__new__(cls)
+                instance._initialized = False
+                cls._instances[key] = instance
+            return cls._instances[key]
+
+
+    def __init__(self, *, app_id, app_secret, lark_host="https://open.feishu.cn"):
         """Init Lark Object"""
+        if self._initialized:
+            return
+
         self._host = lark_host
-        self._token = AccessToken()
         self.__app_id = app_id
         self.__app_secret = app_secret
+        self._token = AccessToken()
+        self._token_lock = threading.Lock()
+        self._initialized = True
+        logger.info(f"Lark Client Initialized for app_id: {app_id}")
 
-        logger.info("Lark Client Load Success.")
+
 
     @property
     def tenant_access_token(self):
         """Get Tenant Access Token"""
-        if self._token.tenant_access_token is None or datetime.now() >= self._token.expire_time:
-            url = self._host+"/open-apis/auth/v3/app_access_token/internal/"
-            headers = {
-                'Content-Type': 'application/json; charset=utf-8'
-            }
-            payload = {
-                'app_id': self.__app_id,
-                'app_secret': self.__app_secret
-            }
-            resp = request("POST", url, headers, payload)
-            # self._token = resp['tenant_access_token']
-            self._token = AccessToken(
-                app_access_token=resp['app_access_token'],
-                tenant_access_token=resp['tenant_access_token'],
-                expire_time=datetime.now() + timedelta(seconds=resp["expire"])
-            )
-            logger.info("Load Access Token Success.")
-
+        if not self._token.is_valid:
+            self._refresh_token()
         return self._token.tenant_access_token
 
 
@@ -53,26 +68,48 @@ class LarkClient(object):
     @property
     def app_access_token(self):
         """Get Application Access Token"""
-        if self._token.app_access_token is None or datetime.now() >= self._token.expire_time:
-            url = self._host+"/open-apis/auth/v3/app_access_token/internal/"
-            headers = {
-                'Content-Type': 'application/json; charset=utf-8'
-            }
-            payload = {
-                'app_id': self.__app_id,
-                'app_secret': self.__app_secret
-            }
-            resp = request("POST", url, headers, payload)
-            
-            self._token = AccessToken(
-                app_access_token=resp['app_access_token'],
-                tenant_access_token=resp['tenant_access_token'],
-                expire_time=datetime.now() + timedelta(seconds=resp["expire"])
-            )
-            logger.info("Load Access Token Success.")
-
+        if not self._token.is_valid:
+            self._refresh_token()
         return self._token.app_access_token
     
+
+
+    def _refresh_token(self):
+        with self._token_lock:
+            if self._token.is_valid:
+                return
+                
+            url = f"{self._host}/open-apis/auth/v3/app_access_token/internal/"
+            headers = {'Content-Type': 'application/json'}
+            payload = {'app_id': self.__app_id, 'app_secret': self.__app_secret}
+            try:
+                for attempt in range(3):
+                    try:
+                        resp = request("POST", url, headers=headers, payload=payload)
+                        if resp["code"] == 0:
+                            break
+                        else:
+                            raise LarkException(f"Error Response: {resp}")
+                    except Exception as e:
+                        if attempt == 2:
+                            raise
+                        logger.warning(f"Token refresh attempt {attempt+1} failed: {e}")
+                        time.sleep(2 ** attempt)
+
+                # adjust expire time before 120 seconds
+                expire_time = datetime.now() + timedelta(seconds=resp["expire"] - 120)
+
+                self._token = AccessToken(
+                    app_access_token=resp.get('app_access_token'),
+                    tenant_access_token=resp.get('tenant_access_token'),
+                    expire_time=expire_time
+                )
+                logger.info("Token refreshed successfully")
+
+            except Exception as e:
+                logger.error(f"Token refresh failed after 3 attempts: {e}")
+                raise LarkException("Failed to refresh access token") from e
+                
 
 
 
@@ -80,7 +117,7 @@ class LarkMultiDimTable(LarkClient):
     """Lark Multi Dimention Table Process"""
 
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
-        super().__init__(app_id, app_secret, lark_host)
+        super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         self._table_name = None
         self._app_token = None
         
@@ -427,3 +464,7 @@ class LarkMultiDimTable(LarkClient):
 
 
  
+class LarkContact(LarkClient):
+    """Lark Contact Process"""
+    def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
+        pass
