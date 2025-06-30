@@ -190,7 +190,6 @@ class LarkMultiDimTable(LarkClient):
             raise LarkException(msg="There isn't specified Table.")
 
 
-        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records"
         headers = {
             'Content-Type': 'application/json; charset=utf-8',
             'Authorization': 'Bearer '+ self.access_token,
@@ -208,8 +207,16 @@ class LarkMultiDimTable(LarkClient):
         if isinstance(kwargs.get("filter"), dict): params["filter"] = kwargs.get("filter")
         
         has_more = True
+        # if there is params, use POST method else use GET
+        if "filter" in params:
+            method = "POST"
+            url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records/search"
+        else:
+            method="GET"
+            url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records"
+
         while has_more:
-            resp = request("GET", url, headers, params=params)
+            resp = request(method, url, headers, params=params)
             yield resp
 
             # update continue boolean
