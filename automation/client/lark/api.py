@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta
 
 
-from .base import AccessToken
+from .base import AccessToken, UserAccessToken
 from .utils import request
 from ..exceptions import LarkException, RegexException
 
@@ -49,7 +49,8 @@ class LarkClient(object):
         self._host = lark_host
         self.__app_id = app_id
         self.__app_secret = app_secret
-        self._token = AccessToken()
+        self._access_token = AccessToken()
+        self._user_token = UserAccessToken()
         self._token_lock = threading.Lock()
         self._initialized = True
         logger.info(f"Lark Client Initialized for app_id: {app_id}")
@@ -59,24 +60,24 @@ class LarkClient(object):
     @property
     def tenant_access_token(self):
         """Get Tenant Access Token"""
-        if not self._token.is_valid:
-            self._refresh_token()
-        return self._token.tenant_access_token
+        if not self._access_token.is_valid:
+            self._refresh_access_token()
+        return self._access_token.tenant_access_token
 
 
 
     @property
     def app_access_token(self):
         """Get Application Access Token"""
-        if not self._token.is_valid:
-            self._refresh_token()
-        return self._token.app_access_token
+        if not self._access_token.is_valid:
+            self._refresh_access_token()
+        return self._access_token.app_access_token
     
 
 
-    def _refresh_token(self):
+    def _refresh_access_token(self):
         with self._token_lock:
-            if self._token.is_valid:
+            if self._access_token.is_valid:
                 return
                 
             url = f"{self._host}/open-apis/auth/v3/app_access_token/internal/"
@@ -89,7 +90,7 @@ class LarkClient(object):
                         if resp["code"] == 0:
                             break
                         else:
-                            raise LarkException(f"Error Response: {resp}")
+                            raise LarkException(msg=f"Error Response: {resp}")
                     except Exception as e:
                         if attempt == 2:
                             raise
@@ -99,7 +100,7 @@ class LarkClient(object):
                 # adjust expire time before 120 seconds
                 expire_time = datetime.now() + timedelta(seconds=resp["expire"] - 120)
 
-                self._token = AccessToken(
+                self._access_token = AccessToken(
                     app_access_token=resp.get('app_access_token'),
                     tenant_access_token=resp.get('tenant_access_token'),
                     expire_time=expire_time
@@ -108,7 +109,7 @@ class LarkClient(object):
 
             except Exception as e:
                 logger.error(f"Token refresh failed after 3 attempts: {e}")
-                raise LarkException("Failed to refresh access token") from e
+                raise LarkException(msg="Failed to refresh access token") from e
                 
 
 
@@ -464,7 +465,3 @@ class LarkMultiDimTable(LarkClient):
 
 
  
-class LarkContact(LarkClient):
-    """Lark Contact Process"""
-    def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
-        pass

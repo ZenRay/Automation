@@ -11,7 +11,7 @@ logger = logging.getLogger("automation.lark.base")
 
 class AccessToken:
     """Lark Access Token"""
-    def __init__(self, tenant_access_token=None, app_access_token=None, expire_time=None):
+    def __init__(self, tenant_access_token: str=None, app_access_token: str=None, expire_time: datetime=None):
         """Access Token Information
 
         Args:
@@ -38,5 +38,6 @@ class AccessToken:
         )
 
         return has_tokens and is_not_expired
+
 
 
