@@ -29,6 +29,7 @@ file = path.join(path.dirname(__file__), "_lark.ini")
 template = """[prod]
 APP_ID: {APP_ID}
 APP_SECRET: {APP_SECRET}
+USER_TOKEN_REDIRECT_URL: {USER_TOKEN_REDIRECT_URL}
 """
 
 lark = ConfigParser()
