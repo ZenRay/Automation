@@ -1,4 +1,4 @@
-#codint:utf8
+#coding:utf8
 
 import logging
 
