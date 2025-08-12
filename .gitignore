@@ -139,3 +139,58 @@ dmypy.json
 */conf/\_*.yaml
 
 *DS_Store
+
+
+*/test/bitable_calendar/*
+*/test/bitable_calendar/Dockerfile
+test/*
+automation/utils/*
+test*.py
+time_utils.py
+
+# Airflow logs and symlinks
+dispatcher/logs/
+logs/
+*.log
+**/latest
+**/symlinks/
+
+# Dispatcher specific ignores
+dispatcher/.env
+dispatcher/.env.local
+dispatcher/.env.production
+dispatcher/.env.conf
+
+# Python cache in dispatcher
+dispatcher/**/__pycache__/
+dispatcher/**/*.pyc
+dispatcher/**/*.pyo
+dispatcher/**/*.pyd
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker related
+.dockerignore
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+dispatcher/scripts/check_config.sh
+dispatcher/docs/start-docker-wsl.sh
+dispatcher/docs/fix-docker-network.sh
+dispatcher/docs/docker-compose-official.yaml
+.cursor/rules/README.md
+.cursor/rules/data-engineer.md
+dispatcher/plugins/example_plugin.py
