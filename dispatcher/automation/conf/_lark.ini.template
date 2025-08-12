@@ -1,0 +1,11 @@
+[dev]
+APP_ID=${LARK_APP_ID_DEV}
+APP_SECRET=${LARK_APP_SECRET_DEV}
+LARK_HOST=https://open.feishu.cn
+USER_TOKEN_REDIRECT_URL=http://localhost:8000/callback
+
+[prod]
+APP_ID=${LARK_APP_ID_PROD}
+APP_SECRET=${LARK_APP_SECRET_PROD}
+LARK_HOST=https://open.feishu.cn
+USER_TOKEN_REDIRECT_URL=https://open.feishu.cn/oauth/callback

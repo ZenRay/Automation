@@ -1,0 +1,176 @@
+x-airflow-common:
+  &airflow-common
+  image: dispatcher-airflow:latest
+  env_file:
+    - .env
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: mysql+pymysql://airflow:airflow@mysql:3306/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+mysql://airflow:airflow@mysql:3306/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: 'Asia/Shanghai'
+    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/dags'
+    AIRFLOW__CORE__PLUGINS_FOLDER: '/opt/airflow/plugins'
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: '/opt/airflow/logs'
+    AIRFLOW__LOGGING__LOGGING_LEVEL: 'INFO'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__WEBSERVER__RBAC: 'true'
+    AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Shanghai'
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./requirements.txt:/requirements.txt
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks:
+    - airflow-network
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-airflow}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-airflow}
+      MYSQL_USER: ${MYSQL_USER:-airflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-airflow}
+    volumes:
+      - mysql-db-volume:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    restart: always
+    networks:
+      - airflow-network
+
+  redis:
+    image: redis:latest
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
+    networks:
+      - airflow-network
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: ["webserver"]
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["scheduler"]
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-worker:
+    <<: *airflow-common
+    command: ["celery", "worker"]
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW__CELERY__WORKER_CONCURRENCY: 16
+      AIRFLOW__CELERY__WORKER_PREFETCH_MULTIPLIER: 1
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: ["triggerer"]
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    command: bash -c "sleep 10 && airflow db init && airflow users create --username ${_AIRFLOW_WWW_USER_USERNAME:-admin} --firstname Admin --lastname User --email admin@example.com --role Admin --password ${_AIRFLOW_WWW_USER_PASSWORD:-admin}"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+
+  flower:
+    <<: *airflow-common
+    command: ["celery", "flower"]
+    ports:
+      - "5555:5555"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+networks:
+  airflow-network:
+    driver: bridge
+
+volumes:
+  mysql-db-volume: 
