@@ -1,0 +1,11 @@
+[prod]
+access_id: ${MAXCOMPUTE_ACCESS_ID}
+secret_access_key: ${MAXCOMPUTE_SECRET_ACCESS_KEY}
+project: ${MAXCOMPUTE_PROJECT_PROD}
+endpoint: ${MAXCOMPUTE_ENDPOINT}
+
+[dev]
+access_id: ${MAXCOMPUTE_ACCESS_ID}
+secret_access_key: ${MAXCOMPUTE_SECRET_ACCESS_KEY}
+project: ${MAXCOMPUTE_PROJECT_DEV}
+endpoint: ${MAXCOMPUTE_ENDPOINT}
