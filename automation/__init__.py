@@ -35,6 +35,7 @@ hints = {
     "odps.odtimizer.dynamic.filter.dpp.enable": True,
     "odps.odtimizer.enable.dynamic.filter": True,
     "odps.sql.python.version": "cp37",
+    "fallback_policy": "default"
 }
 
 
