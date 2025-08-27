@@ -85,23 +85,23 @@ WITH base AS(
         ,t1.mall_id -- '商城id'
 
         ,MIN(IF(
-            t1.dt BETWEEN DATEADD(t2.dates, BIGINT("${start_offset}"), "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3 "dd")
                 AND t2.dates, t1.dt, NULL
         )) AS earliest_ordered_date -- '最早下单日期'
         ,MAX(IF(
-            t1.dt BETWEEN DATEADD(t2.dates, BIGINT("${start_offset}"), "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3, "dd")
                 AND t2.dates, t1.dt, NULL
         )) AS latest_ordered_date -- '最近下单日期'
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(t2.dates, BIGINT("${start_offset}"), "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3, "dd")
                 AND t2.dates, t1.dt, NULL
         )) AS ordered_cnt -- '总下单次数'
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(t2.dates, BIGINT("${start_offset}"), "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3, "dd")
                 AND t2.dates, t1.ordered_goods_amt, NULL
         )) AS ordered_goods_amt -- '总下单金额'
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(t2.dates, BIGINT("${start_offset}"), "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3, "dd")
                 AND t2.dates, t1.deliveried_goods_amt, NULL
         )) AS delivered_goods_amt -- '总送货金额'
         ,COUNT(DISTINCT IF(
@@ -123,7 +123,7 @@ WITH base AS(
                 AND t2.dates
     WHERE t2.dates BETWEEN DATEADD(CURRENT_DATE(), -3, "dd")
             AND DATEADD(CURRENT_DATE(), 0, "dd")
-        AND t1.dt BETWEEN DATEADD(TO_DATE("${dt}"), -60 + BIGINT("${start_offset}"), "dd")
+        AND t1.dt BETWEEN DATEADD(CURRENT_DATE(), -60 + -3, "dd")
             AND DATEADD(CURRENT_DATE(), 0, "dd")
         AND t1.status <> "CANCEL"
 
@@ -172,7 +172,7 @@ WITH base AS(
 
 
 
-    WHERE t1.dt = DATEADD(TO_DATE("${dt}"), BIGINT("${start_offset}") - 1, "dd")
+    WHERE t1.dt = DATEADD(TO_DATE("${dt}"), -3 - 1, "dd")
 )
 
 
