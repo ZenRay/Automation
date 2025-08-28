@@ -4,7 +4,10 @@ import logging
 
 
 from automation.conf import maxcomputer, lark
-from automation.client import MaxComputerClient, LarkClient, LarkMultiDimTable
+from automation.client import (
+    MaxComputerClient, LarkClient, LarkMultiDimTable
+    ,LarkSheets
+)
 conf = {
     "access_id": maxcomputer.get("dev", "access_id"),
     "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
@@ -39,8 +42,14 @@ hints = {
 }
 
 
-lark_multi_table_client = LarkMultiDimTable(
-    app_id=lark.get("prod", "APP_ID")
-    ,app_secret=lark.get("prod", "APP_SECRET")
-    ,lark_host=lark.get("prod", "LARK_HOST")
+# lark_multi_table_client = LarkMultiDimTable(
+#     app_id=lark.get("prod", "APP_ID")
+#     ,app_secret=lark.get("prod", "APP_SECRET")
+#     ,lark_host=lark.get("prod", "LARK_HOST")
+# )
+
+lark_sheets = LarkSheets(
+    app_id=lark.get("dev", "APP_ID")
+    ,app_secret=lark.get("dev", "APP_SECRET")
+    ,lark_host=lark.get("dev", "LARK_HOST")
 )
