@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 
 from .base import AccessToken
-from .utils import request
+from .utils import request, data_generator, parse_sheet_cell
 from ..exceptions import LarkException, RegexException
 
 
@@ -468,19 +468,76 @@ class LarkMultiDimTable(LarkClient):
 class LarkSheets(LarkClient):
     """Lark Sheets Process"""
 
+    # Sheet Value Update Limition
+    _UPDATE_ROW_LIMITION = 5000
+    _UPDATE_COL_LIMITION = 100
+    
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         self._spread_sheet_token = None
         self._sheet_id = None
         self._app_type = None
         self._regex_pattern = re.compile(r"http.*/(?P<app_type>sheets|wiki)/(?P<token>[a-zA-Z0-9_-]+)(?:\?sheet=(?P<sheet_id>[a-zA-Z0-9_-]+))?", re.I)
+        
+        self._sheets_mapping = {}
     
     @property
     def access_token(self):
         """Tenant Access Token"""
         return super().tenant_access_token
     
-    def extract_sheet_info(self, url: str):
+    
+    @property
+    def sheets_mapping(self):
+        """Sheet Information
+        
+        Mapping about Sheet title and sheet id:
+            * SpreadSheet: <spread_sheet_token>
+            * <Sheet Name>: <Sheet Id>
+        """
+        if len(self._spread_sheet_token) == 0:
+            raise LarkException(
+                "Spreadsheet token is required to get sheets mapping"
+                    "Use obj.extract_spreadsheet_info(url) to extract it from the URL"
+            )
+        # check whether SpreadSheet mapping exists, 
+        if not self._sheets_mapping.get("SpreadSheet"):
+            self._sheets_mapping["SpreadSheet"] = self._spread_sheet_token
+            
+            for sheet in self.get_sheets():
+                self._sheets_mapping[sheet["title"]] = sheet["sheet_id"]
+            
+        return self._sheets_mapping
+    
+    
+    @property
+    def spread_sheet(self):
+        """Spread Sheet Token"""
+        if not self._spread_sheet_token:
+            raise LarkException(
+                "Must call extract_spreadsheet_info(url) first"
+                    " or Set spread_sheet value"
+            )
+
+        return self._spread_sheet_token
+
+    @spread_sheet.setter
+    def spread_sheet(self, value):
+        """Set Spread Sheet Token
+        
+        Pass URL or Spread Sheet Token, if get url then extract spread sheet
+        token. Otherwise set the value
+        """
+        if value.startswith("http"):
+            self.extract_spreadsheet_info(value)
+        else:
+            self._spread_sheet_token = value
+            
+        logger.info(f"Update Spread Sheet Token: {self._spread_sheet_token} Success.")
+        
+        
+
+    def extract_spreadsheet_info(self, url: str):
         """Extract Sheet Meta Information from URL
         
         Args:
@@ -503,18 +560,18 @@ class LarkSheets(LarkClient):
             'Authorization': 'Bearer '+ self.access_token,
         }
 
-        # 获取应用类型
+        # extract app type and token
         self._app_type = match.group("app_type")
         token = match.group("token")
-        
-        # 针对不同类型文档的处理方式
+
+        # extract sheet id
         if self._app_type == "sheets":
-            # 直接使用 URL 中的 token 作为电子表格 token
+            # extract sheet token
             self._spread_sheet_token = token
             self._sheet_id = match.group("sheet_id")
             
         elif self._app_type == "wiki":
-            # 获取知识库节点信息
+            # extract token if app_type is wiki
             wiki_token = token
             node_url = f"{self._host}/open-apis/wiki/v2/spaces/get_node"
             params = {
@@ -523,7 +580,6 @@ class LarkSheets(LarkClient):
             }
             resp = request("GET", node_url, headers, params=params)
             
-            # 从知识库节点提取电子表格 token
             if resp.get("code", -1) == 0:
                 obj_token = resp.get("data", {}).get("node", {}).get("obj_token")
                 if obj_token:
@@ -541,6 +597,7 @@ class LarkSheets(LarkClient):
         
         logger.info(f"Extracted spreadsheet token: {self._spread_sheet_token}, sheet id: {self._sheet_id}, app type: {self._app_type}")
         return self._spread_sheet_token, self._sheet_id
+    
     
     def get_spreadsheet_meta(self, spreadsheet_token: str = None):
         """Get Spreadsheet Metadata
@@ -652,7 +709,7 @@ class LarkSheets(LarkClient):
     
     
     def update_sheet_values(self, range_str: str, values: List[List], spreadsheet_token: str = None, 
-                           sheet_id: str = None, value_input_option: str = "raw"):
+                        sheet_id: str = None, value_input_option: str = "raw"):
         """Update Values in a Sheet
         
         Args:
@@ -701,7 +758,6 @@ class LarkSheets(LarkClient):
         else:
             logger.error(f"Update sheet values failed: {resp}")
             raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Update sheet values failed"))
-    
     
     
     def append_sheet_values(self, range_str: str, values: List[List], spreadsheet_token: str = None,
@@ -753,8 +809,8 @@ class LarkSheets(LarkClient):
         else:
             logger.error(f"Append sheet values failed: {resp}")
             raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Append sheet values failed"))
-    
-    
+
+
     # TODO: ADD SHEET
     def add_sheet(self, properties: dict, spreadsheet_token: str = None):
         """Add a New Sheet to a Spreadsheet
@@ -899,17 +955,9 @@ class LarkSheets(LarkClient):
                     start_cell, end_cell = cell_range.split(":")
                     
                     # 提取结束单元格的行号和列号
-                    import re
-                    col_pattern = re.compile(r'[A-Z]+')
-                    row_pattern = re.compile(r'\d+')
-                    
-                    start_col_match = col_pattern.search(start_cell)
-                    start_row_match = row_pattern.search(start_cell)
-                    end_col_match = col_pattern.search(end_cell)
-                    end_row_match = row_pattern.search(end_cell)
-                    
-                    if not (start_col_match and start_row_match and end_col_match and end_row_match):
-                        raise ValueError(f"Cannot parse cell references: {cell_range}")
+
+                    start_col_match, start_row_match = parse_sheet_cell(start_cell)
+                    end_col_match, end_row_match = parse_sheet_cell(end_cell)
                     
                     # 计算需要清除的行数和列数
                     def col_to_num(col):
@@ -972,3 +1020,6 @@ class LarkSheets(LarkClient):
                 raise
             logger.error(f"Error clearing sheet values: {str(e)}")
             raise LarkException(msg=f"Failed to clear sheet values: {str(e)}")
+        
+    
+    
