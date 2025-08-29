@@ -13,3 +13,12 @@ class LarkException(Exception):
 
     def __str__(self) -> str:
         return "{}:{}".format(self.code, self.msg)
+
+        
+        
+class LarkSheetException(Exception):
+    def __init__(self, msg=None):
+        self.msg = msg
+
+    def __str__(self) -> str:
+        return "{}".format(self.msg)

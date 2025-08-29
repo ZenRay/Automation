@@ -811,6 +811,85 @@ class LarkSheets(LarkClient):
             raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Append sheet values failed"))
 
 
+    def batchupdate_values_single_sheet(self, datas:List[List], sheet_range:str,
+                spreadsheet_token: str=None, *, sheet_title: str = None, sheet_id: str = None, 
+                value_input_option: str = "raw"):
+        """Batch Update Values in a Sheet
+        
+        Args:
+        ------------
+        datas: List[List], 2D array of values to update
+        date_range: str, date range to update (e.g. "A1:B2")
+        """
+        token = spreadsheet_token or self._spread_sheet_token
+        if not token:
+            raise LarkSheetException(msg="Spreadsheet token is required")
+
+        # Parse Sheet ID
+        if sheet_title is not None:
+            sheet_id = self.sheets_mapping.get(sheet_title)
+        
+        sheet_id = sheet_id or self._sheet_id
+
+        if sheet_id is None:
+            raise LarkSheetException(
+                "Sheet ID is required, but missing sheet title or sheet_id"
+            )
+        
+        
+        # Prepare Request
+        url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/values_batch_update"
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': f'Bearer {self.access_token}',
+        }
+
+        # TODO: Right now just push under the number of column limition, there
+        # should do the number of row limitation as well
+        if len(data[0]) > self._UPDATE_COL_LIMITION:
+            raise LarkSheetException("Column limit exceeded")
+        
+        # Parse Column and Row
+        if "!" in data_range:
+            _, data_range = data_range.split("!")
+            
+        if ":" in data_range:
+            start_cell, end_cell = data_range.split(":")
+        else:
+            start_cell = data_range
+        
+        start_col, start_row = parse_sheet_cell(start_cell)
+        last_offset_row = 0
+        for index, item in enumerate(data_generator(datas, self._UPDATE_ROW_LIMITION)):
+            # adjust cell
+            start_cell = offset_sheet_cell(
+                start_cell, offset_row=last_offset_row, offset_col=0
+            )
+            end_cell = offset_sheet_cell(
+                start_cell, offset_row=len(item) * index, offset_col=len(item[0])
+            )
+            data_range = f"{start_cell}:{end_cell}"
+            
+            # update last_offset_row
+            last_offset_row += len(item)
+            payload = {
+                'valueRanges': [{
+                        'range': f"{sheet_id}!{data_range}",
+                        'values': item
+                }],
+                'valueInputOption': value_input_option
+            }
+
+            resp = request("POST", url, headers, payload=payload)
+
+            if resp.get("code", -1) == 0:
+                logger.info(f"Batch update sheet values success for range: {data_range}")
+                return resp.get("data", {})
+            else:
+                logger.error(f"Batch update sheet values failed: {resp}")
+                raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Batch update sheet values failed"))
+
+
     # TODO: ADD SHEET
     def add_sheet(self, properties: dict, spreadsheet_token: str = None):
         """Add a New Sheet to a Spreadsheet
@@ -955,7 +1034,6 @@ class LarkSheets(LarkClient):
                     start_cell, end_cell = cell_range.split(":")
                     
                     # 提取结束单元格的行号和列号
-
                     start_col_match, start_row_match = parse_sheet_cell(start_cell)
                     end_col_match, end_row_match = parse_sheet_cell(end_cell)
                     
