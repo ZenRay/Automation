@@ -3,4 +3,4 @@
 
 from .multidimention_table import LarkMultiDimTable
 
-from .spread_sheet import LarkSheets
+from .spreadsheet import LarkSheets
