@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 
 from .token import AccessToken
-from ..utils import request, data_generator, parse_sheet_cell
+from ..utils import request
 from ..exceptions import LarkException, RegexException
 
 

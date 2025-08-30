@@ -4,7 +4,7 @@ import logging
 import string
 
 
-from ..exceptions import LarkException, LarkSheetException
+from ..exceptions import LarkException
 
 
 logger = logging.getLogger("automation.lark.utils.lark_request")

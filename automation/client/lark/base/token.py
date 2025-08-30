@@ -10,7 +10,7 @@ from enum import Enum
 
 from ..exceptions import LarkException
 
-logger = logging.getLogger("automation.lark.base")
+logger = logging.getLogger("automation.lark.base.token")
 
 
 class TokenStatus(Enum):

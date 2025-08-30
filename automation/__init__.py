@@ -42,11 +42,11 @@ hints = {
 }
 
 
-# lark_multi_table_client = LarkMultiDimTable(
-#     app_id=lark.get("prod", "APP_ID")
-#     ,app_secret=lark.get("prod", "APP_SECRET")
-#     ,lark_host=lark.get("prod", "LARK_HOST")
-# )
+lark_multi_table_client = LarkMultiDimTable(
+    app_id=lark.get("prod", "APP_ID")
+    ,app_secret=lark.get("prod", "APP_SECRET")
+    ,lark_host=lark.get("prod", "LARK_HOST")
+)
 
 lark_sheets = LarkSheets(
     app_id=lark.get("dev", "APP_ID")
