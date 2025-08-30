@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from ..utils.lark_request import request
 from ..base import AccessToken, LarkClient
-from ..base.exceptions import LarkException, RegexException
+from ..exceptions import LarkException, RegexException
 
 
 logger = logging.getLogger("automation.lark.api.multidimention_table")
