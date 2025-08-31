@@ -11,8 +11,11 @@ logger = logging.getLogger("automation.lark.utils.lark_request")
 
 
 
-def request(method, url, headers, payload={}, params=None):
+def request(method, url, headers, payload={}, params=None, refresh_client=None):
     """Lark API Request"""
+    # Refresh Access Token if needed
+    if refresh_client and hasattr(refresh_client, "_refresh_access_token") and callable(getattr(refresh_client, "_refresh_access_token")):
+        refresh_client._refresh_access_token()
     response = requests.request(method, url, headers=headers, json=payload, params=params)
 
     resp = {}
