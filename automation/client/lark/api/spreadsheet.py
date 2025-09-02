@@ -182,9 +182,7 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with spreadsheet metadata
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/metainfo"
         headers = {
@@ -244,9 +242,7 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with values in the specified range
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         # Extract real sheet_id and concate sheet id and range info
         # Update url
@@ -294,10 +290,8 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with update result
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
+        token = self._check_spreadsheet_token(spreadsheet_token)
         sheet_id = sheet_id or self._active_sheet_id
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
         
         if not sheet_id:
             raise LarkException(msg="Sheet ID is required for updating values")
@@ -349,9 +343,7 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with append result
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/values_append"
         headers = {
@@ -391,9 +383,7 @@ class LarkSheets(LarkClient):
         datas: List[List], 2D array of values to update
         date_range: str, date range to update (e.g. "A1:B2")
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkSheetException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
 
         # Parse Sheet ID
         if sheet_id is not None:
@@ -467,9 +457,7 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with new sheet info
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         if not properties.get('title'):
             raise LarkException(msg="Sheet title is required")
@@ -513,9 +501,7 @@ class LarkSheets(LarkClient):
         -----------------
         Dict with operation result
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         if not sheet_id:
             raise LarkException(msg="Sheet ID is required")
@@ -569,9 +555,7 @@ class LarkSheets(LarkClient):
         -----------------
         sheets:spreadsheet or sheets:spreadsheet:write
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         # Handle single range or multiple ranges
         ranges = range_str if isinstance(range_str, list) else [range_str]
@@ -711,6 +695,78 @@ class LarkSheets(LarkClient):
                 
                 time.sleep(2)
 
+    def update_single_range_style(self,  range_str: str, format_style:dict, spreadsheet_token:str = None, sheet_id:str=None):
+        """Update Single Range Style
+        
+        Update cell style in single range. Request format style like, 'style' is the argument `format_style`:
+        {
+        "appendStyle":{
+            "range": "1QXD0s!A3:C4",
+            "style":{
+                "font":{
+                    "bold":true,
+                    "italic":true,
+                    "fontSize":"10pt/1.5",
+                    "clean":false  
+                    },    
+                "textDecoration":0,
+                "formatter":"",
+                "hAlign": 0 , 
+                "vAlign":0,   
+                "foreColor":"#000000",
+                "backColor":"#21d11f",
+                "borderType":"FULL_BORDER",
+                "borderColor": "#ff0000",
+                "clean": false 
+                }
+            }
+        }
+        
+        Reference: https://open.feishu.cn/document/server-docs/docs/sheets-v3/data-operation/set-cell-style
+        
+        Args:
+        --------------
+        range_str, str: The A1 notation range to update.
+        format_style, dict: The style to apply to the range.
+        spreadsheet_token, str: The token of the spreadsheet.
+        sheet_id, str: The ID of the sheet or the title of sheet
+        """
+
+        token = self._check_spreadsheet_token(spreadsheet_token)
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': f'Bearer {self.access_token}',
+        }
+
+        url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/style"
+        range_str = self._update_data_range(range_str, sheet_id=sheet_id)
+        payload = {
+            "appendStyle":{
+                "range": range_str,
+                "style":format_style
+                }
+        }
+        
+        try:
+            resp = request("PUT", url, headers, payload=payload, refresh_client=self)
+            
+            if resp.get("code", -1) == 0:
+                logger.info(f"Update Style Success at: {range_str}")
+
+            else:
+                error_code = resp.get("code", -1)
+                error_msg = resp.get("msg", f"Update Range('{range_str}') Style failed")
+
+                logger.error(f"Update sheet style failed: {resp}")
+                raise LarkException(code=error_code, msg=error_msg)
+
+        except Exception as e:
+            logger.error(f"Error updating sheet style: {str(e)}")
+            if isinstance(e, LarkException):
+                raise
+            raise LarkException(msg=f"Failed to update sheet style: {str(e)}")
+
 
     def _update_data_range(self, range_str: str, sheet_id: str=None, update_sheet_method: str="old"):
         """Update Data Range
@@ -766,9 +822,7 @@ class LarkSheets(LarkClient):
         -----------------
         List of sheets in the spreadsheet
         """
-        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
-        if not token:
-            raise LarkException(msg="Spreadsheet token is required")
+        token = self._check_spreadsheet_token(spreadsheet_token)
         
         url = f"{self._host}/open-apis/sheets/v3/spreadsheets/{token}/sheets/query"
         headers = {
@@ -816,6 +870,14 @@ class LarkSheets(LarkClient):
         sheet = self._spread_sheet.get_sheet_by_id(sheet_id) or self._spread_sheet.get_sheet_by_title(sheet_id)
         
         return sheet is not None
+    
+    def _check_spreadsheet_token(self, spreadsheet_token):
+        """Check SpreadSheet Token Exists"""
+        token = spreadsheet_token or self._spread_sheet.spreadsheet_token
+        
+        if not token:
+            raise LarkException(msg="Spreadsheet token is required")
+        return token
     
 
     def get_sheet_id(self, sheet_id: str):
