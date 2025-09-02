@@ -31,8 +31,8 @@ class LarkSheets(LarkClient):
     """Lark Sheets Process"""
 
     # Sheet Value Update Limition
-    _UPDATE_ROW_LIMITION = 5000
-    _UPDATE_COL_LIMITION = 100
+    _UPDATE_ROW_LIMITATION = 5000
+    _UPDATE_COL_LIMITATION = 100
     
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn", url=None):
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
@@ -106,7 +106,7 @@ class LarkSheets(LarkClient):
         logger.info(f"Update Spread Sheet Token: {self._spread_sheet.spreadsheet_token} Success.")
         
         
-    # FIX
+    
     def extract_spreadsheet_info(self, url: str):
         """Extract Sheet Meta Information from URL
         
@@ -170,7 +170,7 @@ class LarkSheets(LarkClient):
         logger.info(f"Extracted spreadsheet token: {self._spread_sheet.spreadsheet_token}, sheet id: {self._active_sheet_id}, app type: {self._app_type}")
         return self._spread_sheet.spreadsheet_token, self._active_sheet_id
     
-    # FIXIT
+    
     def extract_spreadsheet_meta(self, spreadsheet_token: str = None):
         """Get Spreadsheet Metadata
         
@@ -220,7 +220,7 @@ class LarkSheets(LarkClient):
 
     
     
-    # Fixed
+
     def read_sheet_values(self, range_str: str, spreadsheet_token: str = None, sheet_id: str = None, 
             value_render_option: SheetValueRenderOption = SheetValueRenderOption.FORMATTED_VALUE, 
             date_time_render_option: SheetDateTimeRenderOption = SheetDateTimeRenderOption.FORMATTED_STRING):
@@ -277,7 +277,7 @@ class LarkSheets(LarkClient):
             raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Read sheet values failed"))
     
     
-    # Fixed
+    
     def update_sheet_values(self, range_str: str, values: List[List], spreadsheet_token: str = None, 
                         sheet_id: str = None):
         """Update Values in a Sheet
@@ -397,7 +397,7 @@ class LarkSheets(LarkClient):
 
         # Parse Sheet ID
         if sheet_id is not None:
-            sheet = self.get_sheet_id(sheet_id)
+            sheet_id = self.get_sheet_id(sheet_id)
                 
         
         # Prepare Request
@@ -414,7 +414,7 @@ class LarkSheets(LarkClient):
             )
             # TODO: Right now just push under the number of column limition, there
             # should do the number of row limitation as well
-            if len(datas[0]) > self._UPDATE_COL_LIMITION:
+            if len(datas[0]) > self._UPDATE_COL_LIMITATION:
                 raise LarkSheetException("Column limit exceeded")
             
             
@@ -423,7 +423,7 @@ class LarkSheets(LarkClient):
             # init last_offset_row
             last_offset_row = 0
 
-            for index, item in enumerate(data_generator(datas, self._UPDATE_ROW_LIMITION)):
+            for index, item in enumerate(data_generator(datas, self._UPDATE_ROW_LIMITATION)):
                 # adjust cell
                 start_cell = offset_sheet_cell(
                     f"{start_col}{start_row}", offset_row=last_offset_row, offset_col=0
@@ -444,7 +444,7 @@ class LarkSheets(LarkClient):
                     'valueInputOption': value_input_option
                 }
 
-                resp = request("POST", url, headers, payload=payload)
+                resp = request("POST", url, headers, payload=payload, refresh_client=self)
 
                 if resp.get("code", -1) == 0:
                     logger.debug(f"Batch update sheet values success for range: {data_range}")
@@ -454,7 +454,7 @@ class LarkSheets(LarkClient):
                     raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Batch update sheet values failed"))
             logger.info(f"Batch update values success!")
 
-    # Fixed
+    
     def add_sheet(self, properties: dict, spreadsheet_token: str = None):
         """Add a New Sheet to a Spreadsheet
         
@@ -500,7 +500,7 @@ class LarkSheets(LarkClient):
             raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Add sheet failed"))
 
 
-    # FIXIT
+    
     def delete_sheet(self, sheet_id: str, spreadsheet_token: str = None):
         """Delete a Sheet from a Spreadsheet
         
@@ -550,7 +550,7 @@ class LarkSheets(LarkClient):
             raise LarkSheetException(msg=f"Sheet with ID '{raw_sheet_id}' does not exist")
 
 
-    # FIXIT
+    
     def clear_sheet_values(self, range_str, spreadsheet_token: str = None, sheet_id: str = None):
         """Clear Values in a Sheet Range or multiple ranges
         
@@ -578,16 +578,16 @@ class LarkSheets(LarkClient):
         
         # Build range string list (all ranges must already contain sheet identifiers)
         processed_ranges = ranges
-        # Use values_batch_update API to clear data by setting empty values
-        url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/values_batch_update"
+
         headers = {
             'Content-Type': 'application/json; charset=utf-8',
             'Authorization': f'Bearer {self.access_token}',
         }
-        
+
         # Create empty value arrays for each range
-        value_ranges = []
-        
+        less_row_limitation_ranges = []
+        over_row_limitation_ranges = []
+        total_row_records = 1
         for range_str in processed_ranges:
             range_str = self._update_data_range(range_str, sheet_id=sheet_id)
             try:
@@ -603,7 +603,6 @@ class LarkSheets(LarkClient):
                     start_col, start_row = parse_sheet_cell(start_cell)
                     end_col, end_row = parse_sheet_cell(end_cell)
                     
-                    # Use utility function to convert column letters to numeric indices
                     start_col_num = parse_column2index(start_col)
                     end_col_num = parse_column2index(end_col)
                     
@@ -627,55 +626,92 @@ class LarkSheets(LarkClient):
                             time.sleep(2)
                             if len(current_col_data) > rows:
                                 rows = len(current_col_data)
-                        
-                    # Create empty value array
+                    
+                                total_row_records = rows
+                    # # Create empty value array
                     empty_values = [[None for _ in range(cols)] for _ in range(rows)]
-                        
+                
                 else:
-                    # If it's just a single cell, create a 1x1 empty array
-                    empty_values = [['']]
-                
-                value_ranges.append({
-                    'range': range_str,
-                    'values': empty_values
-                })
-                
+                    # check total_rows
+                    sheet_and_range = range_str.split("!")
+                    cell = sheet_and_range[-1]
+                    _, total_row_records = parse_sheet_cell(cell)
+                    empty_values = [[None]]
+                    
+                    start_cell, end_cell = cell_range.split(":")
+                    start_col, start_row = parse_sheet_cell(start_cell)
+                    end_col, end_row = parse_sheet_cell(end_cell)
+
+                    cols = end_col - start_col + 1
+                    rows = end_row - start_row + 1
+                    if not re.search(r"\d", cell):
+                        current_col_data = self.read_sheet_values(
+                            f"{sheet_id}!{cell}"
+                        ).get("valueRange", {}).get("values", [])
+                        time.sleep(2)
+                        if len(current_col_data) > rows:
+                            rows = len(current_col_data)
+                            total_row_records = rows
+                            
+                    empty_values = [[None for _ in range(cols)] for _ in range(rows)]
+
+                # divide the datas by ROW LIMITATION
+                if total_row_records < self._UPDATE_ROW_LIMITATION:
+                    less_row_limitation_ranges.append({
+                        'range': range_str,
+                        'values': empty_values
+                    })
+                else:
+                    over_row_limitation_ranges.append({
+                        'range': range_str,
+                        'values': empty_values
+                    })
             except Exception as e:
                 logger.error(f"Error processing range {range_str}: {str(e)}")
                 raise LarkException(msg=f"Failed to process range {range_str}: {str(e)}")
         
-        payload = {
-            'valueRanges': value_ranges,
-            'valueInputOption': 'RAW'
-        }
-        
-        try:
-            resp = request("POST", url, headers, payload=payload)
+        if len(less_row_limitation_ranges) > 0:
+            # Use values_batch_update API to clear data by setting empty values
+            url = f"{self._host}/open-apis/sheets/v2/spreadsheets/{token}/values_batch_update"
             
-            if resp.get("code", -1) == 0:
-                ranges_str = ", ".join(processed_ranges)
-                logger.info(f"Clear sheet values success for ranges: {ranges_str}")
-                return resp.get("data", {})
-            else:
-                error_code = resp.get("code", -1)
-                error_msg = resp.get("msg", "Clear sheet values failed")
+            payload = {
+                'valueRanges': less_row_limitation_ranges,
+                'valueInputOption': 'RAW'
+            }
+            
+            try:
+                resp = request("POST", url, headers, payload=payload, refresh_client=self)
                 
-                # Handle permission-related error codes
-                if error_code == 11403:
-                    logger.error("Permission denied: The application lacks necessary permissions (sheets:spreadsheet:write)")
-                    raise LarkException(code=error_code, msg="Application lacks required permissions: sheets:spreadsheet:write")
-                elif error_code == 11412:
-                    logger.error("Access denied: The application doesn't have permission to access this spreadsheet")
-                    raise LarkException(code=error_code, msg="No permission to access or modify this spreadsheet")
+                if resp.get("code", -1) == 0:
+                    ranges_str = ", ".join(processed_ranges)
+                    logger.info(f"Clear sheet values success for ranges: {ranges_str}")
+                    
+                    if len(over_row_limitation_ranges) == 0:
+                        return None
+                    #     return resp.get("data", {})
                 else:
+                    error_code = resp.get("code", -1)
+                    error_msg = resp.get("msg", "Clear sheet values failed")
+                    
                     logger.error(f"Clear sheet values failed: {resp}")
                     raise LarkException(code=error_code, msg=error_msg)
-        except Exception as e:
-            if isinstance(e, LarkException):
-                raise
-            logger.error(f"Error clearing sheet values: {str(e)}")
-            raise LarkException(msg=f"Failed to clear sheet values: {str(e)}")
+
+            except Exception as e:
+                logger.error(f"Error clearing sheet values: {str(e)}")
+                if isinstance(e, LarkException):
+                    raise
+                raise LarkException(msg=f"Failed to clear sheet values: {str(e)}")
         
+        if len(over_row_limitation_ranges) > 0:
+            
+            for range_info in over_row_limitation_ranges:
+                self.batchupdate_values_single_sheet(
+                    range_info["values"], data_range=range_info["range"], sheet_id=sheet_id
+                )
+                
+                time.sleep(2)
+
+
     def _update_data_range(self, range_str: str, sheet_id: str=None, update_sheet_method: str="old"):
         """Update Data Range
         
