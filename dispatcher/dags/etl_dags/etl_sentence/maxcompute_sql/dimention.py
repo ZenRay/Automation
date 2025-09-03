@@ -77,6 +77,7 @@ WHERE t1.dt BETWEEN DATEADD(CURRENT_DATE(), -2, "dd")
 
 
 dim_store_history_trade_temp = """
+
 WITH base AS(
 
     SELECT /*+ MAPJOIN(t2) */
@@ -85,7 +86,7 @@ WITH base AS(
         ,t1.mall_id -- '商城id'
 
         ,MIN(IF(
-            t1.dt BETWEEN DATEADD(t2.dates, -3 "dd")
+            t1.dt BETWEEN DATEADD(t2.dates, -3, "dd")
                 AND t2.dates, t1.dt, NULL
         )) AS earliest_ordered_date -- '最早下单日期'
         ,MAX(IF(
@@ -172,7 +173,7 @@ WITH base AS(
 
 
 
-    WHERE t1.dt = DATEADD(TO_DATE("${dt}"), -3 - 1, "dd")
+    WHERE t1.dt = DATEADD(CURRENT_DATE(), -3 - 1, "dd")
 )
 
 
