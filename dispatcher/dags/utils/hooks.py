@@ -73,18 +73,19 @@ class MaxcomputeHook(BaseHook):
     def execute_sql(self, sql: str, *, hints: dict, file: str=None) -> None:
         """Execute SQL statement on MaxCompute
         
+        If file is provided, save the results to the file.
+        
         Args:
             sql: SQL statement to execute
             hints: Optional execution hints
-            
+            file: Optional file path to save results
         """
         
         self.client.execute_sql(sql, hints=hints)
         logger.info("SQL execution completed.")
         
-        # TODO: Implement file handling if needed
-        # if file is not None:
-        #     self.client
+        if file is not None:
+            self.client.execute_to_save(sql, file, hints=hints)
         
     
     
