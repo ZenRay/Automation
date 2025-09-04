@@ -197,3 +197,5 @@ dispatcher/plugins/example_plugin.py
 dispatcher/mysql_backup.tar.gz
 dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/dimension/*.py
 dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/fact/*.py
+
+trash/
