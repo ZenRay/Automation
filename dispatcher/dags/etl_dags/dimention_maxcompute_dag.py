@@ -31,11 +31,16 @@ if etl_sentence_path not in sys.path:
 
 logger = logging.getLogger("dispatcher.dags.etl_dags")
 
-# 导入etl_sentence模块中的SQL语句
-from etl_sentence.maxcompute_sql.dimention import (
-    dim_changsha_goods_property_sentence, 
-    dim_changsha_store_daily_full,
-    dim_store_history_trade_temp
+
+# 导入SQL语句
+from etl_sentence.maxcompute_sql import (
+    dim_sku_store_tags_sentence,
+    dim_store_sentence,
+    dim_store_history_trade_temp_sentence,
+    dim_goods_sentence,
+    dim_changsha_goods_property_sentence,
+    fact_flow_sentence,
+    fact_trade_sentence
 )
 
 
@@ -59,7 +64,7 @@ hints = {
 DAG_CONFIG = {
     'dag_id': 'dimention_maxcompute_dag',
     'description': 'MaxCompute维度表ETL任务 - 包含商品属性、店铺日度、历史交易等维度表',
-    'schedule_interval': '0 2 * * *',  # 每天凌晨2点执行
+    'schedule_interval': '30 9 * * *',  # 每天0930执行
     'start_date': datetime(2025, 1, 1),
     'catchup': False,
     'tags': ['maxcompute', 'dimension', 'etl', 'changsha'],
@@ -85,7 +90,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="标记ETL任务开始"
     )
     
-    # 任务2: 执行维度表ETL
+    # 任务2: 商品属性表
     dim_changsha_goods_property_task = MaxcomputeOperator(
         task_id='dim_changsha_goods_property',
         doc="商品属性维度表ETL",
@@ -94,18 +99,38 @@ with DAG(**DAG_CONFIG) as dag:
         conn_id='maxcompute_prod'
     )
     
+    # 门店历史交易表
     dim_store_history_trade_temp_task = MaxcomputeOperator(
         task_id='dim_store_history_trade_temp',
         doc="店铺历史交易维度表ETL",
-        sql=dim_store_history_trade_temp,
+        sql=dim_store_history_trade_temp_sentence,
         hints=hints,
         conn_id='maxcompute_prod'
     )
     
-    dim_changsha_store_daily_full_task = MaxcomputeOperator(
-        task_id='dim_changsha_store_daily_full',
+    # 门店基础属性表
+    dim_store_sentence_task = MaxcomputeOperator(
+        task_id='dim_store_sentence',
         doc="店铺日度维度表ETL",
-        sql=dim_changsha_store_daily_full,
+        sql=dim_store_sentence,
+        hints=hints,
+        conn_id='maxcompute_prod'
+    )
+
+    # 商品基础属性表
+    dim_goods_sentence_task = MaxcomputeOperator(
+        task_id='dim_goods_sentence',
+        doc="商品基础属性表ETL",
+        sql=dim_goods_sentence,
+        hints=hints,
+        conn_id='maxcompute_prod'
+    )
+
+    # 门店商品标签表
+    dim_sku_store_tags_sentence_task = MaxcomputeOperator(
+        task_id='dim_sku_store_tags_sentence',
+        doc="门店商品标签表ETL",
+        sql=dim_sku_store_tags_sentence,
         hints=hints,
         conn_id='maxcompute_prod'
     )
@@ -116,6 +141,32 @@ with DAG(**DAG_CONFIG) as dag:
         bash_command='echo "✅ MaxCompute维度表ETL任务完成 $(date)"',
         doc="标记ETL任务完成"
     )
+
+    # 中间暂停
+    middle_pause = BashOperator(
+        task_id='middle_pause',
+        bash_command='echo "pause "',
+        doc="中间暂停"
+    )
     
+    # 事实表任务
+    fact_flow_task = MaxcomputeOperator(
+        task_id='fact_flow',
+        doc="事实表-流量",
+        sql=fact_flow_sentence,
+        hints=hints,
+        conn_id='maxcompute_prod'
+    )
+
+    fact_trade_task = MaxcomputeOperator(
+        task_id='fact_trade',
+        doc="事实表-交易",
+        sql=fact_trade_sentence,
+        hints=hints,
+        conn_id='maxcompute_prod'
+    )
+
     # 设置任务依赖关系
-    start_task >> dim_changsha_goods_property_task >> dim_store_history_trade_temp_task >> dim_changsha_store_daily_full_task >> complete_task
+    start_task  >> dim_store_history_trade_temp_task >> dim_store_sentence_task >> middle_pause
+    start_task >> [dim_changsha_goods_property_task,dim_goods_sentence_task] >> middle_pause
+    middle_pause >> dim_sku_store_tags_sentence_task >> [fact_flow_task, fact_trade_task] >>  complete_task
