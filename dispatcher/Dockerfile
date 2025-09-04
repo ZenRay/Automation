@@ -1,5 +1,5 @@
 # 使用官方Airflow镜像作为基础镜像
-FROM apache/airflow:2.7.1-python3.10
+FROM apache/airflow:2.11.0-python3.12
 
 # 设置工作目录
 WORKDIR /opt/airflow

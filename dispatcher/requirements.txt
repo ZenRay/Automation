@@ -1,12 +1,15 @@
-# Airflow核心依赖
-apache-airflow==2.7.1
+# Airflow核心依赖 (升级到最新稳定版本)
+apache-airflow==2.11.0
+
+# Maxcompute Provider (支持Maxcompute Connections)
+apache-airflow-providers-alibaba[cloud]>=3.2.0,<4.0.0
 
 # Maxcompute SDK
 pyodps>=0.11.0
 
 # 数据库连接
 pymysql>=1.0.2
-sqlalchemy>=1.4.0
+sqlalchemy>=1.4.0,<2.0.0
 
 # 数据处理
 pandas>=1.5.0
