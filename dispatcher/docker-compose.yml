@@ -38,6 +38,7 @@ services:
       AIRFLOW__CORE__PLUGINS_FOLDER: '/opt/airflow/plugins'
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: '/opt/airflow/logs'
       AIRFLOW__LOGGING__LOGGING_LEVEL: 'INFO'
+      AIRFLOW__LOGGING__HOSTNAME: 'airflow'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
       AIRFLOW__WEBSERVER__RBAC: 'true'
       AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Shanghai'
