@@ -46,3 +46,22 @@ class MaxComputerClient:
             logger.info("SQL Sentence Executed in ascync model")
             return self._client
     
+    
+    
+    def execute_to_save(self, sql, file_path, hints=None) -> None:
+        """Execute SQL and Save Result to Local File
+        Args:
+            sql: SQL statement
+            file_path: Local file path to save the result
+        """
+        instance = self.execute_sql(sql, hints=hints)
+        instance.wait_for_success()
+        df = instance.to_df()
+        if file_path.endswith('.csv'):
+            df.to_csv(file_path, index=False)
+        elif file_path.endswith('.xlsx'):
+            df.to_excel(file_path, index=False)
+        else:
+            raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
+        
+        logger.info(f"SQL Result saved to local file: {file_path}")
