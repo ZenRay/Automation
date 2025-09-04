@@ -64,7 +64,7 @@ hints = {
 DAG_CONFIG = {
     'dag_id': 'dimention_maxcompute_dag',
     'description': 'MaxCompute维度表ETL任务 - 包含商品属性、店铺日度、历史交易等维度表',
-    'schedule_interval': '30 9 * * *',  # 每天0930执行
+    'schedule_interval': '20 6 * * *',  # 每天0620执行
     'start_date': datetime(2025, 1, 1),
     'catchup': False,
     'tags': ['maxcompute', 'dimension', 'etl', 'changsha'],
@@ -96,7 +96,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="商品属性维度表ETL",
         sql=dim_changsha_goods_property_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
     
     # 门店历史交易表
@@ -105,7 +105,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="店铺历史交易维度表ETL",
         sql=dim_store_history_trade_temp_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
     
     # 门店基础属性表
@@ -114,7 +114,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="店铺日度维度表ETL",
         sql=dim_store_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
 
     # 商品基础属性表
@@ -123,7 +123,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="商品基础属性表ETL",
         sql=dim_goods_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
 
     # 门店商品标签表
@@ -132,7 +132,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="门店商品标签表ETL",
         sql=dim_sku_store_tags_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
 
     # 任务3: 完成标记
@@ -155,7 +155,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="事实表-流量",
         sql=fact_flow_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
 
     fact_trade_task = MaxcomputeOperator(
@@ -163,7 +163,7 @@ with DAG(**DAG_CONFIG) as dag:
         doc="事实表-交易",
         sql=fact_trade_sentence,
         hints=hints,
-        conn_id='maxcompute_prod'
+        conn_id='maxcompute_dev'
     )
 
     # 设置任务依赖关系
