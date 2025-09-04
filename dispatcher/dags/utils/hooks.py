@@ -138,15 +138,15 @@ class LarkSheetsHook(BaseHook):
         return self._client
     
 
-    def file2sheet(self, file_path: str, range_str:str, sheet_name: str=None) -> dict:
-        """Upload a file to Lark Sheet
+    def load_data(self, file_path:str) -> pd.DataFrame:
+        """Load Data
+        Load data from file into DataFrame
 
         Args:
             file_path: Path to the file to upload
-            sheet_name: Optional name for the sheet
 
         Returns:
-            Response from Lark Sheet API
+            DataFrame containing the file data
         """
         if not path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -159,14 +159,14 @@ class LarkSheetsHook(BaseHook):
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
 
-        columns = df.columns.tolist()
-        self._extract_data2sheet_values(
-            df, columns, range_str, sheet_name
-        )
+        return df
         
     
 
-    def _extract_data2sheet_values(self, df: pd.DataFrame, columns: list, range_str: str, sheet_title: str) -> None:
+    def extract_data2sheet_values(
+            self, df: pd.DataFrame, columns: list, range_str: str, 
+            sheet_title: str, target_url:str = None
+        ) -> None:
         """Extract data from DataFrame and update Lark Sheet
 
         Args:
@@ -178,6 +178,10 @@ class LarkSheetsHook(BaseHook):
         Returns:
             None
         """
+        # Update target URL if provided
+        if target_url is not None:
+            self._client.extract_spreadsheet_info(target_url)
+            
         sheet_id = self._client.get_sheet_id(sheet_title)
         raw_data = df.loc[:, columns].drop_duplicates().copy()
         
