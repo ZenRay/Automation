@@ -28,8 +28,31 @@ class LarkImURL(Enum):
     
     
     
-    
 
+class MIMEType(Enum):
+    """ MIME Type Enum.
+    """
+    PNG = "image/png"
+    JPG = "image/jpg"
+    JPEG = "image/jpeg"
+    GIF = "image/gif"
+    BMP = "image/bmp"
+    WEBP = "image/webp"
+    MP4 = "video/mp4"
+    OPUS = "audio/opus"
+    PDF = "application/pdf"
+    DOC = "application/msword"
+    DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    XLS = "application/vnd.ms-excel"
+    XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    PPT = "application/vnd.ms-powerpoint"
+    PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    STREAM = "application/octet-stream"
+    TEXT = "text/plain"
+    MARKDOWN = "text/markdown"
+
+    
 __all__ = [
-    "LarkImURL"
+    "LarkImURL",
+    "MIMEType"
 ]

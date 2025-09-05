@@ -16,6 +16,7 @@ from ...exceptions import LarkMessageException
 
 from .....utils import check_function_arg
 
+from ...common import MIMEType
 
 logger = logging.getLogger("automation.lark.base.im.message")
 
@@ -261,5 +262,165 @@ class ImageMessage(Message):
             return result
         else:
             logger.debug("Image upload skipped: no local file or already uploaded.")
+
+
+
+    
+class FileMessage(Message):
+    """ Lark IM File Message.
+    """
+    
+    SPECIFIC_FILE_TYPES = (
+        "opus", "mp4", "pdf", "doc", "xls", "ppt"
+    )
+    
+    def __init__(self, file_key: str = None, file: str = None):
+        """Common File Message
+
+        Common File Message, Like doc, xls, pdf, ppt.
+        """
+
+        if file is not None and self.check_validate(file):
+            super().__init__(message_type="file")
+            self.file_key = file_key
+            self._file = file
+            self._file_name, self._file_extension = self._extract_file_info(file)
+            self._file_type = self._file_extension
+
+            if self._file_type not in self.SPECIFIC_FILE_TYPES:
+                self._file_type = "stream"
+                logger.warning(f"File type '{self._file_extension}' is not a specific type, defaulting to 'stream'.")
+        elif file_key is not None:
+            self.file_key = file_key
+            self._file = None
+            self._file_name = None
+            self._file_type = None
+            self._file_extension = None
+        else:
+            logger.error("Either 'file' or 'file_key' must be provided.")
+            raise LarkMessageException("Either 'file' or 'file_key' must be provided.")
+
+    @property
+    def message_key(self):
+        return self.file_key
+    
+    
+    @message_key.setter
+    def message_key(self, value):
+        self.file_key = value
+        
+
+
+    @property
+    def file_name(self):
+        """File Name Property"""
+        return self._file_name
+    
+    @file_name.setter
+    def file_name(self, value):
+        """Set File Name Property"""
+        if isinstance(value, str):
+            self._file_name = value
+        else:
+            raise LarkMessageException("File name must be a string.")
+        
+    @property
+    def file_type(self):
+        """File Type Property"""
+        if hasattr(self, "_file_type") and self._file_type is not None:
+            return self._file_type
+        else:
+            raise NotImplementedError("File type is not set.")
+    
+    @file_type.setter
+    def file_type(self, value):
+        """Set File Type Property"""
+        if isinstance(value, str):
+            if value.lower() in self.SPECIFIC_FILE_TYPES:
+                self._file_type = value.lower()
+            else:
+                self._file_type = "stream"
+                logger.warning(f"File type '{value}' is not a specific type, defaulting to 'stream'.")
+        else:
+            raise LarkMessageException("File type must be a string.")
+        
+
+
+    @property
+    def file_extension(self):
+        """File Extension Property"""
+        return self._file_extension
+    
+    @property
+    def mime_type(self):
+        """MIME Type Property"""
+        
+        if self._file_extension is None:
+            extension = "stream"
+        else:
+            extension = self._file_extension
+            
+        return MIMEType.__members__.get(extension.upper(), MIMEType.STREAM).value
+
+
+
+    def check_validate(self, file: str):
+        """Check File Validate
+
+        Check file type, must be one of: doc, xls, pdf, ppt
+
+        Args:
+            file (str): The file path.
+        """
+
+        
+        _, extension = self._extract_file_info(file)
+        if len(extension) == 0:
+            raise LarkMessageException(
+                "Invalid file type, file must have an extension."
+            )
+        return True
+
+
+    def upload_file(self, func, *args, **kwargs):
+        """Upload File With API
+        
+        Args:
+            func: A callable object that will handle the file upload
+            *args: Additional arguments to pass to the uploader
+            **kwargs: Additional keyword arguments to pass to the uploader
+            
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("uploader 'func' must be a callable object")
+        
+        if not check_function_arg(func, "file"):
+            raise TypeError("uploader 'func' must accept a 'file' keyword argument")
+
+        if not check_function_arg(func, "need_binary"):
+            raise TypeError("uploader 'func' must accept a 'need_binary' keyword argument")
+
+        if not check_function_arg(func, "file_type"):
+            raise TypeError("uploader 'func' must accept a 'file_type' keyword argument")
+
+        if not check_function_arg(func, "file_name"):
+            raise TypeError("uploader 'func' must accept a 'file_name' keyword argument")
+        
+
+        if self.is_can_upload:
+            result = func(
+                file=self._file, need_binary=True, file_type=self.file_type, file_name=self._file_name,
+                mime_type=self.mime_type, *args, **kwargs
+            )
+            logger.info(f"File uploaded via uploader callable; local_file={self.file}")
+            if isinstance(result, dict) and result.get("code", -1) == 0:
+                # update file_key after successful upload
+                self.file_key = result.get("data", {}).get("file_key")
+                logger.info(f"File ({self._file_name}) key updated to: {self.file_key}")
+            return result
+        else:
+            logger.debug("File upload skipped: no local file or already uploaded.")
 
 
