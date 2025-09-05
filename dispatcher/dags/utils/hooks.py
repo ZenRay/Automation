@@ -84,8 +84,9 @@ class MaxcomputeHook(BaseHook):
         self.client.execute_sql(sql, hints=hints)
         logger.info("SQL execution completed.")
         
-        if file is not None:
-            self.client.execute_to_save(sql, file, hints=hints)
+        # TODO: Implement file handling if needed
+        # if file is not None:
+        #     self.client
         
     
     
