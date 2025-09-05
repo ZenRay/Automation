@@ -61,3 +61,38 @@ def parse_conf(parser, file, template=None):
             writer.write(template)
     
     parser.read(file)
+
+    
+
+def parse_file_size(file_path, unit='bytes'):
+    """Extract Size of a File.
+
+    Args:
+        file_path (str): The path to the file.
+        unit (str, optional): The unit for the file size. 
+            Supported units are 'bytes', 'kb', and 'mb'. Defaults to 'bytes'.
+
+    Returns:
+        float: The size of the file in the specified unit.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the provided path is not a file.
+        ValueError: If the unit is not supported.
+    """
+    if not path.exists(file_path):
+        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+    
+    if not path.isfile(file_path):
+        raise ValueError(f"The path '{file_path}' is not a file.")
+
+    if unit == 'bytes':
+        return round(path.getsize(file_path), 2)
+
+    elif unit == 'kb':
+        return round(path.getsize(file_path) / 1024, 2) 
+
+    elif unit == 'mb':
+        return round(path.getsize(file_path) / (1024 * 1024), 2)
+
+    raise ValueError(f"Unsupported unit: {unit}. Supported units are: bytes, kb, mb.")
