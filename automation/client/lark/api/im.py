@@ -93,9 +93,7 @@ class LarkIM(LarkClient):
             method="POST",
             url=url,
             headers=headers,
-            data=form,
-            *args,
-            **kwargs
+            data=form
         )
         
         if resp.get("code", -1) == 0:
