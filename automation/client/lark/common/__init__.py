@@ -25,6 +25,14 @@ class LarkImURL(Enum):
     """
     UPLOAD_IMAGE = f"{_lark_host}/open-apis/im/v1/images"
     UPLOAD_FILE = f"{_lark_host}/open-apis/im/v1/files"
+    SEND_MESSAGE = f"{_lark_host}/open-apis/im/v1/messages"
+    
+    
+
+class LarkContactURL(Enum):
+    """ Lark Contact API URL.
+    """
+    QUERY_SINGLE_USER = f"{_lark_host}/open-apis/contact/v3/users/{{user_id}}"
     
     
     
