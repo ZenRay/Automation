@@ -144,7 +144,6 @@ dmypy.json
 */test/bitable_calendar/*
 */test/bitable_calendar/Dockerfile
 test/*
-automation/utils/*
 test*.py
 time_utils.py
 
