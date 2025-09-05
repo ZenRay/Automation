@@ -89,7 +89,53 @@ class LarkIM(LarkClient):
             logger.error(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
             raise LarkMessageException(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
         return resp
+       
+    
+    def query_user_by_phone_email(self, emails: list[str] = None, mobiles: list[str] = None, user_id_type: str = "open_id"):
+        """Query users by their phone numbers or email addresses.
+
+        This method is a placeholder for querying users by phone or email and should be implemented.
+
+        Raises:
+            NotImplementedError: Always, as this method is not yet implemented.
+
+        """
+        url = LarkContactURL.SEARCH_USER_BY_PHONE_OR_EMAIL.value
         
+        if user_id_type not in ("user_id", "open_id", "union_id"):
+            user_id_type = "open_id"
+        
+        payload = {
+            "user_id_type": user_id_type
+        }
+        
+        if emails is not None and isinstance(emails, list) and len(emails) > 0:
+            payload["emails"] = emails
+
+        if mobiles is not None and isinstance(mobiles, list) and len(mobiles) > 0:
+            payload["mobiles"] = mobiles
+
+        headers = {
+            "Authorization": f"Bearer {self.tenant_access_token}",
+            "Content-Type": "application/json; charset=utf-8"
+        }
+        
+        
+        resp = request(
+            method="POST",
+            url=url,
+            headers=headers,
+            payload=payload
+        )
+        
+        if resp.get("code", -1) == 0:
+            logger.info(f"Users queried successfully by phone/email:")
+        else:
+            logger.error(f"Failed to query users by phone/email: {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to query users by phone/email: {resp.get('msg', '')}")
+        return resp
+    
+     
 
     def upload_image(self, file=None,  image_type="message", need_binary=True):
         """Upload an image to Lark's IM service.
