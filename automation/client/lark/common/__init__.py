@@ -33,6 +33,11 @@ class LarkContactURL(Enum):
     """ Lark Contact API URL.
     """
     QUERY_SINGLE_USER = f"{_lark_host}/open-apis/contact/v3/users/{{user_id}}"
+    # Query User with keyword
+    SEARCH_USER_BY_KEYWORD = f"{_lark_host}/open-apis/search/v1/user"
+    
+    # Query User By Phone or Email
+    SEARCH_USER_BY_PHONE_OR_EMAIL = f"{_lark_host}/open-apis/contact/v3/users/batch_get_id"
     
     
     
