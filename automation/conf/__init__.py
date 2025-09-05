@@ -9,7 +9,8 @@ from os import path
 from configparser import ConfigParser
 
 
-from .utils import parse_conf
+from ..utils import parse_conf
+
 logger = logging.getLogger("automation.conf")
 
 # read maxcomputer configurate file
