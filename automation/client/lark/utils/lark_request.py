@@ -11,12 +11,14 @@ logger = logging.getLogger("automation.lark.utils.lark_request")
 
 
 
-def request(method, url, headers, payload={}, params=None, refresh_client=None):
+def request(method, url, headers, payload={}, params=None, refresh_client=None, data=None):
     """Lark API Request"""
     # Refresh Access Token if needed
     if refresh_client and hasattr(refresh_client, "_refresh_access_token") and callable(getattr(refresh_client, "_refresh_access_token")):
         refresh_client._refresh_access_token()
-    response = requests.request(method, url, headers=headers, json=payload, params=params)
+    response = requests.request(
+        method, url, headers=headers, json=payload, params=params, data=data
+    )
 
     resp = {}
     if response.text[0] == '{':
@@ -30,5 +32,4 @@ def request(method, url, headers, payload={}, params=None, refresh_client=None):
          response.raise_for_status()
     if code != 0:
         logger.error("Error Response: {0}".format(resp))
-        raise LarkException(code=code, msg=resp.get("msg", ""))
     return resp
