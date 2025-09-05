@@ -8,7 +8,7 @@ including sending messages, managing chats, and handling user interactions.
 
 
 import logging
-
+import json
 
 from requests_toolbelt import MultipartEncoder
 
@@ -22,7 +22,7 @@ from ..base.im import (
 
 
 
-from ..common import LarkImURL
+from ..common import LarkImURL, LarkContactURL
 
 
 
@@ -49,10 +49,47 @@ class LarkIM(LarkClient):
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         
         
+
+
+    def query_single_user(self, user_id: str = None, user_id_type: str = None, department_id_type: str = None):
+        """Query a single user's information from Lark's Contact service.
+
+        This method is a placeholder for querying user information and should be implemented.
+
+        Raises:
+            NotImplementedError: Always, as this method is not yet implemented.
+
+        """
+        url = LarkContactURL.QUERY_SINGLE_USER.value.format(user_id=user_id)
+        
+        if user_id_type is not None and user_id_type in ("user_id", "open_id", "union_id"):
+            param = {
+                "user_id_type": user_id_type
+            }
+        else:
+            param = {}
+        
+        if department_id_type is not None and department_id_type in ("department_id", "open_department_id"):
+            param["department_id_type"] = department_id_type
+
+        headers = {
+            "Authorization": f"Bearer {self.tenant_access_token}"
+        }
         
         
-    
-    
+        resp = request(
+            method="GET",
+            url=url,
+            headers=headers,
+            params=param
+        )
+        if resp.get("code", -1) == 0:
+            logger.info(f"User({user_id}) information queried successfully:")
+        else:
+            logger.error(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
+        return resp
+        
 
     def upload_image(self, file=None,  image_type="message", need_binary=True):
         """Upload an image to Lark's IM service.
@@ -84,7 +121,6 @@ class LarkIM(LarkClient):
         url = LarkImURL.UPLOAD_IMAGE.value
 
         headers = {
-            # 'Content-Type': 'application/json; charset=utf-8',
             'Authorization': f'Bearer {self.tenant_access_token}',
         }
         form = MultipartEncoder(fields=data)
@@ -171,4 +207,55 @@ class LarkIM(LarkClient):
         else:
             logger.error(f"Failed to upload file({file}): {resp.get('msg', '')}")
             raise LarkMessageException(f"Failed to upload file({file}): {resp.get('msg', '')}")
+        return resp
+
+        
+
+
+    def send_message(self, receive_id_type:str="chat_id", content:dict=None, msg_type:str="text", receive_id:str=None, uuid:str=None):
+        """Send a message via Lark's IM service.
+
+        This method is a placeholder for sending messages and should be implemented.
+
+        Raises:
+            NotImplementedError: Always, as this method is not yet implemented.
+
+        """
+        url = LarkImURL.SEND_MESSAGE.value
+        param = {
+            "receive_id_type": receive_id_type
+        }
+
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+        
+        payload = {
+            "receive_id": receive_id,
+            "msg_type": msg_type,
+            "content": content
+        }
+        
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': f'Bearer {self.tenant_access_token}'
+        }
+        
+        resp = request(
+            method="POST",
+            url=url,
+            headers=headers,
+            params=param,
+            payload=payload
+        )
+        
+        if uuid is not None:
+            resp["uuid"] = uuid
+            
+        if resp.get("code", -1) == 0:
+            logger.info(f"Message sent successfully to {receive_id}:")
+        else:
+            logger.error(f"Failed to send message to {receive_id}: {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to send message to {receive_id}: {resp.get('msg', '')}")
+        
         return resp
