@@ -5,6 +5,7 @@ Main function is used to deal with IM messages.
 """
 
 import logging
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from os import path
@@ -24,7 +25,7 @@ class Message(ABC):
     """ Lark IM messages.
     """
     def __init__(self, message_type: str = None):
-        self.message_key = None
+        self._message_key = None
         self._msg_type = message_type
 
     @property
@@ -72,7 +73,15 @@ class Message(ABC):
         """Check Message Whether Raw"""
         return self.message_key is None
 
+    @property
+    def message_key(self):
+        """Message Key Property"""
+        return self._message_key
 
+    @message_key.setter
+    def message_key(self, value):
+        """Set Message Key Property"""
+        self._message_key = value
 
     @property
     def is_can_upload(self):
@@ -107,9 +116,11 @@ class Message(ABC):
         """Upload File With API"""
         raise NotImplementedError
     
-    
-    
-    
+    @abstractmethod
+    def send_message(self, *args, **kwargs):
+        """Send Message With API"""
+        raise NotImplementedError
+
     def _extract_file_info(self, file: str):
         """Extract File Name from File Path
 
@@ -130,6 +141,140 @@ class Message(ABC):
         _, extension = path.splitext(filename)
         return filename, extension.lower().replace(".", "")
 
+
+class TextMessage(Message):
+    """Simple Text Message
+    
+    Simple Text Message, only support text message. Can deal with text str or dict.
+    """
+    def __init__(self, text: str ):
+        """Initialize TextMessage.
+
+        Keyword arguments:
+            text: str, The text content of the message.
+        """ 
+        super().__init__(message_type="text")
+        self.text = text
+        
+    @property
+    def file_type(self):
+        """File Type Property"""
+        raise NotImplementedError("TextMessage has no file type.")
+    
+    @file_type.setter
+    def file_type(self, value):
+        """Set File Type Property"""
+        raise NotImplementedError("TextMessage has no file type.")
+    
+    @property
+    def file_name(self):
+        """File Name Property"""
+        raise NotImplementedError("TextMessage has no file name.")
+    
+    @file_name.setter
+    def file_name(self, value):
+        """Set File Name Property"""
+        raise NotImplementedError("TextMessage has no file name.")
+    
+    
+    @property
+    def msg_type(self):
+        """Message Type Property"""
+        return self._msg_type
+    
+    @msg_type.setter
+    def msg_type(self, value):
+        """Set Message Type Property"""
+        raise NotImplementedError("TextMessage msg_type is fixed to 'text'.")
+
+    @property
+    def message_key(self):
+        return None
+    
+    
+    @message_key.setter
+    def message_key(self, value):
+        """Set Message Key Property"""
+        self._message_key = value
+
+
+    @property
+    def is_raw(self):
+        """Check Message Whether Raw"""
+        return True
+    
+    @property
+    def is_can_upload(self):
+        """Check Message Whether Can Upload"""
+        return False
+    
+    
+    @property
+    def content(self):
+        """Get Text Content"""
+        # Parse text to dict if possible
+        try:
+            result = json.loads(self.text)
+        except (json.JSONDecodeError, TypeError):
+            result =  {}
+            
+        if isinstance(self.text, str) and result.get("text", False):
+            return result
+        elif isinstance(self.text, str):
+            return {"text": self.text}
+        elif isinstance(self.text, dict) and self.text.get("text", False):
+            return self.text
+        elif isinstance(self.text, dict):
+            return {"text": self.text}
+        else:
+            return {"text": json.dumps(self.text, ensure_ascii=False)}
+
+
+    def check_validate(self, *args, **kwargs):
+        """Check Message Validate"""
+        if not isinstance(self.text, str) or len(self.text) == 0:
+            raise LarkMessageException("Text message content must be a non-empty string.")
+        return True
+    
+    def upload_file(self, *args, **kwargs):
+        """Upload File With API"""
+        raise NotImplementedError("TextMessage has no file to upload.")
+    
+   
+    
+    def send_message(
+        self, func, receive_id_type:str="chat_id", receive_id:str=None, uuid:str=None, *args, **kwargs
+    ):
+        """Send Message With API
+        
+        Args:
+            func: A callable object that will handle the message sending
+            *args: Additional arguments to pass to the sender
+            **kwargs: Additional keyword arguments to pass to the sender
+            
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("sender 'func' must be a callable object")
+        
+        if not check_function_arg(func, "msg_type"):
+            raise TypeError("sender 'func' must accept a 'msg_type' keyword argument")
+        
+        if not check_function_arg(func, "content"):
+            raise TypeError("sender 'func' must accept a 'content' keyword argument")
+
+        content = self.content
+        if kwargs.get("content", None) is not None:
+            content = kwargs.pop("content")
+            
+            
+        result = func(
+            msg_type=self.msg_type, content=content, receive_id_type=receive_id_type,
+            receive_id=receive_id, uuid=uuid, *args, **kwargs
+        )
+        return result
+    
 
 
 class ImageMessage(Message):

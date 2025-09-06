@@ -8,11 +8,8 @@ Lark Instant Message Base Module
 from ._message import (
     Message,
     ImageMessage,
-    VideoMessage,
-    VoiceMessage,
     FileMessage,
-    StreamMessage,
-    StickerMessage
+    TextMessage
 )
 
 
