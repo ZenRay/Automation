@@ -24,10 +24,9 @@ class Message(ABC):
     """ Lark IM messages.
     """
     def __init__(self, message_type: str = None):
-        self.message_type = message_type
         self.message_key = None
-        
-        
+        self._msg_type = message_type
+
     @property
     @abstractmethod
     def file_type(self):
@@ -54,6 +53,18 @@ class Message(ABC):
     @abstractmethod
     def file_name(self, value):
         """Set File Name Property"""
+        NotImplemented
+        
+    @property
+    @abstractmethod
+    def msg_type(self):
+        """Message Type Property"""
+        NotImplemented
+
+    @msg_type.setter
+    @abstractmethod
+    def msg_type(self, value):
+        """Set Message Type Property"""
         NotImplemented
 
     @property
@@ -210,6 +221,18 @@ class ImageMessage(Message):
         else:
             raise LarkMessageException("File type must be a string.")
         
+    @property
+    def msg_type(self):
+        """Message Type Property"""
+        return self._msg_type
+    
+    @msg_type.setter
+    def msg_type(self, value):
+        """Set Message Type Property"""
+        if isinstance(value, str) and value.lower() == "image":
+            self._msg_type = value.lower()
+        else:
+            raise LarkMessageException("Message type must be 'image'.")
 
     def check_validate(self, file: str):
         """Check Image File Validate
@@ -273,6 +296,12 @@ class FileMessage(Message):
     SPECIFIC_FILE_TYPES = (
         "opus", "mp4", "pdf", "doc", "xls", "ppt"
     )
+    AUDIO_MESSAGE_TYPES = (
+        "opus",
+    )
+    MEIDIA_MESSAGE_TYPES = (
+        "mp4",
+    )
     
     def __init__(self, file_key: str = None, file: str = None):
         """Common File Message
@@ -281,14 +310,15 @@ class FileMessage(Message):
         """
 
         if file is not None and self.check_validate(file):
-            super().__init__(message_type="file")
+            super().__init__(message_type="stream")
             self.file_key = file_key
             self._file = file
             self._file_name, self._file_extension = self._extract_file_info(file)
             self._file_type = self._file_extension
 
-            if self._file_type not in self.SPECIFIC_FILE_TYPES:
-                self._file_type = "stream"
+            if self._file_type in self.SPECIFIC_FILE_TYPES:
+                self._file_type = self._file_extension
+            else:
                 logger.warning(f"File type '{self._file_extension}' is not a specific type, defaulting to 'stream'.")
         elif file_key is not None:
             self.file_key = file_key
@@ -362,6 +392,25 @@ class FileMessage(Message):
             
         return MIMEType.__members__.get(extension.upper(), MIMEType.STREAM).value
 
+
+    @property
+    def msg_type(self):
+        """Message Type Property"""
+        return self._msg_type
+    
+    @msg_type.setter
+    def msg_type(self, value):
+        """Set Message Type Property"""
+        if value.lower() in self.AUDIO_MESSAGE_TYPES:
+            self._msg_type = "audio"
+        elif value.lower() in self.MEIDIA_MESSAGE_TYPES:
+            self._msg_type = "media"
+        elif value.lower() in self.SPECIFIC_FILE_TYPES or  value.lower() == "stream":
+            self._msg_type = "file"
+        else:
+            raise LarkMessageException(
+                "Message type must be one of: stream, {}".format(", ".join(self.SPECIFIC_FILE_TYPES))
+            )
 
 
     def check_validate(self, file: str):
