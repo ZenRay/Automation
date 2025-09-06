@@ -12,10 +12,11 @@ from os import path
 from airflow.models import Connection
 from airflow.hooks.base import BaseHook
 
-from  automation.client import MaxComputerClient
+from  automation.client import (
+    MaxComputerClient, LarkIM, LarkSheets
+)
 
 
-from automation.client import LarkSheets
 from automation.client.lark.utils import (
     parse_column2index, parse_index2column, parse_sheet_cell
 )
@@ -88,10 +89,87 @@ class MaxcomputeHook(BaseHook):
         # if file is not None:
         #     self.client
         
-    
-    
+    def execute(self, context):
+        """Execute method for Airflow Operator
         
+        Args:
+            context: Airflow context
+        """
         
+        sql = context['params'].get('sql')
+        hints = context['params'].get('hints', {})
+        file = context['params'].get('file', None)
+        
+        if not sql:
+            raise ValueError("SQL statement is required.")
+        
+        self.execute_sql(sql, hints=hints, file=file)
+        logger.info("MaxCompute SQL execution task completed.")
+
+    
+class LarkHook(BaseHook):
+    """
+    Lark Hook
+
+    Provides a Hook to Lark and methods to interact with the API.
+    """
+    _clients = {
+        "im": None,
+        "sheets": None
+    }
+    
+    def __init__(self, conn_id: str = 'lark_app', target_url=None):
+        """Init MaxCompute Hook
+        
+        Args:
+            conn_id: Airflow connection ID for MaxCompute
+        """
+        super().__init__()
+        self.conn_id = conn_id
+        self.connection = self._get_connection()
+        self.target_url = target_url
+
+
+    def _get_connection(self) -> Connection:
+        """Get Airflow Connection
+        
+        Returns:
+            Connection object
+        """
+        return Connection.get_connection_from_secrets(self.conn_id)
+    
+
+    @property
+    def sheet_client(self) -> LarkSheets:
+        """Get LarkSheets instance
+
+        Returns:
+            LarkSheets instance
+        """
+        if self._clients["sheets"] is None:
+            self._clients["sheets"] = LarkSheets(
+                app_id=self.connection.json_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
+                url=self.target_url
+            )
+        return self._clients["sheets"]
+
+
+    @property
+    def im_client(self) -> LarkIM:
+        """Get LarkIM instance
+
+        Returns:
+            LarkIM instance
+        """
+        if self._clients["im"] is None:
+            self._clients["im"] = LarkIM(
+                app_id=self.connection.json_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
+            )
+        return self._clients["im"]
 
 
 class LarkSheetsHook(BaseHook):
