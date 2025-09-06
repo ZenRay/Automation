@@ -8,12 +8,7 @@ from automation.client import (
     MaxComputerClient, LarkClient, LarkMultiDimTable
     ,LarkSheets
 )
-conf = {
-    "access_id": maxcomputer.get("dev", "access_id"),
-    "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
-    "project": maxcomputer.get("dev", "project"),
-    "endpoint":maxcomputer.get("dev", "endpoint")
-}
+
 
 
 logger = logging.getLogger("automation")
@@ -27,8 +22,12 @@ handler.setFormatter(formater)
 logger.addHandler(handler)
 
 
-
-max_compute_client = MaxComputerClient(**conf)
+conf = {
+    "access_id": maxcomputer.get("dev", "access_id"),
+    "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
+    "project": maxcomputer.get("dev", "project"),
+    "endpoint":maxcomputer.get("dev", "endpoint")
+}
 
 hints = {
     "odps.sql.allow.fullscan": True,
@@ -40,6 +39,10 @@ hints = {
     "odps.sql.python.version": "cp37",
     "fallback_policy": "default"
 }
+
+
+
+# max_compute_client = MaxComputerClient(**conf)
 
 
 # lark_multi_table_client = LarkMultiDimTable(
