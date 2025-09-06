@@ -68,6 +68,7 @@ class MaxcomputeHook(BaseHook):
                 secret_access_key=self.connection.extra_dejson.get('access_key_secret', self.connection.password),
                 project=self.connection.extra_dejson.get('project', self.connection.schema)
             )
+            logger.info(f"MaxCompute client initialized. {self.connection.extra_dejson.get('project', self.connection.schema)}")
         return self._client
     
 
