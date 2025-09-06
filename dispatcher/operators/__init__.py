@@ -79,7 +79,26 @@ class MaxcomputeOperator(BaseOperator):
             hints = self.hints
         
         if file is not None:
-            self.hook.execute_to_save(self.sql, file, hints=hints)
+            # Prefer client-provided execute_to_save if available (implemented in automation client)
+            client = getattr(self.hook, 'client', None)
+            try:
+                if client and hasattr(client, 'execute_to_save'):
+                    client.execute_to_save(self.sql, file, hints=hints)
+                elif hasattr(self.hook, 'execute_to_save'):
+                    self.hook.execute_to_save(self.sql, file, hints=hints)
+                else:
+                    # fallback: run execute_sql and attempt save via returned instance (if supported)
+                    instance = self.hook.client.execute_sql(self.sql, hints=hints)
+                    if instance is not None and hasattr(instance, 'to_df'):
+                        df = instance.to_df()
+                        if file.endswith('.csv'):
+                            df.to_csv(file, index=False)
+                        elif file.endswith('.xlsx'):
+                            df.to_excel(file, index=False)
+                    else:
+                        logger.warning('No method available to save SQL result to file: %s', file)
+            except Exception:
+                logger.exception('Failed to execute and save SQL to file')
         else:
             self.hook.execute_sql(self.sql, hints=hints)
         
