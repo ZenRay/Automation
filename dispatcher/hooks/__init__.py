@@ -122,7 +122,10 @@ class MaxcomputeHook(BaseHook):
         if not sql:
             raise ValueError("SQL statement is required.")
         
-        self.execute_sql(sql, hints=hints, file=file)
+        if file:
+            self.client.execute_to_save(sql, file, hints=hints)
+        else: 
+            self.client.execute_sql(sql, hints=hints)
         logger.info("MaxCompute SQL execution task completed.")
 
     
