@@ -437,7 +437,44 @@ class ImageMessage(Message):
         else:
             logger.debug("Image upload skipped: no local file or already uploaded.")
 
+    @staticmethod
+    def static_upload_image2key(func, file:str, image_type:str="message",  *args, **kwargs):
+        """Static Upload Image To Get Image Key
+        Upload image file via provided callable function to get image_key.
+        
+        
+        Args:
+            func: A callable object that will handle the file upload
+            file (str): The file path to upload
+            image_type (str): The type of the image, "message" or "avatar", default is "message".
+            *args: Additional arguments to pass to the uploader
+            **kwargs: Additional keyword arguments to pass to the uploader
+            
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("uploader 'func' must be a callable object")
 
+        if not check_function_arg(func, "file"):
+            raise TypeError("uploader 'func' must accept a 'file' keyword argument")
+
+        if not check_function_arg(func, "need_binary"):
+            raise TypeError("uploader 'func' must accept a 'need_binary' keyword argument")
+
+
+
+        result = func(file=file, need_binary=True, image_type=image_type, *args, **kwargs)
+        logger.debug(f"Image uploaded via uploader callable; local_file={file}")
+        if isinstance(result, dict) and result.get("code", -1) == 0:
+            # update image_key after successful upload
+            image_key = result.get("data", {}).get("image_key")
+            logger.info(f"Image file ({file}) key updated to: {image_key}")
+        else:
+            raise LarkMessageException("Image upload failed or invalid response.")
+        return image_key
+    
+    
     def send_message(
         self, func, receive_id_type:str="open_id", receive_id:str=None, uuid:str=None, *args, **kwargs
     ):
@@ -489,11 +526,11 @@ class FileMessage(Message):
     AUDIO_MESSAGE_TYPES = (
         "opus",
     )
-    MEIDIA_MESSAGE_TYPES = (
+    MEDIA_MESSAGE_TYPES = (
         "mp4",
     )
     
-    def __init__(self, file_key: str = None, file: str = None):
+    def __init__(self, file: str = None):
         """Common File Message
 
         Common File Message, Like doc, xls, pdf, ppt.
@@ -501,7 +538,7 @@ class FileMessage(Message):
 
         if file is not None and self.check_validate(file):
             super().__init__(message_type="stream")
-            self.file_key = file_key
+            self._file_key = None
             self._file = file
             self._file_name, self._file_extension = self._extract_file_info(file)
             self._file_type = self._file_extension
@@ -510,24 +547,25 @@ class FileMessage(Message):
                 self._file_type = self._file_extension
             else:
                 logger.warning(f"File type '{self._file_extension}' is not a specific type, defaulting to 'stream'.")
-        elif file_key is not None:
-            self.file_key = file_key
+            
+            self.msg_type = self._file_type
+        else:
+            self._file_key = None
             self._file = None
             self._file_name = None
             self._file_type = None
             self._file_extension = None
-        else:
-            logger.error("Either 'file' or 'file_key' must be provided.")
-            raise LarkMessageException("Either 'file' or 'file_key' must be provided.")
+            self._msg_type = None
+        self._media_coverage_key = None  # For media type coverage file key
 
     @property
     def message_key(self):
-        return self.file_key
+        return self._file_key
     
     
     @message_key.setter
     def message_key(self, value):
-        self.file_key = value
+        self._file_key = value
         
 
 
@@ -593,7 +631,7 @@ class FileMessage(Message):
         """Set Message Type Property"""
         if value.lower() in self.AUDIO_MESSAGE_TYPES:
             self._msg_type = "audio"
-        elif value.lower() in self.MEIDIA_MESSAGE_TYPES:
+        elif value.lower() in self.MEDIA_MESSAGE_TYPES:
             self._msg_type = "media"
         elif value.lower() in self.SPECIFIC_FILE_TYPES or  value.lower() == "stream":
             self._msg_type = "file"
@@ -602,7 +640,38 @@ class FileMessage(Message):
                 "Message type must be one of: stream, {}".format(", ".join(self.SPECIFIC_FILE_TYPES))
             )
 
+    @property
+    def media_coverage_key(self):
+        """Media Coverage Key Property"""
+        return self._media_coverage_key
+    
+    
+    @media_coverage_key.setter
+    def media_coverage_key(self, value):
+        """Set Media Coverage Key Property"""
+        if self.msg_type not in self.MEDIA_MESSAGE_TYPES:
+            raise LarkMessageException("Media coverage key can only be set for media message type.")
+        
+        if isinstance(value, ImageMessage):
+            if value.image_key is None:
+                raise LarkMessageException("Media coverage ImageMessage must have a valid image_key.")
+            self._media_coverage_key = value.image_key
+        elif isinstance(value, str):
+            self._media_coverage_key = value
+        else:
+            raise LarkMessageException("Media coverage key must be a image key string or ImageMessage instance.")
 
+
+    @property
+    def file_key(self):
+        """File Key Property"""
+        return self._file_key
+    
+    @file_key.setter
+    def file_key(self, value):
+        """Set File Key Property"""
+        self._file_key = value
+    
     def check_validate(self, file: str):
         """Check File Validate
 
@@ -656,10 +725,85 @@ class FileMessage(Message):
             logger.info(f"File uploaded via uploader callable; local_file={self.file}")
             if isinstance(result, dict) and result.get("code", -1) == 0:
                 # update file_key after successful upload
-                self.file_key = result.get("data", {}).get("file_key")
-                logger.info(f"File ({self._file_name}) key updated to: {self.file_key}")
+                self._file_key = result.get("data", {}).get("file_key")
+                logger.info(f"File ({self._file_name}) key updated to: {self._file_key}")
             return result
         else:
             logger.debug("File upload skipped: no local file or already uploaded.")
 
+    
 
+    def send_message(
+        self, func, receive_id_type:str="open_id", receive_id:str=None, uuid:str=None, 
+        need_covarage_file:bool=False, *, file_key:str=None, msg_type:str=None, **kwargs
+    ):
+        """Send Single File Message
+        Send file message via provided callable function. Can deal with current
+            file file_key or new file_key of uploaded file
+
+        Args:
+            func: A callable object that will handle the message sending
+            receive_id_type (str): The type of the receiver ID, default is "open_id".
+            receive_id (str): The ID of the receiver.
+            uuid (str, optional): The UUID of the message
+            need_covarage_file (bool): Whether a coverage file is needed for media type,
+                if True, an 'image_key' must be provided via kwargs or current object attribute.
+            file_key (str, optional): The file_key to use for sending the message
+            msg_type (str, optional): The message type to use when file_key is provided,
+            *args: Additional arguments to pass to the sender
+            **kwargs: Additional keyword arguments to pass to the sender
+            
+            If want send media type message and need coverage file, must provide 'image_key' via kwargs,
+                else will use current media_coverage_key attribute.
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("sender 'func' must be a callable object")
+        
+        if not check_function_arg(func, "msg_type"):
+            raise TypeError("sender 'func' must accept a 'msg_type' keyword argument")
+        
+        if not check_function_arg(func, "content"):
+            raise TypeError("sender 'func' must accept a 'content' keyword argument")
+
+        msg_type = self.msg_type
+        
+        use_args = False
+        if file_key is not None:
+            content = {
+                "file_key": file_key
+            }
+            use_args = True
+            
+            # Use provided file_key directly, must get msg_type from kwargs
+            if msg_type is not None:
+                msg_type = msg_type.lower()
+            else:
+                raise LarkMessageException("When providing 'file_key' via kwargs, 'msg_type' must also be provided.")
+        elif self.msg_type in ("audio", "file"):
+            content = {
+                "file_key": self.file_key
+            }
+
+        elif self.msg_type in ("media",):
+            content = {
+                "file_key": self.file_key
+            }
+        else:
+            raise LarkMessageException("Invalid message type for file message, or missing file_key.")
+        
+        # handle coverage file for media type
+        if need_covarage_file and msg_type in ("media", ):
+            if use_args and kwargs.get("image_key", None) is not None:
+                content["image_key"] = kwargs.pop("image_key")
+            elif hasattr(self, "media_coverage_key") and self.image_key is not None:
+                content["image_key"] = self.media_coverage_key
+            else:
+                raise LarkMessageException("Media message coverage file required but no image_key provided.")
+
+        result = func(
+            msg_type=self.msg_type, content=content, receive_id_type=receive_id_type,
+            receive_id=receive_id, uuid=uuid, *args, **kwargs
+        )
+        return result

@@ -256,10 +256,10 @@ class LarkIM(LarkClient):
         )
         
         if resp.get("code", -1) == 0:
-            logger.info(f"File({file}) uploaded successfully:")
+            logger.info(f"File({file_name}) uploaded successfully:")
         else:
-            logger.error(f"Failed to upload file({file}): {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to upload file({file}): {resp.get('msg', '')}")
+            logger.error(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
         return resp
 
         
