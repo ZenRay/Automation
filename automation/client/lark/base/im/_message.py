@@ -420,9 +420,15 @@ class ImageMessage(Message):
         if not check_function_arg(func, "need_binary"):
             raise TypeError("uploader 'func' must accept a 'need_binary' keyword argument")
 
+
+        # parse image_type from kwargs or use current
+        image_type = self._image_type
+        if kwargs.get("image_type", None) is None:
+            image_type = kwargs.pop("image_type")
+            
         if self.is_can_upload:
-            result = func(file=self._file, need_binary=True, image_type=self._image_type, *args, **kwargs)
-            logger.info(f"Image uploaded via uploader callable; local_file={self.file}")
+            result = func(file=self._file, need_binary=True, image_type=image_type, *args, **kwargs)
+            logger.debug(f"Image uploaded via uploader callable; local_file={self.file}")
             if isinstance(result, dict) and result.get("code", -1) == 0:
                 # update image_key after successful upload
                 self.image_key = result.get("data", {}).get("image_key")
@@ -431,6 +437,45 @@ class ImageMessage(Message):
         else:
             logger.debug("Image upload skipped: no local file or already uploaded.")
 
+
+    def send_message(
+        self, func, receive_id_type:str="open_id", receive_id:str=None, uuid:str=None, *args, **kwargs
+    ):
+        """Send Single Image Message
+        Send image message via provided callable function. Can deal with current
+            file image_key or new image_key of uploaded file
+
+        Args:
+            func: A callable object that will handle the message sending
+            receive_id_type (str): The type of the receiver ID, default is "open_id".
+            receive_id (str): The ID of the receiver.
+            uuid (str, optional): The UUID of the message
+            *args: Additional arguments to pass to the sender
+            **kwargs: Additional keyword arguments to pass to the sender
+            
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("sender 'func' must be a callable object")
+        
+        if not check_function_arg(func, "msg_type"):
+            raise TypeError("sender 'func' must accept a 'msg_type' keyword argument")
+        
+        if not check_function_arg(func, "content"):
+            raise TypeError("sender 'func' must accept a 'content' keyword argument")
+
+        content = {
+            "image_key": self.image_key
+        }
+        if kwargs.get("image_key", None) is not None:
+            content["image_key"] = kwargs.pop("image_key")
+
+        result = func(
+            msg_type=self.msg_type, content=content, receive_id_type=receive_id_type,
+            receive_id=receive_id, uuid=uuid, *args, **kwargs
+        )
+        return result
 
 
     
