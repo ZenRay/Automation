@@ -95,18 +95,15 @@ class LarkOperator(BaseOperator):
     
     @apply_defaults
     def __init__(self, 
-                 message: dict,
                  conn_id: str = 'lark_app',
                  *args, **kwargs):
         """
         Initialize Lark Operator
         
         Args:
-            message: Message payload to send
             conn_id: Airflow connection ID for Lark
         """
         super().__init__(*args, **kwargs)
-        self.message = message
         self.conn_id = conn_id
         self.hook = None
 
