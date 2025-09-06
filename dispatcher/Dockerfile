@@ -45,14 +45,14 @@ COPY requirements.txt .
 # 安装Python依赖
 RUN pip install --no-cache-dir -r requirements.txt || echo "安装依赖失败，继续执行"
 
-# 设置环境变量
-ENV PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation"
+
+ENV PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators"
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Shanghai
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 
 # 更新bash配置文件以包含Python搜索路径
-RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:$PYTHONPATH"' >> ~/.bashrc
+RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators:$PYTHONPATH"' >> ~/.bashrc
 
 # 验证模块导入
 RUN python -c "from automation.client import MaxComputerClient; print('成功导入MaxComputerClient')" || echo "无法导入MaxComputerClient，请检查模块结构"
