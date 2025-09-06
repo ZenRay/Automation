@@ -143,8 +143,8 @@ class LarkIM(LarkClient):
         This method uploads an image file or uses an existing image key.
 
         Args:
-            file (str, optional): The path to the image file to upload.
-            image_type (str, optional): The type of image, either "message" or "avatar". Defaults to "message".
+            file (str, ImageMesage): The path to the image file to upload.
+            image_type (str): The type of image, either "message" or "avatar". Defaults to "message".
             need_binary (bool, optional): Whether to read the file as binary. Defaults to True.
 
         Returns:
@@ -154,6 +154,12 @@ class LarkIM(LarkClient):
             ValueError: If neither file nor image_key is provided.
 
         """
+        if isinstance(file, ImageMessage):
+            file_name = file.file_name
+            file = file.file
+        elif isinstance(file, str):
+            file_name = ""
+            
         # Prepare the file for upload
         if need_binary:
             with open(file, "rb") as f:
@@ -181,7 +187,8 @@ class LarkIM(LarkClient):
         )
         
         if resp.get("code", -1) == 0:
-            logger.info(f"Image file({file}) uploaded successfully:")
+            msg = f"({file_name})" if len(file_name) > 0 else ""
+            logger.info(f"Image file{msg} uploaded successfully:")
         else:
             logger.error(f"Failed to upload image file({file}): {resp.get('msg', '')}")
             raise LarkMessageException(f"Failed to upload image file({file}): {resp.get('msg', '')}")
@@ -249,10 +256,10 @@ class LarkIM(LarkClient):
         )
         
         if resp.get("code", -1) == 0:
-            logger.info(f"File({file}) uploaded successfully:")
+            logger.info(f"File({file_name}) uploaded successfully:")
         else:
-            logger.error(f"Failed to upload file({file}): {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to upload file({file}): {resp.get('msg', '')}")
+            logger.error(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
         return resp
 
         
