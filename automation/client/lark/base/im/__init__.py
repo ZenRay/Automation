@@ -9,7 +9,8 @@ from ._message import (
     Message,
     ImageMessage,
     FileMessage,
-    TextMessage
+    TextMessage,
+    StaticInteractiveMessage
 )
 
 

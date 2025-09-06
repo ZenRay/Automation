@@ -400,11 +400,13 @@ class ImageMessage(Message):
         return True
 
 
-    def upload_file(self, func, *args, **kwargs):
+    def upload_file(self, func, file:str=None, image_type:str="message", *args, **kwargs):
         """Upload File With API
         
         Args:
             func: A callable object that will handle the file upload
+            file (str, optional): The file path to upload. If None, use the instance's file.
+            image_type (str, optional): The type of the image, "message" or "avatar", default is "message".
             *args: Additional arguments to pass to the uploader
             **kwargs: Additional keyword arguments to pass to the uploader
             
@@ -423,16 +425,27 @@ class ImageMessage(Message):
 
         # parse image_type from kwargs or use current
         image_type = self._image_type
-        if kwargs.get("image_type", None) is None:
-            image_type = kwargs.pop("image_type")
+        file = self.file
+        file_name = self.file_name
+        use_arg = False
+        if file is not None:
+            use_arg = True
+            file = file
+
+            file_name, _ = self._extract_file_info(file)
+        if use_arg:
+            if image_type in ("message", "avatar"):
+                image_type = image_type
+            else:
+                image_type = "message"
             
         if self.is_can_upload:
-            result = func(file=self._file, need_binary=True, image_type=image_type, *args, **kwargs)
+            result = func(file=file, need_binary=True, image_type=image_type, *args, **kwargs)
             logger.debug(f"Image uploaded via uploader callable; local_file={self.file}")
             if isinstance(result, dict) and result.get("code", -1) == 0:
                 # update image_key after successful upload
                 self.image_key = result.get("data", {}).get("image_key")
-                logger.info(f"Image file ({self._file_name}) key updated to: {self.image_key}")
+                logger.info(f"Image file ({file_name}) key updated")
             return result
         else:
             logger.debug("Image upload skipped: no local file or already uploaded.")
@@ -802,6 +815,123 @@ class FileMessage(Message):
             else:
                 raise LarkMessageException("Media message coverage file required but no image_key provided.")
 
+        result = func(
+            msg_type=self.msg_type, content=content, receive_id_type=receive_id_type,
+            receive_id=receive_id, uuid=uuid,  **kwargs
+        )
+        return result
+    
+
+class StaticInteractiveMessage(Message):
+    """ Lark IM Static Interactive Message.
+    Static Interactive Message, only support card dict.
+    """
+    def __init__(self, card: dict = None):
+        """Initialize InteraciiveMessage.
+
+        Keyword arguments:
+            card: dict, The card content of the interactive message.
+        """ 
+        super().__init__(message_type="interactive")
+        self._card = card if isinstance(card, dict) else {}
+        self._msg_type = "interactive"
+        
+    @property
+    def file_type(self):
+        """File Type Property"""
+        raise NotImplementedError("InteraciiveMessage has no file type.")
+    
+    @file_type.setter
+    def file_type(self, value):
+        """Set File Type Property"""
+        raise NotImplementedError("InteraciiveMessage has no file type.")
+    
+    @property
+    def file_name(self):
+        """File Name Property"""
+        raise NotImplementedError("InteraciiveMessage has no file name.")
+    
+    @file_name.setter
+    def file_name(self, value):
+        """Set File Name Property"""
+        raise NotImplementedError("InteraciiveMessage has no file name.")
+    
+    
+    @property
+    def msg_type(self):
+        """Message Type Property"""
+        return self._msg_type
+    
+    @msg_type.setter
+    def msg_type(self, value):
+        """Set Message Type Property"""
+        raise NotImplementedError("InteraciiveMessage msg_type is fixed to 'interactive'.")
+
+    @property
+    def message_key(self):
+        return None
+    
+    
+    @message_key.setter
+    def message_key(self, value):
+        """Set Message Key Property"""
+        self._message_key = value
+
+
+    @property
+    def is_raw(self):
+        """Check Message Whether Raw"""
+        return True
+    
+    @property
+    def is_can_upload(self):
+        """Check Message Whether Can Upload"""
+        return False
+    
+    
+    @property
+    def content(self):
+        """Get Card Content"""
+        return self._card
+
+
+    def check_validate(self, *args, **kwargs):
+        """Check Message Validate"""
+        if not isinstance(self._card, dict) or len(self._card) == 0:
+            raise LarkMessageException("Interactive message card content must be a non-empty dict.")
+        return True
+    
+    def upload_file(self, *args, **kwargs):
+        """Upload File With API"""
+        raise NotImplementedError("InteraciiveMessage has no file to upload.")
+    
+   
+    
+    def send_message(self, func, receive_id_type:str="open_id", receive_id:str=None, uuid:str=None, *args, **kwargs):
+        """Send Message With API
+        
+        Args:
+            func: A callable object that will handle the message sending
+            *args: Additional arguments to pass to the sender
+            **kwargs: Additional keyword arguments to pass to the sender
+            
+        Returns:
+            The result of the callable function.
+        """
+        if not callable(func):
+            raise TypeError("sender 'func' must be a callable object")
+        
+        if not check_function_arg(func, "msg_type"):
+            raise TypeError("sender 'func' must accept a 'msg_type' keyword argument")
+        
+        if not check_function_arg(func, "content"):
+            raise TypeError("sender 'func' must accept a 'content' keyword argument")
+
+        content = self.content
+        if kwargs.get("content", None) is not None:
+            content = kwargs.pop("content")
+            
+            
         result = func(
             msg_type=self.msg_type, content=content, receive_id_type=receive_id_type,
             receive_id=receive_id, uuid=uuid, *args, **kwargs
