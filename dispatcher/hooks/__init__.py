@@ -11,6 +11,7 @@ from os import path
 
 from airflow.models import Connection
 from airflow.hooks.base import BaseHook
+from airflow.exceptions import AirflowNotFoundException
 
 from  automation.client import (
     MaxComputerClient, LarkIM, LarkSheets
@@ -51,7 +52,11 @@ class MaxcomputeHook(BaseHook):
         Returns:
             Connection object
         """
-        return Connection.get_connection_from_secrets(self.conn_id)
+        try:
+            # Prefer secrets backend, but fall back to metadata DB if not found there
+            return Connection.get_connection_from_secrets(self.conn_id)
+        except AirflowNotFoundException:
+            return self.get_connection(self.conn_id)
     
 
     @property
@@ -62,13 +67,26 @@ class MaxcomputeHook(BaseHook):
             MaxComputerClient instance
         """
         if self._client is None:
+            # Support both possible key names stored in Connection.extra
+            secret = (
+                self.connection.extra_dejson.get('access_key_secret')
+                or self.connection.extra_dejson.get('secret_access_key')
+                or self.connection.password
+            )
+
+            # Log resolved connection extra and secret for runtime diagnostics
+            try:
+                logger.info("MaxcomputeHook: connection.extra_dejson=%s", self.connection.extra_dejson)
+                logger.info("MaxcomputeHook: resolved secret startswith=%s", (secret[:4] + '...' if secret else None))
+            except Exception:
+                logger.exception("Failed to log connection extra for MaxcomputeHook")
+
             self._client = MaxComputerClient(
                 endpoint=self.connection.extra_dejson.get('endpoint'),
                 access_id=self.connection.extra_dejson.get('access_key_id', self.connection.login),
-                secret_access_key=self.connection.extra_dejson.get('access_key_secret', self.connection.password),
+                secret_access_key=secret,
                 project=self.connection.extra_dejson.get('project', self.connection.schema)
             )
-            logger.info(f"MaxCompute client initialized. {self.connection.extra_dejson}")
         return self._client
     
 
