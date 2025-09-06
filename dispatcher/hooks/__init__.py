@@ -118,7 +118,7 @@ class LarkHook(BaseHook):
         "sheets": None
     }
     
-    def __init__(self, conn_id: str = 'lark_app', target_url=None):
+    def __init__(self, conn_id: str = 'lark_app'):
         """Init MaxCompute Hook
         
         Args:
@@ -127,7 +127,6 @@ class LarkHook(BaseHook):
         super().__init__()
         self.conn_id = conn_id
         self.connection = self._get_connection()
-        self.target_url = target_url
 
 
     def _get_connection(self) -> Connection:
@@ -146,12 +145,13 @@ class LarkHook(BaseHook):
         Returns:
             LarkSheets instance
         """
+        
         if self._clients["sheets"] is None:
             self._clients["sheets"] = LarkSheets(
                 app_id=self.connection.json_dejson.get('app_id', self.connection.login),
                 app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
                 lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
-                url=self.target_url
+                url=None
             )
         return self._clients["sheets"]
 

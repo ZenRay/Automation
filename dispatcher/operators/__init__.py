@@ -95,18 +95,15 @@ class LarkOperator(BaseOperator):
     
     @apply_defaults
     def __init__(self, 
-                 message: dict,
                  conn_id: str = 'lark_app',
                  *args, **kwargs):
         """
         Initialize Lark Operator
         
         Args:
-            message: Message payload to send
             conn_id: Airflow connection ID for Lark
         """
         super().__init__(*args, **kwargs)
-        self.message = message
         self.conn_id = conn_id
         self.hook = None
 
@@ -206,6 +203,7 @@ class LarkOperator(BaseOperator):
         self._extract_data2sheet_values(
             df=df,
             columns=columns,
+            target_url=target_url,
             range_str=range_str,
             sheet_title=sheet_title,
             lark_sheets=client
@@ -219,15 +217,18 @@ class LarkOperator(BaseOperator):
             f"\tColumns: {columns}\n"
         )
         
-    def _extract_data2sheet_values(self, df, columns, range_str, sheet_title, lark_sheets):
+    def _extract_data2sheet_values(self, df, columns, target_url, range_str, sheet_title, lark_sheets):
         """Extract data from DataFrame and send to Lark Sheets.
         Args:
             df (pd.DataFrame): The DataFrame containing the data to send.
             columns (list): The list of columns to extract from the DataFrame.
+            target_url (str): The URL of the target Lark Sheet.
             range_str (str): The range string for the target sheet.
             sheet_title (str): The title of the target sheet.
             lark_sheets (LarkSheets): The LarkSheets client instance.
         """
+        # Update target URL
+        lark_sheets.extract_spreadsheet_info(target_url)
         
         sheet_id = lark_sheets.get_sheet_id(sheet_title)
         raw_data = df.loc[:, columns].drop_duplicates().copy()
