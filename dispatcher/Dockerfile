@@ -32,26 +32,14 @@ COPY requirements.txt .
 # 安装Python依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 创建必要的目录
-RUN mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins
 
-# 验证并创建Automation/automation目录结构
-RUN ls -la /opt/airflow/ && \
-    echo "验证Automation目录结构..." && \
-    ls -la /opt/airflow/Automation/ && \
-    echo "验证automation子目录..." && \
-    ls -la /opt/airflow/Automation/automation/
-
-# 设置环境变量 - 修复PYTHONPATH，确保包含所有必要的路径
-ENV PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation"
+ENV PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators"
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Shanghai
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 
 # 更新bash配置文件以包含Python搜索路径
-RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:$PYTHONPATH"' >> ~/.bashrc && \
-    echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:$PYTHONPATH"' >> ~/.profile && \
-    echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:$PYTHONPATH"' >> ~/.bash_profile
+RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators:$PYTHONPATH"' >> ~/.bashrc
 
 # # 创建Python配置文件以确保PYTHONPATH在所有环境中都可用
 # RUN echo 'import sys' > /opt/airflow/Automation/automation/__init__.py && \
