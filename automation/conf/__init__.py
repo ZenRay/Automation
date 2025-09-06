@@ -17,7 +17,7 @@ logger = logging.getLogger("automation.conf")
 file = path.join(path.dirname(__file__), "_maxcomputer.ini")
 template = """[prod]
 access_id: {access_id}
-secret_access_key: {secret_acccess_key}
+secret_access_key: {secret_access_key}
 project: {project}
 endpoint: {endpoint}
 """
