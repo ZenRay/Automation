@@ -168,7 +168,7 @@ class LarkOperator(BaseOperator):
         
         # refresh client information
         client.extract_spreadsheet_info(target_url)
-        client.sheets_mapping
+        client.extract_sheets(client.spread_sheet)
         
         if target_url is None:
             raise ValueError("Argument 'target_url' is required for Lark Sheets.")
