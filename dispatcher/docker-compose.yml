@@ -60,25 +60,15 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/requirements.txt
       - ./etl_sentence:/opt/airflow/Automation/dispatcher/etl_sentence:ro
+      - ./scripts:/opt/airflow/scripts:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     # 使用 root 用户启动，但内部进程以 airflow 用户运行
     user: "root"
     ports:
       - "8080:8080"
-    # 添加修复日志权限的命令
-    command: >
-      bash -c "mkdir -p /opt/airflow/logs && 
-      chmod -R 777 /opt/airflow/logs && 
-      chown -R airflow:root /opt/airflow/logs &&
-      airflow db init && 
-      airflow db upgrade &&
-      airflow users create --username admin --firstname Admin --lastname User --email admin@example.com --role Admin --password admin || true &&
-      sleep 5 &&
-      su airflow -c 'airflow scheduler -D' & 
-      su airflow -c 'airflow triggerer -D' & 
-      su airflow -c 'airflow webserver'
-      "
+    # 使用bash明确执行启动脚本
+    command: bash -c "/opt/airflow/scripts/start_airflow.sh"
     depends_on:
       mysql:
         condition: service_healthy

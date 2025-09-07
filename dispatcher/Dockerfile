@@ -7,6 +7,9 @@ USER root
 # 安装git和系统工具
 RUN apt-get update && apt-get install -y git procps curl vim iputils-ping net-tools && apt-get clean
 
+# 创建脚本目录
+RUN mkdir -p /opt/airflow/scripts
+
 # 切换回airflow用户
 USER airflow
 
@@ -56,14 +59,20 @@ RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/A
 # 验证模块导入
 RUN python -c "from automation.client import MaxComputerClient; print('成功导入MaxComputerClient')" || echo "无法导入MaxComputerClient，请检查模块结构"
 
-# 创建健康检查脚本
+# 健康检查
 USER root
-RUN echo '#!/bin/bash\ncurl -sf http://localhost:8080/health >/dev/null || exit 1' > /healthcheck.sh && \
-    chmod +x /healthcheck.sh
+# 创建脚本目录
+RUN mkdir -p /opt/airflow/scripts
+# 复制脚本文件
+COPY scripts/healthcheck.sh /healthcheck.sh
+COPY scripts/watchdog.sh /opt/airflow/scripts/watchdog.sh
+COPY scripts/start_airflow.sh /opt/airflow/scripts/start_airflow.sh
+# 设置脚本权限
+RUN chmod +x /healthcheck.sh /opt/airflow/scripts/*.sh
 USER airflow
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
+# 健康检查配置
+HEALTHCHECK --interval=10s --timeout=10s --start-period=30s --retries=3 \
     CMD /healthcheck.sh
 
 # 暴露端口

@@ -96,42 +96,53 @@ else
   docker-compose logs
 fi
 
-# 步骤 10: 再次等待服务完全启动
-echo "等待服务完全启动 (30秒)..."
-sleep 30
+# 步骤 10: 等待服务完全启动
+echo "等待服务完全启动 (60秒)..."
+# 延长等待时间以确保自动恢复脚本有足够时间启动
+sleep 60
 
 # 步骤 11: 检查容器状态
 echo "正在检查容器状态..."
 docker-compose ps
+
+# 确定容器名称
+echo "确定容器名称..."
+AIRFLOW_CONTAINER=$(docker-compose ps -q airflow)
+AIRFLOW_CONTAINER_NAME=$(docker ps --format "{{.Names}}" -f "id=$AIRFLOW_CONTAINER")
+echo "Airflow容器名称: $AIRFLOW_CONTAINER_NAME"
 
 # 步骤 12: 验证服务健康状态
 echo "正在验证服务健康状态..."
 if curl -s -u admin:admin http://localhost:8080/api/v1/health; then
   echo -e "\nAirflow 服务健康检查完成"
 else
-  echo -e "\n警告: 无法获取健康状态，可能需要更多时间启动"
+  echo -e "\n警告: 无法获取健康状态，请检查容器日志"
+  docker-compose logs --tail=50 airflow
 fi
 
 # 步骤 13: 验证服务进程
 echo "检查关键服务进程..."
-docker exec -it dispatcher-airflow-1 bash -c "ps -ef | grep 'airflow' | grep -v grep"
+docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "ps -ef | grep 'airflow' | grep -v grep"
 
-# 步骤 14: 确保服务运行正常
-echo "正在确认服务是否需要修复..."
-if curl -s -u admin:admin http://localhost:8080/api/v1/health | grep -q '"status": "unhealthy"'; then
-  echo "检测到服务异常，尝试修复..."
-  chmod +x ./fix_airflow.sh
-  ./fix_airflow.sh
+# 步骤 14: 验证自动恢复脚本是否运行
+echo "验证自动恢复脚本..."
+if docker exec -it $AIRFLOW_CONTAINER_NAME pgrep -f "watchdog.sh" > /dev/null; then
+  echo "自动恢复脚本正在运行，服务将自动监控和恢复"
 else
-  echo "服务状态正常，无需修复"
+  echo "警告: 自动恢复脚本未运行，检查容器日志以获取更多信息"
+  docker-compose logs --tail=20 airflow
 fi
 
 echo "===== Airflow 服务重建完成 ====="
 echo "请访问 http://localhost:8080 检查 Airflow UI"
 echo "默认登录凭证: admin / admin"
 echo ""
-echo "如果遇到问题，可以使用以下命令:"
-echo "  ./fix_airflow.sh    - 修复常见的Airflow问题"
+echo "服务说明:"
+echo "  - 自动恢复机制已内置在容器中"
+echo "  - 所有服务异常将被自动监测和恢复"
+echo "  - 如遇紧急情况可使用restart_airflow.sh重启服务"
+echo ""
+echo "如果需要连接测试:"
 echo "  ./test_maxcompute_master.sh -c  - 测试MaxCompute连接（使用Airflow连接）"
 echo "  ./test_maxcompute_master.sh -e  - 测试MaxCompute连接（使用环境变量）"
 
@@ -141,9 +152,14 @@ echo -e "\n检查FERNET_KEY配置:"
 grep "AIRFLOW__CORE__FERNET_KEY" .env
 
 echo -e "\n检查容器内代理设置:"
-docker exec -it dispatcher-airflow-1 bash -c "env | grep -i proxy" || echo "无法连接容器，请检查容器状态"
+docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "env | grep -i proxy" || echo "无法连接容器，请检查容器状态"
 
-echo -e "\n检查scheduler服务状态:"
-curl -s -u admin:admin http://localhost:8080/api/v1/health | grep scheduler || echo "无法获取scheduler状态"
+# 检查自动恢复和监控日志
+echo -e "\n检查监控和自动恢复日志:"
+docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "ls -la /opt/airflow/logs/watchdog.log" || echo "监控日志尚未生成"
+docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "tail -n 5 /opt/airflow/logs/watchdog.log" || echo "无法读取监控日志"
+docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "ls -la /opt/airflow/logs/scheduler_watchdog.log" || echo "调度器监控日志尚未生成"
 
 echo -e "\n重建过程完成!"
+echo "所有服务现在由容器内自动恢复机制进行监控和维护"
+echo "如遇紧急情况可使用restart_airflow.sh重启服务"
