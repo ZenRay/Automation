@@ -74,12 +74,6 @@ class MaxcomputeHook(BaseHook):
                 or self.connection.password
             )
 
-            # Log resolved connection extra and secret for runtime diagnostics
-            try:
-                logger.info("MaxcomputeHook: connection.extra_dejson=%s", self.connection.extra_dejson)
-                logger.info("MaxcomputeHook: resolved secret startswith=%s", (secret[:4] + '...' if secret else None))
-            except Exception:
-                logger.exception("Failed to log connection extra for MaxcomputeHook")
 
             self._client = MaxComputerClient(
                 endpoint=self.connection.extra_dejson.get('endpoint'),
@@ -137,7 +131,7 @@ class LarkHook(BaseHook):
     """
     _clients = {
         "im": None,
-        "sheets": None
+        "sheet": None
     }
     
     def __init__(self, conn_id: str = 'lark_app'):
@@ -167,15 +161,15 @@ class LarkHook(BaseHook):
         Returns:
             LarkSheets instance
         """
-        
-        if self._clients["sheets"] is None:
-            self._clients["sheets"] = LarkSheets(
+
+        if self._clients["sheet"] is None:
+            self._clients["sheet"] = LarkSheets(
                 app_id=self.connection.json_dejson.get('app_id', self.connection.login),
                 app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
                 lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
                 url=None
             )
-        return self._clients["sheets"]
+        return self._clients["sheet"]
 
 
     @property
