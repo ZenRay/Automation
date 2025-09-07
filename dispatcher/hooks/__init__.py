@@ -164,9 +164,9 @@ class LarkHook(BaseHook):
 
         if self._clients["sheet"] is None:
             self._clients["sheet"] = LarkSheets(
-                app_id=self.connection.json_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
+                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
                 url=None
             )
         return self._clients["sheet"]
@@ -181,9 +181,9 @@ class LarkHook(BaseHook):
         """
         if self._clients["im"] is None:
             self._clients["im"] = LarkIM(
-                app_id=self.connection.json_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
+                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
             )
         return self._clients["im"]
 
