@@ -77,7 +77,7 @@ class MaxcomputeHook(BaseHook):
 
             self._client = MaxComputerClient(
                 endpoint=self.connection.extra_dejson.get('endpoint'),
-                access_id=self.connection.extra_dejson.get('access_key_id', self.connection.login),
+                access_id=self.connection.extra_dejson.get('access_id', self.connection.login),
                 secret_access_key=secret,
                 project=self.connection.extra_dejson.get('project', self.connection.schema)
             )
