@@ -78,15 +78,18 @@ class MaxcomputeOperator(BaseOperator):
         if hints is None:
             hints = self.hints
         
+        
         if file is not None:
             # Prefer client-provided execute_to_save if available (implemented in automation client)
             client = getattr(self.hook, 'client', None)
             client.execute_to_save(self.sql, file, hints=hints)
+            file = path.abspath(file)
         else:
             client.execute_sql(self.sql, hints=hints)
+            file = None
         
         logger.info(f"Executing SQL [Maxcompute] Success: \n{self.sql}")
-        
+        return file
    
 class LarkOperator(BaseOperator):
     """
@@ -119,9 +122,9 @@ class LarkOperator(BaseOperator):
         
         if self.hook is None:
             self.hook = LarkSheetsHook(conn_id=self.conn_id)
-        
+        logger.info(f"Context Params: {context.get('params')}") 
         # Get client according to context params
-        if context.get("params").get("client_type", None):
+        if context.get("params").get("client_type") is None:
             raise ValueError("Argument 'client_type' is not supported in LarkOperator.Need provide 'im' or 'sheet' instead.")
         client_type = context['params'].get('client_type')
         
@@ -135,11 +138,11 @@ class LarkOperator(BaseOperator):
         if context.get("params").get("kwargs") is None:
             raise ValueError("Need execute kwargs in context params. Argument 'kwargs' is required in LarkOperator.")
 
-        if context.get("params").get("task_type", None) is None:
+        if context.get("params").get("task_type") is None:
             raise ValueError("Need execute task_type in context params. Argument 'task_type' is required in LarkOperator.")
 
         kwargs = context['params'].get('kwargs')
-        task_type = context['params'].get('task_type', 'single2single')
+        task_type = context['params'].get('task_type')
 
         if client_type == "sheet" and task_type == "single2single":
             self.single2single_update_sheet(client, kwargs)
@@ -157,11 +160,11 @@ class LarkOperator(BaseOperator):
             None
         """
         
-        target_url = kwargs.get("target_url", None)
-        sheet_title = kwargs.get("sheet_title", None)
-        range_str = kwargs.get("range_str", None)
-        columns = kwargs.get("columns", None)
-        file = kwargs.get("file", None)
+        target_url = kwargs.get("target_url")
+        sheet_title = kwargs.get("sheet_title")
+        range_str = kwargs.get("range_str")
+        columns = kwargs.get("columns")
+        file = kwargs.get("file")
         
         if target_url is None:
             raise ValueError("Argument 'target_url' is required for Lark Sheets.")
@@ -175,8 +178,6 @@ class LarkOperator(BaseOperator):
         if file is None:
             raise ValueError("Argument 'file' is required for Lark Sheets.")
 
-        if columns is None:
-            raise ValueError("Argument 'columns' is required for Lark Sheets.")
 
         if file.endswith(".csv"):
             try:
@@ -201,7 +202,10 @@ class LarkOperator(BaseOperator):
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
 
-
+        # adjust columns
+        if columns is None:
+            columns = df.columns.to_list()
+        
         self._extract_data2sheet_values(
             df=df,
             columns=columns,
@@ -373,14 +377,22 @@ class LarkSheetsOperator(BaseOperator):
         if self.hook is None:
             self.hook = LarkSheetsHook(conn_id=self.conn_id, target_url=self.target_url)
         
-        if self.upload_task_type.startswith("Single"):
+        # Load file for single flows
+        if str(self.upload_task_type).lower().startswith("single"):
             df = self.hook.load_data(self.file_path)
-        
-        # Single File and Single 
-        if self.upload_task_type == "Single2Single":
-            # Get context args columns
-            columns = context['params'].get('columns', df.columns.tolist())
-            
+        else:
+            df = None
+
+        # Prepare columns from params or dataframe
+        columns = context.get('params', {}).get('columns', None)
+        if columns is None and df is not None:
+            columns = df.columns.tolist()
+
+        # Branch handling (case-insensitive)
+        ttype = str(self.upload_task_type).lower()
+        if ttype in ("single2single", "single"):
+            if columns is None:
+                raise ValueError("Argument 'columns' is required for single upload when not provided in params.")
             self.hook.extract_data2sheet_values(
                 df=df,
                 columns=columns,
@@ -388,17 +400,20 @@ class LarkSheetsOperator(BaseOperator):
                 sheet_title=self.sheet_title,
                 target_url=self.target_url
             )
-        elif self.upload_task_type == "Single2Batch":
-            
-            if self.__is_single_conf("sheet_title"):
-                for process_columns, process_ranges in zip(columns, range_str):
-                    self.hook.extract_data2sheet_values(
-                        df=df
-                        ,columns=process_columns
-                        ,range_str=process_ranges
-                        ,sheet_title=sheet_title
-                    )
-            
+        elif ttype == "single2batch":
+            # Expect columns to be a list of lists matching self.range_str
+            if not isinstance(self.range_str, (list, tuple)):
+                raise ValueError("For Single2Batch, 'range_str' must be a list of ranges.")
+            if not isinstance(columns, (list, tuple)):
+                raise ValueError("For Single2Batch, 'columns' must be provided as a list of column lists in params.")
+
+            for process_columns, process_ranges in zip(columns, self.range_str):
+                self.hook.extract_data2sheet_values(
+                    df=df,
+                    columns=process_columns,
+                    range_str=process_ranges,
+                    sheet_title=self.sheet_title
+                )
         else:
             raise ValueError("task_type must be either 'single' or 'batch'.")
         
