@@ -166,6 +166,10 @@ class LarkOperator(BaseOperator):
         columns = kwargs.get("columns")
         file = kwargs.get("file")
         
+        # refresh client information
+        client.extract_spreadsheet_info(target_url)
+        client.sheets_mapping
+        
         if target_url is None:
             raise ValueError("Argument 'target_url' is required for Lark Sheets.")
 
