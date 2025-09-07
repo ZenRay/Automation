@@ -4,15 +4,23 @@
 """
 import logging
 import time
-
+import sys
 import pandas as pd
 
 from decimal import Decimal
+from os import path
 
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
 
-from utils.hooks import MaxcomputeHook, LarkSheetsHook
+
+# 添加etl_sentence模块路径到Python搜索路径
+current_dir = path.dirname(path.abspath(__file__))
+utils_path = path.join(current_dir, '..', 'utils')
+if utils_path not in sys.path:
+    sys.path.insert(0, utils_path)
+
+from hooks import MaxcomputeHook, LarkSheetsHook
 
 
 from automation.client.lark.utils import (

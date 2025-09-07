@@ -102,7 +102,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -155,7 +154,6 @@ logs/
 **/symlinks/
 
 # Dispatcher specific ignores
-dispatcher/.env
 dispatcher/.env.local
 dispatcher/.env.production
 dispatcher/.env.conf

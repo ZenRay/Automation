@@ -4,6 +4,7 @@
 Load data and transform data by maxcomputer
 """
 import logging
+from os import path
 from odps import ODPS, options
 
 # activate quota
@@ -56,12 +57,12 @@ class MaxComputerClient:
         """
         instance = self.execute_sql(sql, hints=hints)
         instance.wait_for_success()
-        df = instance.to_df()
+        df = instance.to_pandas()
         if file_path.endswith('.csv'):
             df.to_csv(file_path, index=False)
         elif file_path.endswith('.xlsx'):
             df.to_excel(file_path, index=False)
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
-        
-        logger.info(f"SQL Result saved to local file: {file_path}")
+
+        logger.info(f"SQL Result saved to local file: {path.abspath(file_path)}")
