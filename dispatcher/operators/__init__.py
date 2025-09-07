@@ -16,7 +16,7 @@ from airflow.utils.decorators import apply_defaults
 
 
 
-from dispatcher.hooks import MaxcomputeHook, LarkSheetsHook
+from dispatcher.hooks import MaxcomputeHook, LarkHook
 
 
 from automation.client.lark.utils import (
@@ -121,8 +121,8 @@ class LarkOperator(BaseOperator):
         logger.info(f"Sending message via Lark Start")
         
         if self.hook is None:
-            self.hook = LarkSheetsHook(conn_id=self.conn_id)
-        logger.info(f"Context Params: {context.get('params')}") 
+            self.hook = LarkHook(conn_id=self.conn_id)
+        logger.info(f"Context Params: {context.get('params')}")
         # Get client according to context params
         if context.get("params").get("client_type") is None:
             raise ValueError("Argument 'client_type' is not supported in LarkOperator.Need provide 'im' or 'sheet' instead.")
