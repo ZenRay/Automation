@@ -45,7 +45,7 @@ from etl_sentence.maxcompute_sql import (
 
 
 # 导入MaxcomputeHook
-from utils.operator import MaxcomputeOperator
+from dispatcher.operators import MaxcomputeOperator
 
 
 # Maxcompute Hints

@@ -16,7 +16,7 @@ from airflow.utils.decorators import apply_defaults
 
 
 
-from dispatcher.hooks import MaxcomputeHook, LarkSheetsHook
+from dispatcher.hooks import MaxcomputeHook, LarkHook
 
 
 from automation.client.lark.utils import (
@@ -78,13 +78,18 @@ class MaxcomputeOperator(BaseOperator):
         if hints is None:
             hints = self.hints
         
+        
         if file is not None:
-            self.hook.execute_to_save(self.sql, file, hints=hints)
+            # Prefer client-provided execute_to_save if available (implemented in automation client)
+            client = getattr(self.hook, 'client', None)
+            client.execute_to_save(self.sql, file, hints=hints)
+            file = path.abspath(file)
         else:
-            self.hook.execute_sql(self.sql, hints=hints)
+            client.execute_sql(self.sql, hints=hints)
+            file = None
         
         logger.info(f"Executing SQL [Maxcompute] Success: \n{self.sql}")
-        
+        return file
    
 class LarkOperator(BaseOperator):
     """
@@ -95,18 +100,15 @@ class LarkOperator(BaseOperator):
     
     @apply_defaults
     def __init__(self, 
-                 message: dict,
                  conn_id: str = 'lark_app',
                  *args, **kwargs):
         """
         Initialize Lark Operator
         
         Args:
-            message: Message payload to send
             conn_id: Airflow connection ID for Lark
         """
         super().__init__(*args, **kwargs)
-        self.message = message
         self.conn_id = conn_id
         self.hook = None
 
@@ -119,10 +121,10 @@ class LarkOperator(BaseOperator):
         logger.info(f"Sending message via Lark Start")
         
         if self.hook is None:
-            self.hook = LarkSheetsHook(conn_id=self.conn_id)
-        
+            self.hook = LarkHook(conn_id=self.conn_id)
+        logger.info(f"Context Params: {context.get('params')}")
         # Get client according to context params
-        if context.get("params").get("client_type", None):
+        if context.get("params").get("client_type") is None:
             raise ValueError("Argument 'client_type' is not supported in LarkOperator.Need provide 'im' or 'sheet' instead.")
         client_type = context['params'].get('client_type')
         
@@ -136,11 +138,11 @@ class LarkOperator(BaseOperator):
         if context.get("params").get("kwargs") is None:
             raise ValueError("Need execute kwargs in context params. Argument 'kwargs' is required in LarkOperator.")
 
-        if context.get("params").get("task_type", None) is None:
+        if context.get("params").get("task_type") is None:
             raise ValueError("Need execute task_type in context params. Argument 'task_type' is required in LarkOperator.")
 
         kwargs = context['params'].get('kwargs')
-        task_type = context['params'].get('task_type', 'single2single')
+        task_type = context['params'].get('task_type')
 
         if client_type == "sheet" and task_type == "single2single":
             self.single2single_update_sheet(client, kwargs)
@@ -158,11 +160,15 @@ class LarkOperator(BaseOperator):
             None
         """
         
-        target_url = kwargs.get("target_url", None)
-        sheet_title = kwargs.get("sheet_title", None)
-        range_str = kwargs.get("range_str", None)
-        columns = kwargs.get("columns", None)
-        file = kwargs.get("file", None)
+        target_url = kwargs.get("target_url")
+        sheet_title = kwargs.get("sheet_title")
+        range_str = kwargs.get("range_str")
+        columns = kwargs.get("columns")
+        file = kwargs.get("file")
+        
+        # refresh client information
+        client.extract_spreadsheet_info(target_url)
+        client.extract_sheets(client.spread_sheet)
         
         if target_url is None:
             raise ValueError("Argument 'target_url' is required for Lark Sheets.")
@@ -176,8 +182,6 @@ class LarkOperator(BaseOperator):
         if file is None:
             raise ValueError("Argument 'file' is required for Lark Sheets.")
 
-        if columns is None:
-            raise ValueError("Argument 'columns' is required for Lark Sheets.")
 
         if file.endswith(".csv"):
             try:
@@ -202,10 +206,14 @@ class LarkOperator(BaseOperator):
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
 
-
+        # adjust columns
+        if columns is None:
+            columns = df.columns.to_list()
+        
         self._extract_data2sheet_values(
             df=df,
             columns=columns,
+            target_url=target_url,
             range_str=range_str,
             sheet_title=sheet_title,
             lark_sheets=client
@@ -219,15 +227,18 @@ class LarkOperator(BaseOperator):
             f"\tColumns: {columns}\n"
         )
         
-    def _extract_data2sheet_values(self, df, columns, range_str, sheet_title, lark_sheets):
+    def _extract_data2sheet_values(self, df, columns, target_url, range_str, sheet_title, lark_sheets):
         """Extract data from DataFrame and send to Lark Sheets.
         Args:
             df (pd.DataFrame): The DataFrame containing the data to send.
             columns (list): The list of columns to extract from the DataFrame.
+            target_url (str): The URL of the target Lark Sheet.
             range_str (str): The range string for the target sheet.
             sheet_title (str): The title of the target sheet.
             lark_sheets (LarkSheets): The LarkSheets client instance.
         """
+        # Update target URL
+        lark_sheets.extract_spreadsheet_info(target_url)
         
         sheet_id = lark_sheets.get_sheet_id(sheet_title)
         raw_data = df.loc[:, columns].drop_duplicates().copy()
@@ -309,133 +320,3 @@ class LarkOperator(BaseOperator):
             f"\tContent: {kwargs.get('content')}\n"
         )
 
-        
-class LarkSheetsOperator(BaseOperator):
-    """Lark Sheets Operator
-    
-    Uploads data to Lark Sheets using LarkSheetsHook.
-    """
-    
-    @apply_defaults
-    def __init__(self, 
-                 file_path: str,
-                 range_str: str,
-                 sheet_title: str,
-                 target_url: str,
-                 conn_id: str = 'lark_app',
-                 upload_task_type:str = "single2Single",
-                 *args, **kwargs):
-        """
-        Initialize Lark Sheets Operator
-        
-        Args:
-            file_path: str or List[str], Path to the file to load data from
-            range_str: str or List[str], Cell range in A1 notation. 
-                If task_type is "Batch", must be a list of ranges.
-            sheet_title: str or List[str], Title/Id of the sheet to upload data to.
-                If task_type is "Batch", can be a list of titles/Ids, or a single title/Id if all data goes to one sheet.
-            target_url: URL of the target Lark Sheet
-            conn_id: Airflow connection ID for Lark Sheets
-            upload_task_type: Type of task, None, "single" or "batch". Default is "single2Single".
-                If "Single2Single", uploads data to one sheet. Single file and single range are expected.
-                If "Single2Batch",  uploads data to multi range. Single file and multi range are expected
-                    and 'range_str' must be list with multiple ranges.
-        """
-        super().__init__(*args, **kwargs)
-
-        self.file_path = file_path
-        self.range_str = range_str
-        self.sheet_title = sheet_title
-        self.target_url = target_url
-        self.conn_id = conn_id
-        self.hook = None
-
-        # TODO: Add Download Task Type
-        if upload_task_type is not None and upload_task_type not in ["single", "batch"]:
-            raise ValueError("upload_task_type must be either 'single' or 'batch' or None.")
-        
-        self.upload_task_type = upload_task_type
-        
-        
-    
-    def execute(self, context):
-        """
-        Execute the data upload to Lark Sheets
-        
-        Args:
-            context: Airflow execution context
-        """
-        logger.info(f"Uploading data to Lark Sheets Start")
-        
-        if self.hook is None:
-            self.hook = LarkSheetsHook(conn_id=self.conn_id, target_url=self.target_url)
-        
-        if self.upload_task_type.startswith("Single"):
-            df = self.hook.load_data(self.file_path)
-        
-        # Single File and Single 
-        if self.upload_task_type == "Single2Single":
-            # Get context args columns
-            columns = context['params'].get('columns', df.columns.tolist())
-            
-            self.hook.extract_data2sheet_values(
-                df=df,
-                columns=columns,
-                range_str=self.range_str,
-                sheet_title=self.sheet_title,
-                target_url=self.target_url
-            )
-        elif self.upload_task_type == "Single2Batch":
-            
-            if self.__is_single_conf("sheet_title"):
-                for process_columns, process_ranges in zip(columns, range_str):
-                    self.hook.extract_data2sheet_values(
-                        df=df
-                        ,columns=process_columns
-                        ,range_str=process_ranges
-                        ,sheet_title=sheet_title
-                    )
-            
-        else:
-            raise ValueError("task_type must be either 'single' or 'batch'.")
-        
-        logger.info(f"Uploading data to Lark Sheets Success")
-        
-        
-    
-    def __is_single_conf(self, property:str, types=(str,)):
-        """Check Single Configuration Validation
-
-        Raises:
-            ValueError: If parameters are not valid for single upload
-        """
-        if not isinstance(getattr(self, property), types):
-            raise ValueError(f"For single upload job, '{property}' must be a single string.")
-
-        return True
-
-    def __is_multi_conf(self, property:str, is_nested=False):
-        """Check Multi Configuration Validation
-        
-        Raises:
-            ValueError: If parameters are not valid for multi upload
-        """
-        value = getattr(self, property)
-        if  not isinstance(value, (list, tuple)) and not is_nested:
-            raise ValueError(
-                f"For Non-nested Batch job, expected 'list' or 'tuple', but get '{type(value)}'"
-            )
-        
-        if not (
-            isinstance(value, (list, tuple))
-                and isinstance(value[0], (list, tuple))
-        ) and is_nested:
-            if isinstance(value, (list, tuple)):
-                msg = f"List[Non-List]"
-            else:
-                msg = "Non-List"
-            raise ValueError(
-                f"For nested Batch job, expected List[List], but{msg} "
-            )
-            
-        return True
