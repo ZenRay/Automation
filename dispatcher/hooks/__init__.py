@@ -11,6 +11,7 @@ from os import path
 
 from airflow.models import Connection
 from airflow.hooks.base import BaseHook
+from airflow.exceptions import AirflowNotFoundException
 
 from  automation.client import (
     MaxComputerClient, LarkIM, LarkSheets
@@ -51,7 +52,11 @@ class MaxcomputeHook(BaseHook):
         Returns:
             Connection object
         """
-        return Connection.get_connection_from_secrets(self.conn_id)
+        try:
+            # Prefer secrets backend, but fall back to metadata DB if not found there
+            return Connection.get_connection_from_secrets(self.conn_id)
+        except AirflowNotFoundException:
+            return self.get_connection(self.conn_id)
     
 
     @property
@@ -62,10 +67,24 @@ class MaxcomputeHook(BaseHook):
             MaxComputerClient instance
         """
         if self._client is None:
+            # Support both possible key names stored in Connection.extra
+            secret = (
+                self.connection.extra_dejson.get('access_key_secret')
+                or self.connection.extra_dejson.get('secret_access_key')
+                or self.connection.password
+            )
+
+            # Log resolved connection extra and secret for runtime diagnostics
+            try:
+                logger.info("MaxcomputeHook: connection.extra_dejson=%s", self.connection.extra_dejson)
+                logger.info("MaxcomputeHook: resolved secret startswith=%s", (secret[:4] + '...' if secret else None))
+            except Exception:
+                logger.exception("Failed to log connection extra for MaxcomputeHook")
+
             self._client = MaxComputerClient(
                 endpoint=self.connection.extra_dejson.get('endpoint'),
                 access_id=self.connection.extra_dejson.get('access_key_id', self.connection.login),
-                secret_access_key=self.connection.extra_dejson.get('access_key_secret', self.connection.password),
+                secret_access_key=secret,
                 project=self.connection.extra_dejson.get('project', self.connection.schema)
             )
         return self._client
@@ -103,7 +122,10 @@ class MaxcomputeHook(BaseHook):
         if not sql:
             raise ValueError("SQL statement is required.")
         
-        self.execute_sql(sql, hints=hints, file=file)
+        if file:
+            self.client.execute_to_save(sql, file, hints=hints)
+        else: 
+            self.client.execute_sql(sql, hints=hints)
         logger.info("MaxCompute SQL execution task completed.")
 
     
@@ -118,7 +140,7 @@ class LarkHook(BaseHook):
         "sheets": None
     }
     
-    def __init__(self, conn_id: str = 'lark_app', target_url=None):
+    def __init__(self, conn_id: str = 'lark_app'):
         """Init MaxCompute Hook
         
         Args:
@@ -127,7 +149,6 @@ class LarkHook(BaseHook):
         super().__init__()
         self.conn_id = conn_id
         self.connection = self._get_connection()
-        self.target_url = target_url
 
 
     def _get_connection(self) -> Connection:
@@ -146,12 +167,13 @@ class LarkHook(BaseHook):
         Returns:
             LarkSheets instance
         """
+        
         if self._clients["sheets"] is None:
             self._clients["sheets"] = LarkSheets(
                 app_id=self.connection.json_dejson.get('app_id', self.connection.login),
                 app_secret=self.connection.json_dejson.get('app_secret', self.connection.password),
                 lark_host=self.connection.json_dejson.get('lark_host', 'https://open.feishu.cn'),
-                url=self.target_url
+                url=None
             )
         return self._clients["sheets"]
 
