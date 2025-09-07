@@ -179,6 +179,7 @@ class LarkHook(BaseHook):
         Returns:
             LarkIM instance
         """
+        logger.info(f"Getting Lark IM Client {self.connection.extra_dejson}")
         if self._clients["im"] is None:
             self._clients["im"] = LarkIM(
                 app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
