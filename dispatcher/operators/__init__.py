@@ -83,7 +83,7 @@ class MaxcomputeOperator(BaseOperator):
             client = getattr(self.hook, 'client', None)
             client.execute_to_save(self.sql, file, hints=hints)
         else:
-            self.hook.execute_sql(self.sql, hints=hints)
+            client.execute_sql(self.sql, hints=hints)
         
         logger.info(f"Executing SQL [Maxcompute] Success: \n{self.sql}")
         
