@@ -56,7 +56,7 @@ class MaxComputerClient:
         """
         instance = self.execute_sql(sql, hints=hints)
         instance.wait_for_success()
-        df = instance.to_df()
+        df = instance.to_pandas()
         if file_path.endswith('.csv'):
             df.to_csv(file_path, index=False)
         elif file_path.endswith('.xlsx'):
