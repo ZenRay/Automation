@@ -196,3 +196,13 @@ dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/dimension/*.py
 dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/fact/*.py
 
 trash/
+dispatcher/etl_sentence/comon_maxcompute_sql/dimension/goods.py
+.gitignore
+.gitignore
+.gitignore
+dispatcher/etl_sentence/comon_maxcompute_sql/fact/trade.py
+dispatcher/etl_sentence/comon_maxcompute_sql/fact/flow.py
+.gitignore
+dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores_goods.py
+dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores.py
+dispatcher/etl_sentence/report_sql/merchant.py

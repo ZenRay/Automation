@@ -22,7 +22,7 @@ from airflow.models import Connection
 
 
 # Maxcompute SQL Statements
-from report_sql.merchant import (
+from dispatcher.etl_sentence.report_sql.merchant import (
     mct_roi_report_sentence
 )
 
@@ -42,7 +42,7 @@ hints = {
 
 
 logger = logging.getLogger("dispatcher.dags.report_dags")
-
+current_dir = path.dirname(path.abspath(__file__))
 
 # Default arguments for the DAG
 DAG_CONFIG = {
