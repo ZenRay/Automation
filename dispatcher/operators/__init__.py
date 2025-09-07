@@ -74,11 +74,13 @@ class MaxcomputeOperator(BaseOperator):
             self.hook = MaxcomputeHook(conn_id=self.conn_id)
         hints = context.get("params", {}).get('hints')
         file = context.get("params", {}).get('file')
-        
+          
         if hints is None:
             hints = self.hints
         
-        
+        # Get MaxCompute client
+        client = self.hook.client
+
         if file is not None:
             # Prefer client-provided execute_to_save if available (implemented in automation client)
             client = getattr(self.hook, 'client', None)
