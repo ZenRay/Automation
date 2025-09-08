@@ -22,13 +22,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      network: host
     env_file:
       - .env
     environment:
-      AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: mysql+pymysql://airflow:airflow@mysql:3306/airflow
+      # 使用.env中的FERNET_KEY
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
@@ -37,38 +36,29 @@ services:
       AIRFLOW__CORE__PLUGINS_FOLDER: '/opt/airflow/plugins'
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: '/opt/airflow/logs'
       AIRFLOW__LOGGING__LOGGING_LEVEL: 'INFO'
-      AIRFLOW__LOGGING__HOSTNAME: 'airflow'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
       AIRFLOW__WEBSERVER__RBAC: 'true'
       AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Shanghai'
-      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: 'true'
-      AIRFLOW__WEBSERVER__SECRET_KEY: 'a_strong_secret_key_for_csrf_protection'
-      AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT: 120
       AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: 10
       AIRFLOW__SCHEDULER__PARSING_PROCESSES: 4
-      AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 30
-      AIRFLOW__SCHEDULER__SCHEDULER_ZOMBIE_TASK_THRESHOLD: 300
-      AIRFLOW__SCHEDULER__SCHEDULER_HEALTH_CHECK_THRESHOLD: 30
-      TZ: ${TZ:-Asia/Shanghai}
+      PYTHONPATH: "/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators:/opt/airflow/Automation/dispatcher/dags:/opt/airflow/Automation/dispatcher/plugins:/opt/airflow/Automation/dispatcher/etl_sentence"
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-      # Ensure feishu host and MaxCompute API bypass local proxy
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,open.feishu.cn,feishu.cn,service.cn-zhangjiakou.maxcompute.aliyun.com}
-      no_proxy: ${no_proxy:-localhost,127.0.0.1,open.feishu.cn,feishu.cn,service.cn-zhangjiakou.maxcompute.aliyun.com}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/requirements.txt
-      - ./etl_sentence:/opt/airflow/Automation/dispatcher/etl_sentence:ro
-      - ./scripts:/opt/airflow/scripts:ro
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
-    # 使用 root 用户启动，但内部进程以 airflow 用户运行
+      - ./etl_sentence:/opt/airflow/Automation/dispatcher/etl_sentence
     user: "root"
     ports:
       - "8080:8080"
-    # 使用bash明确执行启动脚本
-    command: bash -c "/opt/airflow/scripts/start_airflow.sh"
+    command: bash -c "
+              airflow db init &&
+              airflow db upgrade &&
+              airflow users create --username admin --firstname Admin --lastname User --email admin@example.com --role Admin --password admin || true &&
+              airflow scheduler & 
+              airflow triggerer &
+              airflow webserver"
     depends_on:
       mysql:
         condition: service_healthy
@@ -84,10 +74,6 @@ services:
 networks:
   airflow-network:
     driver: bridge
-    # 添加网络配置以匹配宿主机网络设置
-    driver_opts:
-      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
-      com.docker.network.driver.mtu: 1500
 
 volumes:
   mysql-db-volume:

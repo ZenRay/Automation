@@ -18,20 +18,42 @@ if [ -n "$CONTAINERS" ]; then
 fi
 echo "所有容器已停止"
 
-# 步骤 2: 生成新的 FERNET_KEY
-echo "正在生成新的 FERNET_KEY..."
-if command -v python3 &>/dev/null; then
-  NEW_FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-  if [ -n "$NEW_FERNET_KEY" ]; then
-    echo "生成了新的 FERNET_KEY: $NEW_FERNET_KEY"
-    # 更新 .env 文件中的 FERNET_KEY
-    sed -i "s|^AIRFLOW__CORE__FERNET_KEY=.*|AIRFLOW__CORE__FERNET_KEY=$NEW_FERNET_KEY|" .env
-    echo "已更新 .env 文件中的 FERNET_KEY"
-  else
-    echo "无法生成 FERNET_KEY，将使用默认值"
+# 步骤 2: 检查 FERNET_KEY 是否存在
+echo "检查 FERNET_KEY 配置..."
+if grep -q "^AIRFLOW__CORE__FERNET_KEY=" .env && grep -q -v "^AIRFLOW__CORE__FERNET_KEY=$" .env; then
+  echo "FERNET_KEY 已存在，将保留现有密钥以确保数据库兼容性"
+  read -p "是否要生成新的 FERNET_KEY？这可能会导致现有连接无法使用 (y/N): " REGEN_KEY
+  if [ "$REGEN_KEY" = "y" ] || [ "$REGEN_KEY" = "Y" ]; then
+    if command -v python3 &>/dev/null; then
+      NEW_FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+      if [ -n "$NEW_FERNET_KEY" ]; then
+        echo "生成了新的 FERNET_KEY: $NEW_FERNET_KEY"
+        # 更新 .env 文件中的 FERNET_KEY
+        sed -i "s|^AIRFLOW__CORE__FERNET_KEY=.*|AIRFLOW__CORE__FERNET_KEY=$NEW_FERNET_KEY|" .env
+        echo "已更新 .env 文件中的 FERNET_KEY，注意：这将使现有加密数据无法解密"
+      else
+        echo "无法生成 FERNET_KEY，将使用现有值"
+      fi
+    else
+      echo "未找到 python3，将使用现有 FERNET_KEY"
+    fi
   fi
 else
-  echo "未找到 python3，将使用默认 FERNET_KEY"
+  echo "未找到有效的 FERNET_KEY，将生成新密钥..."
+  if command -v python3 &>/dev/null; then
+    NEW_FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+    if [ -n "$NEW_FERNET_KEY" ]; then
+      echo "生成了新的 FERNET_KEY: $NEW_FERNET_KEY"
+      # 更新 .env 文件中的 FERNET_KEY
+      sed -i "s|^AIRFLOW__CORE__FERNET_KEY=.*|AIRFLOW__CORE__FERNET_KEY=$NEW_FERNET_KEY|" .env || \
+      echo "AIRFLOW__CORE__FERNET_KEY=$NEW_FERNET_KEY" >> .env
+      echo "已更新 .env 文件中的 FERNET_KEY"
+    else
+      echo "无法生成 FERNET_KEY，将使用默认值"
+    fi
+  else
+    echo "未找到 python3，将使用默认 FERNET_KEY"
+  fi
 fi
 
 # 步骤 3: 清理日志目录
@@ -71,10 +93,12 @@ echo "正在删除旧容器和镜像..."
 docker rm -f $(docker ps -a -q --filter name=dispatcher) 2>/dev/null || true
 # 删除旧镜像
 docker rmi dispatcher-airflow:latest 2>/dev/null || true
+# 清理可能的任何悬空镜像
+docker image prune -f
 
 # 步骤 6: 重新构建镜像
 echo "正在重新构建镜像..."
-docker build --network=host -t dispatcher-airflow:latest .
+docker build --no-cache --network=host -t dispatcher-airflow:latest .
 
 # 步骤 7: 启动容器
 echo "正在启动容器..."
@@ -154,11 +178,6 @@ grep "AIRFLOW__CORE__FERNET_KEY" .env
 echo -e "\n检查容器内代理设置:"
 docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "env | grep -i proxy" || echo "无法连接容器，请检查容器状态"
 
-# 检查自动恢复和监控日志
-echo -e "\n检查监控和自动恢复日志:"
-docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "ls -la /opt/airflow/logs/watchdog.log" || echo "监控日志尚未生成"
-docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "tail -n 5 /opt/airflow/logs/watchdog.log" || echo "无法读取监控日志"
-docker exec -it $AIRFLOW_CONTAINER_NAME bash -c "ls -la /opt/airflow/logs/scheduler_watchdog.log" || echo "调度器监控日志尚未生成"
 
 echo -e "\n重建过程完成!"
 echo "所有服务现在由容器内自动恢复机制进行监控和维护"
