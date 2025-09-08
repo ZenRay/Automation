@@ -206,3 +206,6 @@ dispatcher/etl_sentence/comon_maxcompute_sql/fact/flow.py
 dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores_goods.py
 dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores.py
 dispatcher/etl_sentence/report_sql/merchant.py
+
+
+backup/
