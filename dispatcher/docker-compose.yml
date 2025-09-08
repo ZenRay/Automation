@@ -178,6 +178,10 @@ services:
 networks:
   airflow-network:
     driver: bridge
+    # 添加网络配置以匹配宿主机网络设置
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+      com.docker.network.driver.mtu: 1500
 
 volumes:
   mysql-db-volume: 

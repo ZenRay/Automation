@@ -59,29 +59,34 @@ class MaxcomputeHook(BaseHook):
             return self.get_connection(self.conn_id)
     
 
-    @property
-    def client(self) -> MaxComputerClient:
-        """Get MaxComputerClient instance
+    def get_client(self) -> MaxComputerClient:
+        """Get a new MaxComputerClient instance
         
         Returns:
             MaxComputerClient instance
         """
-        if self._client is None:
-            # Support both possible key names stored in Connection.extra
-            secret = (
-                self.connection.extra_dejson.get('access_key_secret')
-                or self.connection.extra_dejson.get('secret_access_key')
-                or self.connection.password
-            )
+        # Support both possible key names stored in Connection.extra
+        secret = (
+            self.connection.extra_dejson.get('access_key_secret')
+            or self.connection.extra_dejson.get('secret_access_key')
+            or self.connection.password
+        )
 
-
-            self._client = MaxComputerClient(
-                endpoint=self.connection.extra_dejson.get('endpoint'),
-                access_id=self.connection.extra_dejson.get('access_id', self.connection.login),
-                secret_access_key=secret,
-                project=self.connection.extra_dejson.get('project', self.connection.schema)
-            )
-        return self._client
+        return MaxComputerClient(
+            endpoint=self.connection.extra_dejson.get('endpoint'),
+            access_id=self.connection.extra_dejson.get('access_id', self.connection.login),
+            secret_access_key=secret,
+            project=self.connection.extra_dejson.get('project', self.connection.schema)
+        )
+        
+    @property
+    def client(self) -> MaxComputerClient:
+        """Get MaxComputerClient instance (always returns a new instance)
+        
+        Returns:
+            MaxComputerClient instance
+        """
+        return self.get_client()
     
 
     def execute_sql(self, sql: str, *, hints: dict, file: str=None) -> None:
