@@ -70,18 +70,20 @@ class MaxcomputeOperator(BaseOperator):
         """
         logger.info(f"Executing SQL [Maxcompute] Start")
         
-        if self.hook is None:
-            self.hook = MaxcomputeHook(conn_id=self.conn_id)
+        # Always create a new hook instance for each execution
+        self.hook = MaxcomputeHook(conn_id=self.conn_id)
+        
         hints = context.get("params", {}).get('hints')
         file = context.get("params", {}).get('file')
-        
+          
         if hints is None:
             hints = self.hints
         
-        
+        # Get a fresh MaxCompute client for this execution
+        client = self.hook.get_client()
+
         if file is not None:
-            # Prefer client-provided execute_to_save if available (implemented in automation client)
-            client = getattr(self.hook, 'client', None)
+            # Execute SQL and save to file
             client.execute_to_save(self.sql, file, hints=hints)
             file = path.abspath(file)
         else:

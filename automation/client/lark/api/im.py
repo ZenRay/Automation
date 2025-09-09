@@ -48,8 +48,52 @@ class LarkIM(LarkClient):
         """
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         
-        
+    
+    # TODO: This need user key, so need to be implemented later
+    def query_user_by_keyword(self, keyword: str = None, user_id_type: str = "open_id", page_size: int = 10, page_token: str = None):
+        """Query users by a keyword from Lark's Contact service.
 
+        This method is a placeholder for querying users by keyword and should be implemented.
+
+        Raises:
+            NotImplementedError: Always, as this method is not yet implemented.
+
+        """
+        url = LarkContactURL.SEARCH_USER_BY_KEYWORD.value
+        
+        if user_id_type not in ("user_id", "open_id", "union_id"):
+            user_id_type = "open_id"
+        
+        param = {
+            "user_id_type": user_id_type,
+            "page_size": page_size
+        }
+        
+        if keyword is not None and len(keyword) > 0:
+            param["keyword"] = keyword
+
+        if page_token is not None and len(page_token) > 0:
+            param["page_token"] = page_token
+
+        headers = {
+            "Authorization": f"Bearer {self.tenant_access_token}"
+        }
+        
+        
+        resp = request(
+            method="GET",
+            url=url,
+            headers=headers,
+            params=param
+        )
+        
+        if resp.get("code", -1) == 0:
+            logger.info(f"Users queried successfully by keyword({keyword}):")
+        else:
+            logger.error(f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}")
+            raise LarkMessageException(f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}")
+        return resp
+    
 
     def query_single_user(self, user_id: str = None, user_id_type: str = None, department_id_type: str = None):
         """Query a single user's information from Lark's Contact service.
