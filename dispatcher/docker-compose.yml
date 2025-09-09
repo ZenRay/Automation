@@ -44,6 +44,9 @@ x-airflow-common:
       condition: service_healthy
   networks:
     - airflow-network
+  dns:
+    - 114.114.114.114
+    - 8.8.8.8
 
 services:
   mysql:
