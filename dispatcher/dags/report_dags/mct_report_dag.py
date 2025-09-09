@@ -22,7 +22,7 @@ from airflow.models import Connection
 
 
 # Maxcompute SQL Statements
-from report_sql.merchant import (
+from dispatcher.etl_sentence.report_sql.merchant import (
     mct_roi_report_sentence
 )
 
@@ -42,7 +42,7 @@ hints = {
 
 
 logger = logging.getLogger("dispatcher.dags.report_dags")
-
+current_dir = path.dirname(path.abspath(__file__))
 
 # Default arguments for the DAG
 DAG_CONFIG = {
@@ -64,6 +64,10 @@ DAG_CONFIG = {
     }
 } 
 
+# mct_roi_target_url = "https://bggc.feishu.cn/wiki/Jm36w0fKqiuxZikTDcxcaVu6ndd"
+
+mct_roi_target_url = "https://bggc.feishu.cn/wiki/Jm36w0fKqiuxZikTDcxcaVu6ndd?sheet=a05b50"
+save_file = path.join(current_dir, "./mct_roi_report_data.csv")
 
 with DAG(**DAG_CONFIG) as dag:
     # start_task
@@ -87,38 +91,118 @@ with DAG(**DAG_CONFIG) as dag:
     )
 
     # update lark sheet
-    update_mct_roi_lark_sheet_task = LarkOperator(
-        task_id="update_mct_roi_lark_sheet",
-        doc="更新商家ROI报表数据到飞书表格",
+    update_mct_roi_raw_data_task = LarkOperator(
+        task_id="pdate_mct_roi_raw_data",
+        doc="更新商家ROI报表数据到飞书表格，原始数据",
+        conn_id="lark_app_prod",
         params={
             "client_type": "sheet",
             "task_type": "single2single",
             "kwargs": {
-                "target_url": "https://test-datkt5aa0s25.feishu.cn/wiki/I4cRwuyAMiXFhRkFkLVcM0yonEb?sheet=XhYmqm",
+                "target_url": mct_roi_target_url,
                 "sheet_title": "原始数据",
                 "range_str": "A:AO",
-                "file": path.join(current_dir, "./mct_roi_report_data.csv"),
+                "file": save_file,
                 #  "columns": [...], # 可选参数，如不指定则使用数据文件的列名
             }
         }
     )
+    
 
+    # update
+    update_mct_roi_config_sku_task = LarkOperator(
+        task_id="update_mct_roi_config_sku_task",
+        doc="更新商家ROI报表数据到飞书表格，更新商品配置数据",
+        conn_id="lark_app_prod",
+        params={
+            "client_type": "sheet",
+            "task_type": "single2single",
+            "kwargs": {
+                "target_url": mct_roi_target_url,
+                "sheet_title": "Config",
+                "range_str": "A:F",
+                "file": save_file,
+                 "columns":["商品名称", "商品id",  "商家id", "四级类目名称",  "四级类目id", "最近下单间隔天数"]
+            }
+        }
+    )
+    
+    # update
+    update_mct_roi_config_cat4_mct_task = LarkOperator(
+        task_id="update_mct_roi_config_cat4_mct_task",
+        doc="更新商家ROI报表数据到飞书表格，更新商家类目配置数据",
+        conn_id="lark_app_prod",
+        params={
+            "client_type": "sheet",
+            "task_type": "single2single",
+            "kwargs": {
+                "target_url": mct_roi_target_url,
+                "sheet_title": "Config",
+                "range_str": "H:K",
+                "file": save_file,
+                 "columns":["四级类目id", "四级类目名称", "商家id", "商家名称"]
+            }
+        }
+    )
+
+    # update
+    update_mct_roi_config_cat4_task = LarkOperator(
+        task_id="update_mct_roi_config_cat4_task",
+        doc="更新商家ROI报表数据到飞书表格，更新类目配置数据",
+        conn_id="lark_app_prod",
+        params={
+            "client_type": "sheet",
+            "task_type": "single2single",
+            "kwargs": {
+                "target_url": mct_roi_target_url,
+                "sheet_title": "Config",
+                "range_str": "Q:R",
+                "file": save_file,
+                 "columns":['四级类目名称', "四级类目id"]
+            }
+        }
+    )
+    
+
+    # update
+    update_mct_roi_config_mct_task = LarkOperator(
+        task_id="update_mct_roi_config_mct_task",
+        doc="更新商家ROI报表数据到飞书表格，更新商家配置数据",
+        conn_id="lark_app_prod",
+        params={
+            "client_type": "sheet",
+            "task_type": "single2single",
+            "kwargs": {
+                "target_url": mct_roi_target_url,
+                "sheet_title": "Config",
+                "range_str": "T:U",
+                "file": save_file,
+                 "columns":["商家名称", "商家id"]
+            }
+        }
+    )
+    
+     
     # send msg
     send_message_task = LarkOperator(
         task_id="notify_mct_roi_report",
         doc="发送商家ROI更新提醒信息到飞书",
-        conn_id="lark_app",
+        conn_id="lark_app_prod",
         params={
             "client_type": "im",
             "task_type": "send_message",
             "kwargs": {
                 "receive_id_type": "open_id",
-                "receive_id": "ou_f22c565bf4f3ca8b3fa5bd2f20039949",
-                "content": "商家中心ROI报表数据已生成，请查收！",
+                "receive_id": "ou_f986b2f0354ea6f61492ba24aa3a8a22",
+                "content": "商家中心ROI报表数据已生成，请查收[链接](https://bggc.feishu.cn/wiki/Jm36w0fKqiuxZikTDcxcaVu6ndd?sheet=a05b50)！",
                 "message_type": "text"
             }
         }
     )
 
+# 杨银涛 ou_f986b2f0354ea6f61492ba24aa3a8a22
+# me ou_1a69b48a5944c26cc19b0272be54eabe
 
-    start_task >> extract_mct_roi_task >> update_mct_roi_lark_sheet_task >> send_message_task
+    start_task >> extract_mct_roi_task >> update_mct_roi_raw_data_task >> \
+    update_mct_roi_config_sku_task >> update_mct_roi_config_cat4_mct_task >> \
+    update_mct_roi_config_cat4_task >>  update_mct_roi_config_mct_task >> send_message_task

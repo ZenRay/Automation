@@ -21,19 +21,15 @@ from airflow.models import Connection
 
 
 # 添加etl_sentence模块路径到Python搜索路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-etl_sentence_path = os.path.join(current_dir, 'etl_sentence')
-utils_path = os.path.join(current_dir, '..', 'utils')
-if etl_sentence_path not in sys.path:
-    sys.path.insert(0, etl_sentence_path)
-    sys.path.insert(0, current_dir)
-    sys.path.insert(0, utils_path)
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# etl_sentence_path = os.path.join(current_dir, 'etl_sentence')
+# utils_path = os.path.join(current_dir, '..', 'utils')
+# if etl_sentence_path not in sys.path:
+#     sys.path.insert(0, etl_sentence_path)
+#     sys.path.insert(0, current_dir)
+#     sys.path.insert(0, utils_path)
 
-logger = logging.getLogger("dispatcher.dags.etl_dags")
-
-
-# 导入SQL语句
-from etl_sentence.maxcompute_sql import (
+from dispatcher.etl_sentence.comon_maxcompute_sql import (
     dim_sku_store_tags_sentence,
     dim_store_sentence,
     dim_store_history_trade_temp_sentence,
@@ -42,6 +38,20 @@ from etl_sentence.maxcompute_sql import (
     fact_flow_sentence,
     fact_trade_sentence
 )
+
+logger = logging.getLogger("dispatcher.dags.etl_dags")
+
+
+# # 导入SQL语句
+# from etl_sentence.maxcompute_sql import (
+#     dim_sku_store_tags_sentence,
+#     dim_store_sentence,
+#     dim_store_history_trade_temp_sentence,
+#     dim_goods_sentence,
+#     dim_changsha_goods_property_sentence,
+#     fact_flow_sentence,
+#     fact_trade_sentence
+# )
 
 
 # 导入MaxcomputeHook
