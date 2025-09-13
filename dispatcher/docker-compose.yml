@@ -47,8 +47,9 @@ services:
       PYTHONPATH: "/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators:/opt/airflow/Automation/dispatcher/dags:/opt/airflow/Automation/dispatcher/plugins:/opt/airflow/Automation/dispatcher/etl_sentence"
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     volumes:
+      - ~/data:/opt/airflow/data
+      - ~/models:/opt/airflow/models
       - ./dags:/opt/airflow/dags
-      - ./data:/opt/airflow/data
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/requirements.txt
