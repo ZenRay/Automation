@@ -208,6 +208,7 @@ class LarkOperator(BaseOperator):
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
 
+        logger.info(f"Data file ({file}) read success")
         # adjust columns
         if columns is None:
             columns = df.columns.to_list()
