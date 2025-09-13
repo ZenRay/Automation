@@ -242,6 +242,12 @@ class LarkOperator(BaseOperator):
         # Update target URL
         lark_sheets.extract_spreadsheet_info(target_url)
         
+        # Fix Date Value to Int
+        if '日期' in df.columns:
+            df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
+                lambda x: x - lark_sheets._START_DATE if pd.notna(x) else x
+            ).dt.days
+            
         sheet_id = lark_sheets.get_sheet_id(sheet_title)
         raw_data = df.loc[:, columns].drop_duplicates().copy()
         
