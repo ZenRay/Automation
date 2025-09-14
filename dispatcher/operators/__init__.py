@@ -121,7 +121,6 @@ class LarkOperator(BaseOperator):
             context: Airflow execution context
         """
         logger.info(f"Sending message via Lark Start")
-        
         if self.hook is None:
             self.hook = LarkHook(conn_id=self.conn_id)
         logger.info(f"Context Params: {context.get('params')}")
@@ -161,13 +160,13 @@ class LarkOperator(BaseOperator):
         Returns:
             None
         """
-        
         target_url = kwargs.get("target_url")
         sheet_title = kwargs.get("sheet_title")
         range_str = kwargs.get("range_str")
         columns = kwargs.get("columns")
         file = kwargs.get("file")
-        
+        drop_duplicates = kwargs.get("drop_duplicates", True)
+        loop = kwargs.get("loop", False)
         # refresh client information
         client.extract_spreadsheet_info(target_url)
         client.extract_sheets(client.spread_sheet)
@@ -207,21 +206,53 @@ class LarkOperator(BaseOperator):
                 )
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
+        
+        # Fix Date Value to Int
+        if '日期' in df.columns:
+            df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
+                lambda x: x - client._START_DATE if pd.notna(x) else x
+            ).dt.days
 
         logger.info(f"Data file ({file}) read success")
         # adjust columns
         if columns is None:
             columns = df.columns.to_list()
+        # if loop is True, then we will keep updating the sheet until all data is sent
+        if not loop:
+            self._extract_data2sheet_values(
+                df=df,
+                columns=columns,
+                target_url=target_url,
+                range_str=range_str,
+                sheet_title=sheet_title,
+                lark_sheets=client,
+                drop_duplicates=drop_duplicates
+            )
         
-        self._extract_data2sheet_values(
-            df=df,
-            columns=columns,
-            target_url=target_url,
-            range_str=range_str,
-            sheet_title=sheet_title,
-            lark_sheets=client
-        )
-    
+        
+        else:
+            # data too large to update in one time, so split the columns and update in loop
+            indexes = list(range(1, len(columns) + 1, 10)) + [len(columns) + 1]
+            start_indexes = indexes[:-1]
+            end_indexes = indexes[1:]
+            for start, end in zip(start_indexes, end_indexes):
+                info = f"{parse_index2column(start)}:{parse_index2column(end-1)}", start, end, "-".join(columns[start-1:end-1])
+                logger.info(f"Processing columns: {info}")
+                start_col = parse_index2column(start)
+                end_col = parse_index2column(end - 1)
+                
+                self._extract_data2sheet_values(
+                    df=df.copy(),
+                    columns=columns,
+                    target_url=target_url,
+                    range_str=f"{start_col}:{end_col}",
+                    sheet_title=sheet_title,
+                    lark_sheets=client,
+                    drop_duplicates=False
+                )
+                time.sleep(2)
+             
+            
         logger.info(
             f"Single file({file}) Send to Lark Sheet Success:\n"
             f"\tTarget URL: {target_url}\n"
@@ -229,8 +260,8 @@ class LarkOperator(BaseOperator):
             f"\tRange: {range_str}\n"
             f"\tColumns: {columns}\n"
         )
-        
-    def _extract_data2sheet_values(self, df, columns, target_url, range_str, sheet_title, lark_sheets):
+                
+    def _extract_data2sheet_values(self, df, columns, target_url, range_str, sheet_title, lark_sheets, drop_duplicates=True):
         """Extract data from DataFrame and send to Lark Sheets.
         Args:
             df (pd.DataFrame): The DataFrame containing the data to send.
@@ -239,40 +270,42 @@ class LarkOperator(BaseOperator):
             range_str (str): The range string for the target sheet.
             sheet_title (str): The title of the target sheet.
             lark_sheets (LarkSheets): The LarkSheets client instance.
+            drop_duplicates (bool): Whether to drop duplicate rows. Defaults to True.
         """
         # Update target URL
         lark_sheets.extract_spreadsheet_info(target_url)
-        
-        # Fix Date Value to Int
-        if '日期' in df.columns:
-            df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
-                lambda x: x - lark_sheets._START_DATE if pd.notna(x) else x
-            ).dt.days
             
         sheet_id = lark_sheets.get_sheet_id(sheet_title)
-        raw_data = df.loc[:, columns].drop_duplicates().copy()
-        
-        end_col, end_row = parse_sheet_cell(range_str, parse_type="end")
+        if drop_duplicates:
+            raw_data = df.loc[:, columns].drop_duplicates().copy()
+        else:
+            raw_data = df.loc[:, columns].copy()
+
+        start_col, start_row, end_col, end_row = parse_sheet_cell(range_str, parse_type="all")
+        start_col_num = parse_column2index(start_col)
         end_col_num = parse_column2index(end_col)
-        
-        if end_col_num > lark_sheets._UPDATE_COL_LIMITATION:
+        # Columns Range index
+        range_str = []
+        column_range_index = []
+        if end_col_num - start_col_num + 1 > lark_sheets._UPDATE_COL_LIMITATION:
             logger.warning("Data column count exceeds limit, splitting required.")
-            range_str = []
-            range_index = []
+
             col_range = list(
-                range(0, end_col_num, lark_sheets._UPDATE_COL_LIMITATION)
+                range(start_col_num-1, end_col_num, lark_sheets._UPDATE_COL_LIMITATION)
             ) + [end_col_num]
             
             for start, end in zip(col_range[:-1], col_range[1:]):
                 range_str.append(f"{parse_index2column(start+1)}:{parse_index2column(end)}")
-                range_index.append((start, end))
+                column_range_index.append((start, end))
         else:
-            range_index = [(0, end_col_num)]
+            column_range_index = [(start_col_num - 1, end_col_num)]
+            range_str = [range_str]
             
         time.sleep(2)
         
-        for range_idx, range_col_idx in zip(range_index, range_str):
+        for range_idx, range_col_idx in zip(column_range_index, range_str):
             data = []
+            split_data = raw_data.loc[:, columns[range_idx[0]:range_idx[1]]].copy()
             split_data = raw_data.iloc[:, range_idx[0]:range_idx[1]].copy()
             data.append(split_data.columns.to_list())
             
@@ -285,8 +318,6 @@ class LarkOperator(BaseOperator):
                     else:
                         record.append(None)
                 data.append(record)
-            
-            
             lark_sheets.batchupdate_values_single_sheet(data, data_range=range_col_idx, sheet_id=sheet_id)
             time.sleep(2)
 
