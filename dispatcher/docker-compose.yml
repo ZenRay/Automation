@@ -44,7 +44,7 @@ services:
       AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Shanghai'
       AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: 10
       AIRFLOW__SCHEDULER__PARSING_PROCESSES: 4
-      PYTHONPATH: "/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/Automation/dispatcher/hooks:/opt/airflow/Automation/dispatcher/operators:/opt/airflow/Automation/dispatcher/dags:/opt/airflow/Automation/dispatcher/plugins:/opt/airflow/Automation/dispatcher/etl_sentence:/opt/airflow/TestArchive"
+      PYTHONPATH: "/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/models"
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     volumes:
       - ~/data:/opt/airflow/data

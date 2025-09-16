@@ -14,23 +14,6 @@ WORKDIR /opt/airflow
 # 切换到airflow用户
 USER airflow
 
-# 配置工作包
-# RUN git clone https://github.com/ZenRay/Automation.git
-# ADD Automation.tar.gz /opt/airflow/
-
-# # 创建必要的配置文件目录
-# RUN mkdir -p /opt/airflow/Automation/automation/conf /opt/airflow/data/mall \
-#     /opt/airflow/data/models
-
-# 复制配置文件模板
-# COPY automation/conf/_maxcomputer.ini /opt/airflow/Automation/automation/conf/_maxcomputer.ini
-# COPY automation/conf/_lark.ini /opt/airflow/Automation/automation/conf/_lark.ini
-
-# # 重命名配置文件（保持模板格式，稍后在 Airflow 中配置）
-# RUN mv /opt/airflow/Automation/automation/conf/_maxcomputer.ini.template /opt/airflow/Automation/automation/conf/_maxcomputer.ini && \
-#     mv /opt/airflow/Automation/automation/conf/_lark.ini.template /opt/airflow/Automation/automation/conf/_lark.ini && \
-#     echo "配置文件复制完成"
-
 
 # 创建必要的目录，确保client目录及其子目录存在（如果不存在）
 RUN mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins \
@@ -52,8 +35,6 @@ ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 # 更新bash配置文件以包含Python搜索路径
 RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:$PYTHONPATH"' >> ~/.bashrc
 
-# 验证模块导入
-# RUN python -c "from automation.client import MaxComputerClient; print('成功导入MaxComputerClient')" || echo "无法导入MaxComputerClient，请检查模块结构"
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
