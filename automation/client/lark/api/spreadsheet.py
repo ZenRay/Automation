@@ -1,7 +1,7 @@
 # coding:utf8
 import time
 from typing import List
-
+from datetime import datetime
 import logging
 import re
 
@@ -30,7 +30,7 @@ class LarkSheets(LarkClient):
     # Sheet Value Update Limition
     _UPDATE_ROW_LIMITATION = 5000
     _UPDATE_COL_LIMITATION = 100
-    
+    _START_DATE = datetime.strptime("1899-12-30", "%Y-%m-%d")
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn", url=None):
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         self._spread_sheet = SpreadSheetMeta()

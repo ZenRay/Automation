@@ -42,13 +42,13 @@ hints = {
 
 
 logger = logging.getLogger("dispatcher.dags.report_dags")
-current_dir = path.dirname(path.abspath(__file__))
+data_path = path.abspath("/opt/airflow/data")
 
 # Default arguments for the DAG
 DAG_CONFIG = {
     'dag_id': 'report_mct_dag',
     'description': 'MaxCompute商家中心报表任务 - 包含商品、店铺、交易等数据的汇总',
-    'schedule_interval': '20 8 * * *',  # 每天0820执行
+    'schedule_interval': '00 11 * * *',  # 每天1100执行
     'start_date': datetime(2025, 1, 1),
     'catchup': False,
     'tags': ['maxcompute', 'report', 'changsha'],
@@ -62,12 +62,12 @@ DAG_CONFIG = {
         'email_on_success': False,
         'execution_timeout': timedelta(hours=2),  # 执行超时时间
     }
-} 
+}
 
 # mct_roi_target_url = "https://bggc.feishu.cn/wiki/Jm36w0fKqiuxZikTDcxcaVu6ndd"
 
 mct_roi_target_url = "https://bggc.feishu.cn/wiki/Jm36w0fKqiuxZikTDcxcaVu6ndd?sheet=a05b50"
-save_file = path.join(current_dir, "./mct_roi_report_data.csv")
+save_file = path.join(data_path, "./mct_roi_report_data.csv")
 
 with DAG(**DAG_CONFIG) as dag:
     # start_task
@@ -86,7 +86,7 @@ with DAG(**DAG_CONFIG) as dag:
         conn_id='maxcompute_dev',
         params={
             "hints": hints,
-            "file": path.join(current_dir, "./mct_roi_report_data.csv")
+            "file": path.join(data_path, "./mct_roi_report_data.csv")
         }
     )
 
@@ -101,8 +101,12 @@ with DAG(**DAG_CONFIG) as dag:
             "kwargs": {
                 "target_url": mct_roi_target_url,
                 "sheet_title": "原始数据",
-                "range_str": "A:AO",
+                # "range_str": "A:AO",
+                "start_cell": "A1",
+                "batch_size": 20, 
                 "file": save_file,
+                # "drop_duplicates": False,
+                # "loop": True
                 #  "columns": [...], # 可选参数，如不指定则使用数据文件的列名
             }
         }
@@ -120,9 +124,13 @@ with DAG(**DAG_CONFIG) as dag:
             "kwargs": {
                 "target_url": mct_roi_target_url,
                 "sheet_title": "Config",
-                "range_str": "A:F",
+                # "range_str": "A:F",
+                "start_cell": "A1",
                 "file": save_file,
-                 "columns":["商品名称", "商品id",  "商家id", "四级类目名称",  "四级类目id", "最近下单间隔天数"]
+                "columns":["商品名称", "商品id",  "商家id", "四级类目名称",  "四级类目id", "最近下单间隔天数"],
+                "filter_query": "商品名称 != '总计'"
+                # "loop": False,
+                # "drop_duplicates": True
             }
         }
     )
@@ -138,9 +146,13 @@ with DAG(**DAG_CONFIG) as dag:
             "kwargs": {
                 "target_url": mct_roi_target_url,
                 "sheet_title": "Config",
-                "range_str": "H:K",
+                # "range_str": "H:K",
+                "start_cell": "H1",
                 "file": save_file,
-                 "columns":["四级类目id", "四级类目名称", "商家id", "商家名称"]
+                "columns":["四级类目id", "四级类目名称", "商家id", "商家名称"],
+                "filter_query": "四级类目名称 != '总计' and 商家名称 != '总计'"
+                # "loop": False,
+                # "drop_duplicates": True
             }
         }
     )
@@ -156,9 +168,11 @@ with DAG(**DAG_CONFIG) as dag:
             "kwargs": {
                 "target_url": mct_roi_target_url,
                 "sheet_title": "Config",
-                "range_str": "Q:R",
+                # "range_str": "Q:R",
+                "start_cell": "Q1",
                 "file": save_file,
-                 "columns":['四级类目名称', "四级类目id"]
+                "columns":['四级类目名称', "四级类目id"],
+                "filter_query": "四级类目名称 != '总计'"
             }
         }
     )
