@@ -20,7 +20,7 @@ from dispatcher.hooks import MaxcomputeHook, LarkHook
 
 
 from automation.client.lark.utils import (
-    parse_column2index, parse_index2column, parse_sheet_cell
+    parse_column2index, parse_index2column, parse_sheet_cell, offset_sheet_cell
 )
 
 from automation.client.lark import (
@@ -162,11 +162,11 @@ class LarkOperator(BaseOperator):
         """
         target_url = kwargs.get("target_url")
         sheet_title = kwargs.get("sheet_title")
-        range_str = kwargs.get("range_str")
         columns = kwargs.get("columns")
         file = kwargs.get("file")
-        drop_duplicates = kwargs.get("drop_duplicates", True)
-        loop = kwargs.get("loop", False)
+        start_cell = kwargs.get("start_cell", "A1")
+        batch_size = kwargs.get("batch_size", 0)
+        
         # refresh client information
         client.extract_spreadsheet_info(target_url)
         client.extract_sheets(client.spread_sheet)
@@ -176,9 +176,6 @@ class LarkOperator(BaseOperator):
 
         if sheet_title is None:
             raise ValueError("Argument 'sheet_title' is required for Lark Sheets.")
-
-        if range_str is None:
-            raise ValueError("Argument 'range_str' is required for Lark Sheets.")
 
         if file is None:
             raise ValueError("Argument 'file' is required for Lark Sheets.")
@@ -207,6 +204,14 @@ class LarkOperator(BaseOperator):
         else:
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
         
+        # Filter Query
+        filter_query = kwargs.get("filter_query")
+        if filter_query is not None:
+            try:
+                df = df.query(filter_query).copy()
+            except Exception as e:
+                raise ValueError(f"Error applying filter query '{filter_query}': {e}")
+            
         # Fix Date Value to Int
         if '日期' in df.columns:
             df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
@@ -217,110 +222,84 @@ class LarkOperator(BaseOperator):
         # adjust columns
         if columns is None:
             columns = df.columns.to_list()
-        # if loop is True, then we will keep updating the sheet until all data is sent
-        if not loop:
-            self._extract_data2sheet_values(
-                df=df,
-                columns=columns,
-                target_url=target_url,
-                range_str=range_str,
-                sheet_title=sheet_title,
-                lark_sheets=client,
-                drop_duplicates=drop_duplicates
-            )
-        
-        
-        else:
-            # data too large to update in one time, so split the columns and update in loop
-            indexes = list(range(1, len(columns) + 1, 10)) + [len(columns) + 1]
-            start_indexes = indexes[:-1]
-            end_indexes = indexes[1:]
-            for start, end in zip(start_indexes, end_indexes):
-                info = f"{parse_index2column(start)}:{parse_index2column(end-1)}", start, end, "-".join(columns[start-1:end-1])
-                logger.info(f"Processing columns: {info}")
-                start_col = parse_index2column(start)
-                end_col = parse_index2column(end - 1)
-                
-                self._extract_data2sheet_values(
-                    df=df.copy(),
-                    columns=columns,
-                    target_url=target_url,
-                    range_str=f"{start_col}:{end_col}",
-                    sheet_title=sheet_title,
-                    lark_sheets=client,
-                    drop_duplicates=False
-                )
-                time.sleep(2)
              
-            
+        self._extract_data2sheet_values(
+            df=df,
+            columns=columns,
+            start_cell=start_cell,
+            sheet_title=sheet_title,
+            lark_sheets=client,
+            batch_size=batch_size
+        )
+        
+        end_cell = offset_sheet_cell(start_cell, offset_col=len(columns)-1, offset_row=len(df)+1)
         logger.info(
             f"Single file({file}) Send to Lark Sheet Success:\n"
             f"\tTarget URL: {target_url}\n"
             f"\tSheet Title: {sheet_title}\n"
-            f"\tRange: {range_str}\n"
+            f"\tRange: {start_cell}:{end_cell}\n"
             f"\tColumns: {columns}\n"
         )
-                
-    def _extract_data2sheet_values(self, df, columns, target_url, range_str, sheet_title, lark_sheets, drop_duplicates=True):
-        """Extract data from DataFrame and send to Lark Sheets.
-        Args:
-            df (pd.DataFrame): The DataFrame containing the data to send.
-            columns (list): The list of columns to extract from the DataFrame.
-            target_url (str): The URL of the target Lark Sheet.
-            range_str (str): The range string for the target sheet.
-            sheet_title (str): The title of the target sheet.
-            lark_sheets (LarkSheets): The LarkSheets client instance.
-            drop_duplicates (bool): Whether to drop duplicate rows. Defaults to True.
-        """
-        # Update target URL
-        lark_sheets.extract_spreadsheet_info(target_url)
-            
-        sheet_id = lark_sheets.get_sheet_id(sheet_title)
-        if drop_duplicates:
-            raw_data = df.loc[:, columns].drop_duplicates().copy()
-        else:
-            raw_data = df.loc[:, columns].copy()
 
-        start_col, start_row, end_col, end_row = parse_sheet_cell(range_str, parse_type="all")
-        start_col_num = parse_column2index(start_col)
-        end_col_num = parse_column2index(end_col)
-        # Columns Range index
-        range_str = []
-        column_range_index = []
-        if end_col_num - start_col_num + 1 > lark_sheets._UPDATE_COL_LIMITATION:
-            logger.warning("Data column count exceeds limit, splitting required.")
-
-            col_range = list(
-                range(start_col_num-1, end_col_num, lark_sheets._UPDATE_COL_LIMITATION)
-            ) + [end_col_num]
-            
-            for start, end in zip(col_range[:-1], col_range[1:]):
-                range_str.append(f"{parse_index2column(start+1)}:{parse_index2column(end)}")
-                column_range_index.append((start, end))
-        else:
-            column_range_index = [(start_col_num - 1, end_col_num)]
-            range_str = [range_str]
-            
-        time.sleep(2)
+    def _extract_data2sheet_values(self, df, columns, start_cell, sheet_title, lark_sheets, batch_size=0):
+        """Extract DataFrame to Lark Sheet Values
         
-        for range_idx, range_col_idx in zip(column_range_index, range_str):
-            data = []
-            split_data = raw_data.loc[:, columns[range_idx[0]:range_idx[1]]].copy()
-            split_data = raw_data.iloc[:, range_idx[0]:range_idx[1]].copy()
-            data.append(split_data.columns.to_list())
+        Args:
+            df: DataFrame to send
+            columns: Columns to extract
+            start_cell: Starting cell in the sheet
+            sheet_title: Title of the sheet
+            lark_sheets: LarkSheets client instance
+            batch_size: Number of columns to send in each batch
+        """
+        if len(columns) > lark_sheets._UPDATE_COL_LIMITATION or batch_size > 0:
+            logger.warning("Data column count exceeds limit or specified batch size, splitting required.")
+            if batch_size == 0:
+                batch_size = 20
+            batch_indexes = list(range(0, len(columns) + 1, batch_size)) + [len(columns) + 1]
+        else:
+            batch_indexes = [0, len(columns) + 1]
             
-            
-            for _, item in split_data.iterrows():
-                record = []
-                for col in split_data.columns:
-                    if pd.notna(item.get(col)):
-                        record.append(item.get(col) if not isinstance(item.get(col), (Decimal)) else float(item.get(col)))
-                    else:
-                        record.append(None)
-                data.append(record)
-            lark_sheets.batchupdate_values_single_sheet(data, data_range=range_col_idx, sheet_id=sheet_id)
-            time.sleep(2)
+        sheet_start_col, sheet_start_row = parse_sheet_cell(start_cell, parse_type="start")
+        start_column_index = batch_indexes[0]
+        for batch in batch_indexes[1:]:
+            # parse data records and columns
+            batch_columns = columns[start_column_index:batch]
+            data = [df.loc[:, batch_columns].columns.to_list()]
+            data += self._df2record(df.loc[:, batch_columns])
 
+            start_cell = f"{parse_index2column(parse_column2index(sheet_start_col) + start_column_index)}{sheet_start_row}"
+            end_cell = f"{parse_index2column(parse_column2index(sheet_start_col) + start_column_index + len(batch_columns) - 1)}{sheet_start_row + len(data) - 1}"
+            data_range = f"{start_cell}:{end_cell}"
+
+            lark_sheets.batchupdate_values_single_sheet(
+                data, data_range=data_range, sheet_id=lark_sheets.get_sheet_id(sheet_title)
+            )
+
+            logger.debug(f"Batch columns {batch_columns} sent to range {data_range}")
+            # next batch
+            start_column_index = batch
+            time.sleep(2)
+            
+    def _df2record(self, df):
+        """Convert DataFrame to list of records
+
+        Args:
+            df: DataFrame to convert
+
+        Returns:
+            List of records
+        """
+        records = []
+        for _, item in df.iterrows():
+            record = []
+            for col in df.columns:
+                if pd.notna(item.get(col)):
+                    record.append(item.get(col) if not isinstance(item.get(col), (Decimal)) else float(item.get(col)))
+                else:
+                    record.append(None)
+            records.append(record)
+        return records
 
     def im_send_message(self, client, kwargs):
         """Send message using LarkIM client
