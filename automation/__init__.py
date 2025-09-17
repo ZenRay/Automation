@@ -9,7 +9,6 @@ from automation.client import (
     ,LarkSheets, LarkIM
 )
 
-from automation.utils.common.value_adjust import AdjustValue
 
 logger = logging.getLogger("automation")
 logger.setLevel(logging.DEBUG)
