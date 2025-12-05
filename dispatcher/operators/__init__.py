@@ -382,7 +382,12 @@ class LarkOperator(BaseOperator):
             record = []
             for col in df.columns:
                 if pd.notna(item.get(col)):
-                    record.append(item.get(col) if not isinstance(item.get(col), (Decimal)) else float(item.get(col)))
+                    if isinstance(item.get(col), (Decimal)):
+                        record.append(float(item.get(col)))
+                    elif isinstance(item.get(col), (np.int64, np.int32, np.int16, np.int8)):
+                        record.append(int(item.get(col)))
+                    else:
+                        record.append(item.get(col))
                 else:
                     record.append(None)
             records.append(record)
