@@ -153,6 +153,11 @@ class LarkOperator(BaseOperator):
         if client_type == "im" and task_type == "send_message":
             self.im_send_message(client, kwargs)
 
+        # Multi Dimention Table
+        if client_type == "multi" and task_type == "single2single":
+            self.single2single_update_multitable(client, kwargs)
+            
+            
     def single2single_update_sheet(self, client, kwargs):
         """Single File to Single Sheet Update
         
@@ -238,6 +243,7 @@ class LarkOperator(BaseOperator):
         table_name = kwargs.get("table_name")
         table_id = kwargs.get("table_id")
         is_clear = kwargs.get("is_clear", False)
+        filter = kwargs.get("filter", None)
         columns = kwargs.get("columns")
         file = kwargs.get("file")
         
@@ -260,12 +266,19 @@ class LarkOperator(BaseOperator):
         # clear existing records
         if is_clear:
             records_id_list = []
-            for records in client.request_records_generator(url=target_url): 
+            if filter is not None:
+                request_records = client.request_records_generator(url=target_url)
+            elif isinstance(filter, dict):
+                request_records = client.request_records_generator(url=target_url, filter=filter)
+            else:
+                logger.error("Filter parameter must be a dictionary.")
+                raise ValueError("Filter parameter must be a dictionary.")
+            
+            for records in request_records: 
                 records_id = [record.get("record_id") for record in records["data"]["items"]]
                 records_id_list.extend(records_id)
 
-
-            index = list(range(0, len(records_id_list), 50))
+            index = list(range(0, len(records_id_list), client.DELETE_RECORD_LIMITATION))
             for start, end in zip(index, index[1:] + [len(records_id_list)]):
                 client.delete_batch_records(
                     url=target_url
@@ -274,13 +287,11 @@ class LarkOperator(BaseOperator):
                 time.sleep(2)
 
         # Update records
-        index = list(range(0, df.shape[0], LarkMultiDimTable.ADD_RECORD_LIMITATION))
+        index = list(range(0, df.shape[0], client.ADD_RECORD_LIMITATION))
+        data = self._df2record(df)
         for start, end in zip(index, index[1:] + [df.shape[0]]):
             records = []
             for record in data[start:end]:
-                for key, value in record.items():
-                    if pd.isna(value):
-                        record[key] = None
                 records.append({"fields": record})
             client.add_batch_records(
                 records=records
