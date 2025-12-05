@@ -136,7 +136,8 @@ class LarkHook(BaseHook):
     """
     _clients = {
         "im": None,
-        "sheet": None
+        "sheet": None,
+        "multi": None
     }
     
     def __init__(self, conn_id: str = 'lark_app'):
@@ -193,3 +194,18 @@ class LarkHook(BaseHook):
             )
         return self._clients["im"]
 
+
+    @property
+    def multi_client(self) -> LarkMultiDimTable:
+        """Get LarkMultiDimTable instance
+
+        Returns:
+            LarkMultiDimTable instance
+        """
+        if self._clients["multi"] is None:
+            self._clients["multi"] = LarkMultiDimTable(
+                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
+            )
+        return self._clients["multi"]
