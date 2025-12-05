@@ -266,7 +266,7 @@ class LarkOperator(BaseOperator):
         # clear existing records
         if is_clear:
             records_id_list = []
-            if filter is not None:
+            if filter is None:
                 request_records = client.request_records_generator(url=target_url)
             elif isinstance(filter, dict):
                 request_records = client.request_records_generator(url=target_url, filter=filter)
