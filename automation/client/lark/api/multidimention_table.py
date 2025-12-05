@@ -18,13 +18,33 @@ logger = logging.getLogger("automation.lark.api.multidimention_table")
 
 
 class LarkMultiDimTable(LarkClient):
-    """Lark Multi Dimention Table Process"""
+    """Lark Multi Dimention Table Process
+    
+    Property:
+    -----------------
+    ADD_RECORD_LIMITATION: int, the limitation of adding records each batch.
+    DELETE_RECORD_LIMITATION: int, the limitation of deleting records each batch.
+    """
 
+    ADD_RECORD_LIMITATION = 1000
+    DELETE_RECORD_LIMITATION = 450
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
+        """Initialize Lark Multi Dimention Table Client
+        
+        Property:
+        -----------------
+        access_token: str, Lark tenant access token.
+        app_type: str, Multi Dimention Table App Type (base/wiki/docx/sheets)
+        app_table_map: dict, The table and table_id mapping in Multi Dimention Table App
+        """
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
         self._table_name = None
         self._app_token = None
+        self._app_type = None
+        self._app_table_map = {}
         
+        self.__raw_url = None
+         
         self._regex_pattern = re.compile("http.*/(?P<app_type>base|wiki|docx|sheets)/(?P<app_token>[a-z0-9]*)\?table=(?P<table_id>[a-z0-9]*)", re.I)
 
 
@@ -37,7 +57,19 @@ class LarkMultiDimTable(LarkClient):
     def app_type(self):
         """App Type (base/wiki/docx/sheets)"""
         return self._app_type
+    
+    @property
+    def app_token(self):
+        """Multi Dimention Table App Token"""
+        return self._app_token
+    
 
+    @property
+    def tables_map(self):
+        """Multi Dimention Table App Tables Mapping"""
+        return self._app_table_map
+    
+    
 
     def extract_app_information(self, url: str):
         """Extract Table App Token And Table Name From URL"""
@@ -85,16 +117,60 @@ class LarkMultiDimTable(LarkClient):
             logger.info(f"Extract Table Information Success, Origin URL: {raw_url}\nGet Table App Information: {resp}")
             self._table_name = resp["data"]["app"]["name"]
             self._app_token = resp["data"]["app"]["app_token"]
+            self.__raw_url = raw_url
             
         else:
             logger.error(f"Extract Table Information Fail, Origin URL: {raw_url}")
             raise LarkException(code=resp["code"], msg=resp["msg"])
 
 
+    def extract_table_information(self, *, url: str=None, app_token: str=None):
+        """Extract Table Information From App
+        
+        Args:
+        -----------------
+        url: str, table url, if it's None, app_token must exist.
+        app_token: str, Multi Dimention Table App Token, if it's None, url must exist.
+        
+        Result:
+        -----------------
+        Dict, return table information mapping.
+        """
+        
+        if url is not None:
+            self._check_app_token(url=url)
+            app_token = self._app_token
+        
+        if app_token is None:
+            logger.error("There isn't specified App Token. URL address: {url}".format(url=url))
+            raise LarkException(msg="There isn't specified App Token.")
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer '+ self.access_token,
+        }
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{app_token}/tables"
+        resp = request("GET", url, headers)
+        print(resp)
+        if resp.get("code", -1) == 0:
+            tables = resp.get("data", {}).get("items", [])
+            self._app_table_map = {table.get("name"): table.get("table_id") for table in tables}
+            logger.info(f"Extract Table Information From App {app_token} Success: {self._app_table_map}")
+            return self._app_table_map
+        else:
+            logger.error(f"Extract Table Information From App {app_token} Failed: {resp}")
+            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Extract table information failed"))
+        
+        
+
     def _check_app_token(self, url):
-        """Check App Token Validate"""
-        app_token = self._regex_pattern.match(url).group('app_token')
-        if app_token != self._app_token:
+        """Check App Token Validate
+        
+        If the URL address app token is different from the current one, re-extract the app information
+        """
+        
+        if url != self.__raw_url:
             self.extract_app_information(url=url)
             logger.info("Use New URL, Update App Token Success.")
         
@@ -310,7 +386,9 @@ class LarkMultiDimTable(LarkClient):
         return resp
 
 
-    def add_batch_records(self, records: List[dict], *, table_id: str=None, url: str=None):
+    def add_batch_records(
+        self, records: List[dict], *, table_id: str=None, url: str=None, table_name: str=None
+    ):
         """Batch Add Multiple Records
         
         Args:
@@ -324,9 +402,13 @@ class LarkMultiDimTable(LarkClient):
         Dict, return created records information.
         """
         _table_id = None
+        if table_name is not None and self.tables_map:
+            _table_id = self.tables_map.get(table_name)
+            
         if url is not None:
             self._check_app_token(url=url)
-            _table_id = self._regex_pattern.match(url).group("table_id")
+            if _table_id is None:
+                _table_id = self._regex_pattern.match(url).group("table_id")
         
         if table_id is not None:
             logger.debug("Specify Table Id, Don't Use the URL address Table id")

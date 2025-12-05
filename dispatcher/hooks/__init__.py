@@ -14,7 +14,7 @@ from airflow.hooks.base import BaseHook
 from airflow.exceptions import AirflowNotFoundException
 
 from  automation.client import (
-    MaxComputerClient, LarkIM, LarkSheets
+    MaxComputerClient, LarkIM, LarkSheets, LarkMultiDimTable
 )
 
 
@@ -194,18 +194,19 @@ class LarkHook(BaseHook):
             )
         return self._clients["im"]
 
-
+        
     @property
     def multi_client(self) -> LarkMultiDimTable:
-        """Get LarkMultiDimTable instance
+        """Get Lark Multi Dimention Table instance
 
         Returns:
             LarkMultiDimTable instance
         """
-        if self._clients["multi"] is None:
+        if self._clients.get("multi") is None:
             self._clients["multi"] = LarkMultiDimTable(
                 app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
                 app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
                 lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
             )
         return self._clients["multi"]
+
