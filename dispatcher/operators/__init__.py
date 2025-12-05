@@ -6,6 +6,7 @@ import logging
 import time
 import sys
 import pandas as pd
+import numpy as np
 
 from decimal import Decimal
 from os import path

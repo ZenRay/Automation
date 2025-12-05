@@ -22,10 +22,12 @@ class LarkMultiDimTable(LarkClient):
     
     Property:
     -----------------
-    ADD_RECORD_LIMITATION: int, the limitation of adding records each time.
+    ADD_RECORD_LIMITATION: int, the limitation of adding records each batch.
+    DELETE_RECORD_LIMITATION: int, the limitation of deleting records each batch.
     """
 
     ADD_RECORD_LIMITATION = 1000
+    DELETE_RECORD_LIMITATION = 450
     def __init__(self, app_id, app_secret, lark_host="https://open.feishu.cn"):
         """Initialize Lark Multi Dimention Table Client
         
