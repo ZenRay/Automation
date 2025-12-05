@@ -19,10 +19,15 @@ numpy>=1.21.0
 python-dotenv>=0.19.0
 requests>=2.28.0
 requests-toolbelt>=0.9.0
-
+statsmodels>=0.14.4
+scikit-learn>=1.7.1
+ipython>=8.37.0
+matplotlib>=3.10.3
+openpyxl>=3.1.5
 # 测试相关
 pytest>=7.0.0
 pytest-cov>=4.0.0
+debugpy>=1.8.16
 
 # 开发工具
 black>=22.0.0

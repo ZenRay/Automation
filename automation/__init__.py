@@ -10,7 +10,6 @@ from automation.client import (
 )
 
 
-
 logger = logging.getLogger("automation")
 logger.setLevel(logging.DEBUG)
 
