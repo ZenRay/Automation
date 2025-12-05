@@ -275,8 +275,11 @@ class LarkOperator(BaseOperator):
                 raise ValueError("Filter parameter must be a dictionary.")
             
             for records in request_records: 
-                records_id = [record.get("record_id") for record in records["data"]["items"]]
-                records_id_list.extend(records_id)
+                if "data" in records and "items" in records["data"]:
+                    records_id = [
+                        record.get("record_id") for record in records["data"]["items"] if "record_id" in record
+                    ]
+                    records_id_list.extend(records_id)
 
             index = list(range(0, len(records_id_list), client.DELETE_RECORD_LIMITATION))
             for start, end in zip(index, index[1:] + [len(records_id_list)]):
