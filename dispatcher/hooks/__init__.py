@@ -136,7 +136,8 @@ class LarkHook(BaseHook):
     """
     _clients = {
         "im": None,
-        "sheet": None
+        "sheet": None,
+        "multi": None
     }
     
     def __init__(self, conn_id: str = 'lark_app'):
