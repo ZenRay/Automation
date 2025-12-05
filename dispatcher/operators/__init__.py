@@ -133,6 +133,8 @@ class LarkOperator(BaseOperator):
             client = self.hook.im_client
         elif client_type == "sheet":
             client = self.hook.sheet_client
+        elif client_type == "multi":
+            client = self.hook.multi_client
         else:
             raise ValueError("Argument 'client_type' must be either 'im' or 'sheet'.")
         
@@ -181,28 +183,8 @@ class LarkOperator(BaseOperator):
             raise ValueError("Argument 'file' is required for Lark Sheets.")
 
 
-        if file.endswith(".csv"):
-            try:
-                sep = kwargs.get("sep")
-                df = pd.read_csv(file, sep="," if sep is None else sep)
-            except Exception as e:
-                raise ValueError(
-                    f"Error reading CSV file: {e}"
-                        f"1. check if the file ({file}) exists;"
-                        f"2. check if the separator ({'default sep' if sep is None else sep}) is correct."
-                )
-        elif file.endswith(".xlsx"):
-            try:
-                sheet_name = kwargs.get("sheet_name")
-                df = pd.read_excel(file, sheet_name=sheet_name if sheet_name is not None else 0)
-            except Exception as e:
-                raise ValueError(
-                    f"Error reading Excel file: {e}"
-                        f"1. check if the file ({file}) exists;"
-                        f"2. check if the sheet name is correct."
-                )
-        else:
-            raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
+        # read file to DataFrame
+        df = self._load_data(file, kwargs)
         
         # Filter Query
         filter_query = kwargs.get("filter_query")
@@ -213,7 +195,7 @@ class LarkOperator(BaseOperator):
                 raise ValueError(f"Error applying filter query '{filter_query}': {e}")
             
         # Fix Date Value to Int
-        if '日期' in df.columns:
+        if '日期' in df.columns and df['日期'].dtype != 'int64':
             df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
                 lambda x: x - client._START_DATE if pd.notna(x) else x
             ).dt.days
@@ -240,7 +222,112 @@ class LarkOperator(BaseOperator):
             f"\tRange: {start_cell}:{end_cell}\n"
             f"\tColumns: {columns}\n"
         )
+    
+    def single2single_update_multitable(self, client, kwargs):
+        """Single File to Single Multi Dimention Table Update
+        
+        Args:
+            client: LarkSheets client instance
+            kwargs: Execution parameters from context
 
+        Returns:
+            None
+        """
+        target_url = kwargs.get("target_url")
+        table_name = kwargs.get("table_name")
+        table_id = kwargs.get("table_id")
+        is_clear = kwargs.get("is_clear", False)
+        columns = kwargs.get("columns")
+        file = kwargs.get("file")
+        
+        if target_url is None:
+            raise ValueError("Argument 'target_url' is required for Lark Multi Dimention Table.")
+        
+        if file is None:
+            raise ValueError("Argument 'file' is required for Lark Multi Dimention Table.")
+        
+        # refresh client information
+        client.extract_app_information(url=target_url)
+        client.extract_table_information(url=target_url)
+
+        # adjust columns
+        df = self._load_data(file, kwargs)
+        
+        if columns is None:
+            columns = df.columns.to_list()
+            
+        # clear existing records
+        if is_clear:
+            records_id_list = []
+            for records in client.request_records_generator(url=target_url): 
+                records_id = [record.get("record_id") for record in records["data"]["items"]]
+                records_id_list.extend(records_id)
+
+
+            index = list(range(0, len(records_id_list), 50))
+            for start, end in zip(index, index[1:] + [len(records_id_list)]):
+                client.delete_batch_records(
+                    url=target_url
+                    ,records_id=records_id_list[start:end]
+                )
+                time.sleep(2)
+
+        # Update records
+        index = list(range(0, df.shape[0], LarkMultiDimTable.ADD_RECORD_LIMITATION))
+        for start, end in zip(index, index[1:] + [df.shape[0]]):
+            records = []
+            for record in data[start:end]:
+                for key, value in record.items():
+                    if pd.isna(value):
+                        record[key] = None
+                records.append({"fields": record})
+            client.add_batch_records(
+                records=records
+                ,url=target_url
+                ,table_id=table_id
+                ,table_name=table_name
+            )
+            time.sleep(2)
+            
+        logger.info(
+            f"Single file({file}) Send to Multi Dimension Table Success:\n"
+            f"\tTarget URL: {target_url}\n"
+            f"\tTable Title: {table_name}\n"
+            f"\tColumns: {columns}\n"
+        )
+        
+        
+        
+    def _load_data(self, file, kwargs):
+        """Read input file and return a pandas DataFrame.
+
+        Supports CSV and XLSX. Raises ValueError with a helpful message on failure.
+        """
+        if file.endswith(".csv"):
+            try:
+                sep = kwargs.get("sep")
+                return pd.read_csv(file, sep="," if sep is None else sep)
+            except Exception as e:
+                raise ValueError(
+                    f"Error reading CSV file: {e}"
+                    f" 1. check if the file ({file}) exists;"
+                    f" 2. check if the separator ({'default sep' if sep is None else sep}) is correct."
+                )
+        elif file.endswith(".xlsx"):
+            try:
+                sheet_name = kwargs.get("sheet_name")
+                return pd.read_excel(file, sheet_name=sheet_name if sheet_name is not None else 0)
+            except Exception as e:
+                raise ValueError(
+                    f"Error reading Excel file: {e}"
+                    f" 1. check if the file ({file}) exists;"
+                    f" 2. check if the sheet name is correct."
+                )
+        else:
+            raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
+        
+        
+        
     def _extract_data2sheet_values(self, df, columns, start_cell, sheet_title, lark_sheets, batch_size=0):
         """Extract DataFrame to Lark Sheet Values
         
