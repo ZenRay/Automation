@@ -6,7 +6,7 @@ Maxcompute连接配置
 
 # Maxcompute连接配置示例
 MAXCOMPUTE_CONNECTION_CONFIG = {
-    "conn_id": "maxcompute_default",
+    "conn_id": "maxcompute_dev",
     "conn_type": "maxcompute",
     "host": "http://service.cn.maxcompute.aliyun.com",  # Maxcompute服务端点
     "login": "your_access_key_id",  # AccessKey ID
