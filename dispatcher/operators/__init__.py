@@ -275,9 +275,10 @@ class LarkOperator(BaseOperator):
                 raise ValueError("Filter parameter must be a dictionary.")
             
             for records in request_records: 
-                if "data" in records and "items" in records["data"]:
+                records = records.get("data", {}).get("items", [])
+                if records is not None and len(records) > 0:
                     records_id = [
-                        record.get("record_id") for record in records["data"]["items"] if "record_id" in record
+                        record.get("record_id") for record in records if "record_id" in record
                     ]
                     records_id_list.extend(records_id)
 
