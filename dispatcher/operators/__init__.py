@@ -288,7 +288,7 @@ class LarkOperator(BaseOperator):
 
         # Update records
         index = list(range(0, df.shape[0], client.ADD_RECORD_LIMITATION))
-        data = self._df2record(df)
+        data = self._df2record(df, type="dict")
         for start, end in zip(index, index[1:] + [df.shape[0]]):
             records = []
             for record in data[start:end]:
@@ -380,29 +380,44 @@ class LarkOperator(BaseOperator):
             start_column_index = batch
             time.sleep(2)
             
-    def _df2record(self, df):
+    def _df2record(self, df, type: str = "raw"):
         """Convert DataFrame to list of records
 
         Args:
             df: DataFrame to convert
-
+            type: Type of conversion
+                'raw' - raw values
+                'dict' - key value mapping, key the column name
         Returns:
             List of records
         """
         records = []
-        for _, item in df.iterrows():
-            record = []
-            for col in df.columns:
-                if pd.notna(item.get(col)):
-                    if isinstance(item.get(col), (Decimal)):
-                        record.append(float(item.get(col)))
-                    elif isinstance(item.get(col), (np.int64, np.int32, np.int16, np.int8)):
-                        record.append(int(item.get(col)))
+        if type == "raw":
+            for _, item in df.iterrows():
+                record = []
+                for col in df.columns:
+                    if pd.notna(item.get(col)):
+                        if isinstance(item.get(col), (Decimal)):
+                            record.append(float(item.get(col)))
+                        elif isinstance(item.get(col), (np.int64, np.int32, np.int16, np.int8)):
+                            record.append(int(item.get(col)))
+                        else:
+                            record.append(item.get(col))
                     else:
-                        record.append(item.get(col))
-                else:
-                    record.append(None)
-            records.append(record)
+                        record.append(None)
+                records.append(record)
+        elif type == "dict":
+            data = df.to_dict(orient="records")
+            for item in data:
+                for key, value in item.items():
+                    if pd.notna(value):
+                        if isinstance(value, (Decimal)):
+                            item[key] = float(value)
+                        elif isinstance(value, (np.int64, np.int32, np.int16, np.int8)):
+                            item[key] = int(value)
+                    else:
+                        item[key] = None
+                records.append(item)
         return records
 
     def im_send_message(self, client, kwargs):
