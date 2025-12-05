@@ -240,7 +240,35 @@ class LarkOperator(BaseOperator):
             f"\tRange: {start_cell}:{end_cell}\n"
             f"\tColumns: {columns}\n"
         )
+    
+    def single2single_update_multitable(self, client, kwargs):
+        """Single File to Single Multi Dimention Table Update
+        
+        Args:
+            client: LarkSheets client instance
+            kwargs: Execution parameters from context
 
+        Returns:
+            None
+        """
+        target_url = kwargs.get("target_url")
+        table_name = kwargs.get("table_name")
+        is_clear = kwargs.get("is_clear", False)
+        columns = kwargs.get("columns")
+        file = kwargs.get("file")
+        
+        if target_url is None:
+            raise ValueError("Argument 'target_url' is required for Lark Multi Dimention Table.")
+        
+        if file is None:
+            raise ValueError("Argument 'file' is required for Lark Multi Dimention Table.")
+        
+        # refresh client information
+        client.extract_app_information(url=target_url)
+        client.extract_table_information(url=target_url)
+
+        # adjust columns
+        
     def _extract_data2sheet_values(self, df, columns, start_cell, sheet_title, lark_sheets, batch_size=0):
         """Extract DataFrame to Lark Sheet Values
         
