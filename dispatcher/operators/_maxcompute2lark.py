@@ -117,7 +117,7 @@ class Maxcompute2LarkOperator(BaseOperator):
         params = context.get('params', {})
         hints  = params.get("hints")
 
-        if any([i is None for i in [hints, self.maxcompute_hints]]):
+        if all([i is None for i in [hints, self.maxcompute_hints]]):
             msg = "Maxcompute hints is missing. Please provide hints in either operator args or context params."
             logger.error(msg)
             raise Exception(msg)
