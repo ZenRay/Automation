@@ -34,6 +34,10 @@ from automation.client.lark.base.im import (
 )
 
 
+from ._maxcompute2lark import (
+    Maxcompute2LarkOperator
+)
+
 logger = logging.getLogger("dags.utils.operator")
 
 class MaxcomputeOperator(BaseOperator):
