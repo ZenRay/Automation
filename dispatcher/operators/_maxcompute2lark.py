@@ -28,6 +28,8 @@ class Maxcompute2LarkOperator(BaseOperator):
     Maxcompute to Lark Docs Operator
     1. Maxcompute ETL
     2. Update Data to Lark Docs: Sheet or Multi Dimensional Table
+    3. Send Message to Lark IM, argument `receive_type` is 'user' or 'group', if 'user' the send private message, 
+        if 'group' send group message.
     """
 
     @apply_defaults
@@ -62,6 +64,8 @@ class Maxcompute2LarkOperator(BaseOperator):
         url = self._check_context_params("url", context)
         client_type = self._check_context_params("client_type", context)
 
+        message = context.get('params', {}).get("message", None)
+
         # Maxcompute ETL
         instance = self._maxcompute_etl(
             sql=sql
@@ -79,6 +83,13 @@ class Maxcompute2LarkOperator(BaseOperator):
             msg = f"Lark Client Type '{client_type}' is not supported."
             logger.error(msg)
             raise Exception(msg)
+
+        # Send Lark Message
+        if message is not None:
+            self._send_lark_message(
+                context=context
+                ,message=message
+            )
 
 
     def _check_context_params(self, name, context):
@@ -148,13 +159,12 @@ class Maxcompute2LarkOperator(BaseOperator):
         logger.info("Start Update Lark Sheet")
         
         # extract parameters from context
+        table_name = self._check_context_params("table_name", context)
         params = context.get('params', {})
         
-        table_name = params.get("table_name")
         table_id = params.get("table_id")
         is_clear = params.get("is_clear", False)
         filter = params.get("filter", None)
-        columns = params.get("columns")
         
         # refresh client information
         if not self.lark_hook:
@@ -202,7 +212,7 @@ class Maxcompute2LarkOperator(BaseOperator):
             raise Exception(msg)
 
         # Update records
-        for batch in instance.iter_pandas(batch_size=20):
+        for batch in instance.iter_pandas(batch_size=client.ADD_RECORD_LIMITATION):
             index = list(range(0, batch.shape[0], client.ADD_RECORD_LIMITATION))
             data = dataframe2record(batch, type="dict")
             for start, end in zip(index, index[1:] + [batch.shape[0]]):
@@ -221,4 +231,51 @@ class Maxcompute2LarkOperator(BaseOperator):
             f"Maxcompute ETL Records Send to Multi Dimension Table Success:\n"
             f"\tTarget URL: {url}\n"
             f"\tTable Title: {table_name}\n"
+        )
+
+    
+    def _send_lark_message(self, context, message: str, **kwargs):
+        """Send Lark Message
+        
+        Args:
+        ------------
+            context: Airflow context
+            message: Message content to send
+        """
+        logger.info("Start Send Lark Message")
+        
+        # extract parameters from context
+        receive_type = self._check_context_params("receive_type", context)
+        message_type = self._check_context_params("message_type", context)
+        params = context.get('params', {})
+        receive_id = params.get("receive_id", context)
+
+        if receive_type == "group":
+            receive_type_id = "chat_id"
+        elif receive_type == "user":
+            receive_type_id = "open_id"
+        else:
+            msg = f"Lark Receive Type '{receive_type}' is not supported."
+            logger.error(msg)
+            raise Exception(msg)
+        
+        # refresh client information
+        if not self.lark_hook:
+            self.lark_hook = LarkHook(
+                conn_id=self.lark_conn_id
+            )
+        client = self.lark_hook.im_client
+
+        client.send_message(
+            receive_id=receive_id
+            ,receive_type=receive_type
+            ,receive_type_id=receive_type_id
+            ,message=message
+            ,message_type=message_type
+        )
+
+        logger.info(
+            f"Lark Message Sent Success:\n"
+            f"\tReceiver ID: {receive_id}\n"
+            f"\tMessage: {message}\n"
         )
