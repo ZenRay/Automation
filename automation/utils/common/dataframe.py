@@ -6,6 +6,7 @@
 
 
 import numpy as np
+import pandas as pd
 from decimal import Decimal
 
 
@@ -25,7 +26,7 @@ def dataframe2record(df, type: str = "raw"):
         for _, item in df.iterrows():
             record = []
             for col in df.columns:
-                if not np.isnan(item.get(col)):
+                if pd.notna(item.get(col)):
                     if isinstance(item.get(col), (Decimal)):
                         record.append(float(item.get(col)))
                     elif isinstance(item.get(col), (np.int64, np.int32, np.int16, np.int8)):
@@ -39,7 +40,7 @@ def dataframe2record(df, type: str = "raw"):
         data = df.to_dict(orient="records")
         for item in data:
             for key, value in item.items():
-                if not np.isnan(value):
+                if pd.notna(value):
                     if isinstance(value, (Decimal)):
                         item[key] = float(value)
                     elif isinstance(value, (np.int64, np.int32, np.int16, np.int8)):
