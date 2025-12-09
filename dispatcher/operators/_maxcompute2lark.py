@@ -180,7 +180,7 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         # get table id by table name
         if table_id is None and table_name is not None:
-            table_id = client.get_table_id_by_name(table_name=table_name)
+            table_id = client.tables_map.get(table_name, {})
 
         # clear existing records
         if is_clear:
