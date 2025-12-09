@@ -178,13 +178,17 @@ class Maxcompute2LarkOperator(BaseOperator):
         client.extract_app_information(url=url)
         client.extract_table_information(url=url)
 
+        # get table id by table name
+        if table_id is None and table_name is not None:
+            table_id = client.get_table_id_by_name(table_name=table_name)
+
         # clear existing records
         if is_clear:
             records_id_list = []
             if filter is None:
-                request_records = client.request_records_generator(url=url)
+                request_records = client.request_records_generator(url=url, table_id=table_id)
             elif isinstance(filter, dict):
-                request_records = client.request_records_generator(url=url, filter=filter)
+                request_records = client.request_records_generator(url=url, filter=filter, table_id=table_id)
             else:
                 logger.error("Filter parameter must be a dictionary.")
                 raise ValueError("Filter parameter must be a dictionary.")
