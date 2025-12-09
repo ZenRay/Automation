@@ -180,7 +180,12 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         # get table id by table name
         if table_id is None and table_name is not None:
-            table_id = client.tables_map.get(table_name, {})
+            table_id = client.tables_map.get(table_name, None)
+        
+        if table_id is None:
+            msg = f"Table ID for Table Name '{table_name}' is missing."
+            logger.error(msg)
+            raise Exception(msg)
 
         # clear existing records
         if is_clear:
