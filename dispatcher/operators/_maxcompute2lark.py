@@ -210,6 +210,7 @@ class Maxcompute2LarkOperator(BaseOperator):
             for start, end in zip(index, index[1:] + [len(records_id_list)]):
                 client.delete_batch_records(
                     url=url
+                    ,table_id=table_id
                     ,records_id=records_id_list[start:end]
                 )
                 time.sleep(2)
