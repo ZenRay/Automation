@@ -32,6 +32,9 @@ class LarkImURL(Enum):
 class LarkContactURL(Enum):
     """ Lark Contact API URL.
     """
+    # 
+    AUTH_CODE = "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
+    AUTH_USER_TOKEN = f"{_lark_host}/open-apis/authen/v2/oauth/token"
     QUERY_SINGLE_USER = f"{_lark_host}/open-apis/contact/v3/users/{{user_id}}"
     # Query User with keyword
     SEARCH_USER_BY_KEYWORD = f"{_lark_host}/open-apis/search/v1/user"

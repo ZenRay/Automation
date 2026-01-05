@@ -51,12 +51,21 @@ class LarkClient(object):
         self.__app_id = app_id
         self.__app_secret = app_secret
         self._access_token = AccessToken()
-        # self._user_token = UserAccessToken()
+        
         self._token_lock = threading.Lock()
         self._initialized = True
         logger.info(f"Lark Client Initialized for app_id: {app_id}")
 
 
+    @property
+    def app_id(self):
+        """Get Application ID"""
+        return self.__app_id
+    
+    @property
+    def app_secret(self):
+        """Get Application Secret"""
+        return self.__app_secret
 
     @property
     def tenant_access_token(self):
