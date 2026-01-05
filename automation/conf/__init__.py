@@ -27,10 +27,18 @@ logger.info("Load Maxcomputer Configuration Success.")
 
 # read lark configurate file
 file = path.join(path.dirname(__file__), "_lark.ini")
-template = """[prod]
+template = """
+[prod]
 APP_ID: {APP_ID}
 APP_SECRET: {APP_SECRET}
 USER_TOKEN_REDIRECT_URL: {USER_TOKEN_REDIRECT_URL}
+
+[sqlite_db]
+DB_Name={DB_Name}
+
+[master]
+USER_NAME={USER_NAME}
+USER_EMAIL={USER_EMAIL}
 """
 
 lark = ConfigParser()
