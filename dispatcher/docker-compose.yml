@@ -16,6 +16,7 @@ services:
     restart: always
     networks:
       - airflow-network
+      - analytics_net
     dns:
       - 114.114.114.114
       - 8.8.8.8
@@ -74,6 +75,7 @@ services:
     restart: always
     networks:
       - airflow-network
+      - analytics_net
     dns:
       - 114.114.114.114
       - 8.8.8.8
@@ -86,6 +88,9 @@ services:
 networks:
   airflow-network:
     driver: bridge
+  analytics_net:
+    external: true
+    name: analytics_net
 
 volumes:
   mysql-db-volume:
