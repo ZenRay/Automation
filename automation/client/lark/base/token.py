@@ -63,8 +63,13 @@ class UserAccessToken:
     
     def __init__(self, 
                  user_id: Optional[str] = None,
-                 user_name: Optional[str] = None, 
+                 open_id: Optional[str] = None,
+                 union_id: Optional[str] = None,
+                 user_name: Optional[str] = None,
+                 en_name: Optional[str] = None,
                  user_email: Optional[str] = None,
+                 mobile: Optional[str] = None,
+                 tenant_key: Optional[str] = None,
                  access_token: Optional[str] = None,
                  refresh_token: Optional[str] = None,
                  expire_time: Optional[datetime] = None,
@@ -77,9 +82,14 @@ class UserAccessToken:
         """UserAccessToken initialization
 
         Args:
-            user_id: Lark user ID
-            user_name: User name
+            user_id: Lark user ID (depends on scope, might be null)
+            open_id: User open ID (unique in app dimension)
+            union_id: User union ID (unique across multiple apps)
+            user_name: User name (Chinese name)
+            en_name: User English name
             user_email: User email
+            mobile: User mobile number
+            tenant_key: Tenant key (organization ID)
             access_token: User access token
             refresh_token: Refresh token
             expire_time: Token expiration time
@@ -92,8 +102,13 @@ class UserAccessToken:
         """
         self.id = id
         self.user_id = user_id
+        self.open_id = open_id
+        self.union_id = union_id
         self.user_name = user_name
+        self.en_name = en_name
         self.user_email = user_email
+        self.mobile = mobile
+        self.tenant_key = tenant_key
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.expire_time = expire_time
@@ -164,9 +179,14 @@ class UserAccessToken:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS user_access_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT UNIQUE NOT NULL,
+                    user_id TEXT,
+                    open_id TEXT,
+                    union_id TEXT,
                     user_name TEXT,
+                    en_name TEXT,
                     user_email TEXT,
+                    mobile TEXT,
+                    tenant_key TEXT,
                     access_token TEXT NOT NULL,
                     refresh_token TEXT,
                     expire_time TEXT,
@@ -174,12 +194,15 @@ class UserAccessToken:
                     status TEXT NOT NULL DEFAULT 'active',
                     source TEXT NOT NULL DEFAULT 'manual',
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(open_id, tenant_key)
                  )
              ''')
 
             # Create indexes
             conn.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_access_tokens(user_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_open_id ON user_access_tokens(open_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_union_id ON user_access_tokens(union_id)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_user_email ON user_access_tokens(user_email)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_status ON user_access_tokens(status)')
             conn.commit()
@@ -196,15 +219,19 @@ class UserAccessToken:
                     # use context manager for safe connection handling
                     with self._get_connection() as conn:
                         if self.id is None:
-                            # Upsert based on unique user_id
+                            # Upsert based on unique (open_id, tenant_key)
                             cursor = conn.execute('''
                                 INSERT INTO user_access_tokens 
-                                (user_id, user_name, user_email, access_token, refresh_token, 
-                                 expire_time, scopes, status, source, created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                ON CONFLICT(user_id) DO UPDATE SET
+                                (user_id, open_id, union_id, user_name, en_name, user_email, mobile, tenant_key,
+                                 access_token, refresh_token, expire_time, scopes, status, source, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(open_id, tenant_key) DO UPDATE SET
+                                    user_id=excluded.user_id,
+                                    union_id=excluded.union_id,
                                     user_name=excluded.user_name,
+                                    en_name=excluded.en_name,
                                     user_email=excluded.user_email,
+                                    mobile=excluded.mobile,
                                     access_token=excluded.access_token,
                                     refresh_token=excluded.refresh_token,
                                     expire_time=excluded.expire_time,
@@ -213,7 +240,8 @@ class UserAccessToken:
                                     source=excluded.source,
                                     updated_at=excluded.updated_at
                             ''', (
-                                self.user_id, self.user_name, self.user_email,
+                                self.user_id, self.open_id, self.union_id,
+                                self.user_name, self.en_name, self.user_email, self.mobile, self.tenant_key,
                                 self.access_token, self.refresh_token,
                                 self.expire_time.isoformat() if self.expire_time else None,
                                 json.dumps(self.scopes),
@@ -222,17 +250,25 @@ class UserAccessToken:
                             ))
 
                             # ensure id is set (may be existing row)
-                            row = conn.execute('SELECT id FROM user_access_tokens WHERE user_id = ?', (self.user_id,)).fetchone()
+                            if self.open_id and self.tenant_key:
+                                row = conn.execute('SELECT id FROM user_access_tokens WHERE open_id = ? AND tenant_key = ?', 
+                                                 (self.open_id, self.tenant_key)).fetchone()
+                            elif self.user_id:
+                                row = conn.execute('SELECT id FROM user_access_tokens WHERE user_id = ?', (self.user_id,)).fetchone()
+                            else:
+                                row = None
                             if row:
                                 self.id = row['id']
                         else:
                             conn.execute('''
                                 UPDATE user_access_tokens SET
-                                user_name=?, user_email=?, access_token=?, refresh_token=?,
-                                expire_time=?, scopes=?, status=?, source=?, updated_at=?
+                                user_id=?, open_id=?, union_id=?, user_name=?, en_name=?, user_email=?, mobile=?, tenant_key=?,
+                                access_token=?, refresh_token=?, expire_time=?, scopes=?, status=?, source=?, updated_at=?
                                 WHERE id=?
                             ''', (
-                                self.user_name, self.user_email, self.access_token, self.refresh_token,
+                                self.user_id, self.open_id, self.union_id,
+                                self.user_name, self.en_name, self.user_email, self.mobile, self.tenant_key,
+                                self.access_token, self.refresh_token,
                                 self.expire_time.isoformat() if self.expire_time else None,
                                 json.dumps(self.scopes),
                                 self.status.value, self.source, self.updated_at.isoformat(),
@@ -311,7 +347,7 @@ class UserAccessToken:
                 params = []
 
                 for key, value in conditions.items():
-                    if key in ['user_id', 'user_name', 'user_email', 'status', 'source']:
+                    if key in ['user_id', 'open_id', 'union_id', 'user_name', 'en_name', 'user_email', 'mobile', 'tenant_key', 'status', 'source']:
                         where_parts.append(f"{key} = ?")
                         params.append(value.value if isinstance(value, TokenStatus) else value)
 
@@ -343,9 +379,14 @@ class UserAccessToken:
 
         return cls(
             id=row['id'],
-            user_id=row['user_id'],
-            user_name=row['user_name'],
-            user_email=row['user_email'],
+            user_id=row.get('user_id'),
+            open_id=row.get('open_id'),
+            union_id=row.get('union_id'),
+            user_name=row.get('user_name'),
+            en_name=row.get('en_name'),
+            user_email=row.get('user_email'),
+            mobile=row.get('mobile'),
+            tenant_key=row.get('tenant_key'),
             access_token=row['access_token'],
             refresh_token=row['refresh_token'],
             expire_time=_parse_dt(row['expire_time']),
@@ -454,8 +495,13 @@ class UserAccessToken:
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'open_id': self.open_id,
+            'union_id': self.union_id,
             'user_name': self.user_name,
+            'en_name': self.en_name,
             'user_email': self.user_email,
+            'mobile': self.mobile,
+            'tenant_key': self.tenant_key,
             'access_token': self.access_token,
             'refresh_token': self.refresh_token,
             'expire_time': self.expire_time.isoformat() if self.expire_time else None,
@@ -470,11 +516,11 @@ class UserAccessToken:
 
     def __str__(self) -> str:
         """String representation"""
-        return f"UserAccessToken(user_id={self.user_id}, email={self.user_email}, status={self.status.value})"
+        return f"UserAccessToken(open_id={self.open_id}, user_id={self.user_id}, email={self.user_email}, status={self.status.value})"
 
     def __repr__(self) -> str:
         """Detailed representation"""
-        return (f"UserAccessToken(id={self.id}, user_id={self.user_id}, "
+        return (f"UserAccessToken(id={self.id}, open_id={self.open_id}, user_id={self.user_id}, "
             f"status={self.status.value})")
 
 

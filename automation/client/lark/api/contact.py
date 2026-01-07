@@ -4,13 +4,14 @@
 """
 
 import logging
+import requests
 
 from datetime import datetime, timedelta
 
 
 from ..base import LarkClient, UserAccessToken, TokenStatus
 
-from ..utils.lark_request import request
+from ..utils import lark_request
 from ..common import LarkContactURL
 
 
@@ -58,6 +59,7 @@ class LarkContact(LarkClient):
             str: User Access Token string, or None if not set
         """
         if self.__user_access_token is None:
+            logger.warning("User access token is not set")
             return None
             
         # Check if token needs refresh
@@ -122,6 +124,53 @@ class LarkContact(LarkClient):
         logger.info(f"Generated authorization URL with scope: {scope}")
         return authorization_url
     
+    def query_user_info(self, user_access_token: str) -> dict:
+        """Query user information using user_access_token
+        Reference doc:
+        https://open.feishu.cn/document/server-docs/authentication-management/login-state-management/get
+        
+        Args:
+        ---------
+            user_access_token: User access token string
+            
+        Returns:
+            Dict with user information: {
+                'user_id': str,
+                'name': str,
+                'en_name': str,
+                'email': str,
+                'mobile': str,
+                'tenant_key': str,
+                ...
+            }
+            
+        Raises:
+            Exception: If query fails
+        """
+        url = LarkContactURL.QUERY_USER_INFO.value
+        
+        headers = {
+            "Authorization": f"Bearer {user_access_token}",
+            "Content-Type": "application/json; charset=utf-8"
+        }
+        
+        response = lark_request.request(
+            method="GET",
+            url=url,
+            headers=headers
+        )
+        
+        result = response
+        
+        if result.get("code") != 0:
+            error_msg = result.get("msg") or "Unknown error"
+            logger.error(f"Failed to query user info: {error_msg}")
+            raise Exception(f"Query user info failed: {error_msg}")
+        
+        user_info = result.get("data", {})
+        logger.info(f"Successfully retrieved user info for user_id: {user_info.get('user_id')}")
+        return user_info
+    
     def exchange_code_for_token(self, code: str, redirect_uri: str = None) -> UserAccessToken:
         """Exchange authorization code for user_access_token
         
@@ -144,8 +193,6 @@ class LarkContact(LarkClient):
             >>> contact.user_access_token = token
             >>> contact.save_user_access_token()
         """
-        from datetime import datetime, timedelta
-        import requests
         
         url = "https://open.feishu.cn/open-apis/authen/v2/oauth/token"
         
@@ -179,19 +226,35 @@ class LarkContact(LarkClient):
         # Create UserAccessToken instance
         expires_in = result.get("expires_in", 7200)
         expire_time = datetime.now() + timedelta(seconds=expires_in)
+        scopes = result.get("scope", "").split()
+        access_token_str = result["access_token"]
         
-        # scopes = result.get("scope", "").split()
-        import ipdb; ipdb.set_trace()
+        # Query user information using the new token
+        try:
+            user_info = self.query_user_info(access_token_str)
+        except Exception as e:
+            logger.warning(f"Failed to get user info after token exchange: {e}")
+            user_info = {}
+        
+        # Create token with complete user information
         token = UserAccessToken(
-            access_token=result["access_token"],
+            user_id=user_info.get("user_id"),
+            open_id=user_info.get("open_id"),
+            union_id=user_info.get("union_id"),
+            user_name=user_info.get("name"),
+            en_name=user_info.get("en_name"),
+            user_email=user_info.get("email"),
+            mobile=user_info.get("mobile"),
+            tenant_key=user_info.get("tenant_key"),
+            access_token=access_token_str,
             refresh_token=result.get("refresh_token"),
             expire_time=expire_time,
-            # scopes=scopes,
+            scopes=scopes,
             status=TokenStatus.ACTIVE,
             source="oauth_authorization"
         )
         
-        # logger.info(f"Successfully exchanged code for user_access_token with scopes: {scopes}")
+        logger.info(f"Successfully exchanged code for user_access_token with scopes: {scopes}")
         return token
     
     def refresh_user_access_token(self, refresh_token: str = None) -> UserAccessToken:
@@ -224,11 +287,11 @@ class LarkContact(LarkClient):
             "refresh_token": refresh_token
         }
         
-        response = request(
+        response = lark_request.request(
             method="POST",
             url=url,
             headers=headers,
-            json=body
+            payload=body
         )
         
         result = response.json()
@@ -240,18 +303,46 @@ class LarkContact(LarkClient):
         
         expires_in = result.get("expires_in", 7200)
         expire_time = datetime.now() + timedelta(seconds=expires_in)
+        scopes = result.get("scope", "").split()
+        access_token_str = result["access_token"]
         
-        # scopes = result.get("scope", "").split()
+        # Try to get updated user info, fallback to original if available
+        user_id = getattr(self.__user_access_token, 'user_id', None)
+        open_id = getattr(self.__user_access_token, 'open_id', None)
+        union_id = getattr(self.__user_access_token, 'union_id', None)
+        user_name = getattr(self.__user_access_token, 'user_name', None)
+        en_name = getattr(self.__user_access_token, 'en_name', None)
+        user_email = getattr(self.__user_access_token, 'user_email', None)
+        mobile = getattr(self.__user_access_token, 'mobile', None)
+        tenant_key = getattr(self.__user_access_token, 'tenant_key', None)
+        
+        try:
+            user_info = self.query_user_info(access_token_str)
+            user_id = user_info.get("user_id") or user_id
+            open_id = user_info.get("open_id") or open_id
+            union_id = user_info.get("union_id") or union_id
+            user_name = user_info.get("name") or user_name
+            en_name = user_info.get("en_name") or en_name
+            user_email = user_info.get("email") or user_email
+            mobile = user_info.get("mobile") or mobile
+            tenant_key = user_info.get("tenant_key") or tenant_key
+        except Exception as e:
+            logger.warning(f"Failed to update user info during refresh: {e}")
         
         # Keep original user info if available
         token = UserAccessToken(
-            user_id=self.__user_access_token.user_id if self.__user_access_token else None,
-            user_name=self.__user_access_token.user_name if self.__user_access_token else None,
-            user_email=self.__user_access_token.user_email if self.__user_access_token else None,
-            access_token=result["access_token"],
+            user_id=user_id,
+            open_id=open_id,
+            union_id=union_id,
+            user_name=user_name,
+            en_name=en_name,
+            user_email=user_email,
+            mobile=mobile,
+            tenant_key=tenant_key,
+            access_token=access_token_str,
             refresh_token=result.get("refresh_token"),
             expire_time=expire_time,
-            # scopes=scopes,
+            scopes=scopes,
             status=TokenStatus.ACTIVE,
             source="token_refresh"
         )
@@ -318,7 +409,7 @@ class LarkContact(LarkClient):
         # Generate authorization URL
         auth_url = self.get_authorization_url(
             redirect_uri=redirect_uri,
-            # scope=scope,
+            scope=scope,
             state=None  # Could add CSRF protection if needed
         )
         
@@ -370,6 +461,22 @@ class LarkContact(LarkClient):
         print(f"{'='*60}")
         print("✓ 成功获取用户访问令牌!")
         print(f"{'='*60}")
+        if token.open_id:
+            print(f"用户OpenID: {token.open_id}")
+        if token.user_id:
+            print(f"用户ID: {token.user_id}")
+        if token.union_id:
+            print(f"用户UnionID: {token.union_id}")
+        if token.user_name:
+            print(f"用户名: {token.user_name}")
+        if token.en_name:
+            print(f"英文名: {token.en_name}")
+        if token.user_email:
+            print(f"邮箱: {token.user_email}")
+        if token.mobile:
+            print(f"手机: {token.mobile}")
+        if token.tenant_key:
+            print(f"组织ID: {token.tenant_key}")
         print(f"权限范围: {', '.join(token.scopes)}")
         print(f"有效期至: {token.expire_time.strftime('%Y-%m-%d %H:%M:%S')}")
         if token.refresh_token:
@@ -404,11 +511,11 @@ class LarkContact(LarkClient):
         if page_token:
             params["page_token"] = page_token
         
-        response = request(
+        response = lark_request.request(
             method="GET",
             url=url,
             headers=headers,
             params=params
         )
         
-        return response.json()
+        return response
