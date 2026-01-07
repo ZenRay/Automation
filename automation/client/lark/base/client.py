@@ -31,7 +31,8 @@ class LarkClient(object):
         if not app_id or not app_secret:
             raise ValueError("app_id and app_secret are required parameters")
         
-        key = (app_id, app_secret, lark_host)
+        # include the subclass in the key so different client subclasses
+        key = (cls, app_id, app_secret, lark_host)
 
 
         with cls._instances_lock:
