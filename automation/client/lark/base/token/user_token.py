@@ -54,6 +54,7 @@ class UserAccessToken:
         """UserAccessToken initialization
 
         Args:
+        ----------
             user_id: Lark user ID (depends on scope, might be null)
             open_id: User open ID (unique in app dimension)
             union_id: User union ID (unique across multiple apps)
@@ -510,11 +511,11 @@ class UserAccessToken:
         buffer_time = datetime.now() + timedelta(minutes=buffer_minutes)
         return buffer_time >= self.expire_time
 
-    def auto_refresh(self, refresh_func: Callable) -> bool:
+    def auto_refresh(self) -> bool:
         """Auto refresh Token
-        
-        Args:
-            refresh_func: Function to refresh Token, should return new token info dict
+        Returns:
+        ---------
+            bool: True if refresh succeeded, False otherwise
         """
         if not self.refresh_token or self.status == TokenStatus.REFRESHING:
             logger.error(
@@ -528,9 +529,10 @@ class UserAccessToken:
                 # save status change; save() has its own locking and retry
                 self.save()
 
+                logger.debug(f"Start refreshing token for user {self.user_id}")
                 # Call refresh function (may block) — do not hold DB locks across this call
                 start_time = datetime.now()
-                new_token_data = refresh_func(self.refresh_token)
+                new_token_data = self.refresh(self.refresh_token)
 
                 if new_token_data:
                     self.access_token = new_token_data.get('access_token', self.access_token)
@@ -717,7 +719,7 @@ class UserAccessToken:
         return token
 
 
-    def refresh(self, http_client: Optional[Callable] = None, user_info_fetcher: Optional[Callable] = None, save: bool = True, client: Optional[object] = None) -> 'UserAccessToken':
+    def refresh(self, client: Optional[object], user_info_fetcher: Optional[Callable] = None, save: bool = True) -> 'UserAccessToken':
         """Refresh this user's access token using the refresh_token.
 
         Args:
@@ -738,28 +740,16 @@ class UserAccessToken:
                 return self
             self.status = TokenStatus.REFRESHING
             try:
+                start_time = datetime.now()
                 # Resolve credentials from provided `client` (preferred)
-                client_id = None
-                client_secret = None
-                if client is not None:
-                    try:
-                        client_id = getattr(client, 'app_id', None)
-                        client_secret = getattr(client, 'app_secret', None)
-                    except Exception:
-                        client_id = client_secret = None
+                client_id = getattr(client, 'app_id', None)
+                client_secret = getattr(client, 'app_secret', None)
 
                 if not client_id or not client_secret:
                     raise LarkException("App credentials required: provide a `client` with `app_id` and `app_secret`")
 
-                if http_client is None:
-                    try:
-                        from ...utils import lark_request
-                        http_client = lark_request.request
-                    except Exception:
-                        import requests
-                        def http_client(method: str, url: str, headers=None, payload=None, params=None, json=None):
-                            resp = requests.post(url, headers=headers, json=payload)
-                            return resp.json()
+                    resp = requests.post(url, headers=headers, json=payload)
+                    return resp.json()
 
                 url = AuthURL.AUTH_USER_TOKEN.value
                 headers = {"Content-Type": "application/json; charset=utf-8"}
@@ -770,21 +760,14 @@ class UserAccessToken:
                     "refresh_token": self.refresh_token
                 }
 
-                result = http_client(method="POST", url=url, headers=headers, payload=body)
-                if not isinstance(result, dict):
-                    try:
-                        result = result.json()
-                    except Exception:
-                        raise LarkException("Invalid refresh response")
+                import requests
+                result = requests.post(url, headers=headers, json=body).json()
 
                 if result.get("code") != 0 and not result.get("access_token"):
                     error_msg = result.get("error_description") or result.get("msg") or result
                     self.status = TokenStatus.INVALID
                     if save:
-                        try:
-                            self.save()
-                        except Exception:
-                            pass
+                        self.save()
                     raise LarkException(f"Token refresh failed: {error_msg}")
 
                 # update fields
@@ -793,7 +776,7 @@ class UserAccessToken:
                 expires_in = result.get("expires_in")
                 if expires_in:
                     try:
-                        self.expire_time = datetime.now() + timedelta(seconds=int(expires_in))
+                        self.expire_time = start_time + timedelta(seconds=int(expires_in))
                     except Exception:
                         self.expire_time = None
 
@@ -819,22 +802,21 @@ class UserAccessToken:
                 self.status = TokenStatus.ACTIVE
                 if save:
                     self.save()
-                return self
+                
 
             except Exception as e:
                 logger.error(f"Error refreshing token for user {self.user_id}: {e}")
                 self.status = TokenStatus.INVALID
-                try:
-                    if save:
-                        self.save()
-                except Exception:
-                    pass
-                raise
+                self.save()
+                raise LarkException(f"Token refresh failed: {e}")
+            return self    
+            
 
     @classmethod
     def get_user_access_token_interactive(
             cls, client: Optional[object] = None, scope: Optional[str] = None, 
-            port: int = 8080, timeout: int = 120, auto_open_browser: bool = True
+            port: int = 8080, timeout: int = 120, auto_open_browser: bool = True,
+            need_fetch_user_info: bool = True, redirect_uri: Optional[str] = None
         ) -> 'UserAccessToken':
         """Interactive OAuth flow implemented at model level: starts local callback server, exchanges code and returns token instance.
 
@@ -856,7 +838,10 @@ class UserAccessToken:
         if not client_id or not client_secret:
             raise LarkException("App credentials required: provide a `client` with `app_id` and `app_secret`")
 
-        redirect = f"http://localhost:{port}/callback"
+        if redirect_uri:
+            redirect = redirect_uri
+        else:
+            redirect = f"http://localhost:{port}/callback"
 
         # Build authorization url
         auth_base_url = AuthURL.AUTH_CODE.value
@@ -893,7 +878,7 @@ class UserAccessToken:
             code=auth_code,
             redirect_uri=redirect,
             client=client,
-            need_fetch_user_info=True
+            need_fetch_user_info=need_fetch_user_info
         )
         return token
 
