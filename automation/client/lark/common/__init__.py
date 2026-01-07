@@ -51,6 +51,14 @@ class AuthURL(Enum):
     AUTH_USER_TOKEN = f"{_lark_host}/open-apis/authen/v2/oauth/token"
     
 
+
+class APaaSURL(Enum):
+    """ Lark aPaaS API URL.
+    """
+    QUERY_WORKSPACE_TABLES = f"{_lark_host}/open-apis/apaas/v1/workspaces/{{workspace_id}}/tables"
+    DELETE_TABLE_RECORDS = f"{_lark_host}/open-apis/apaas/v1/workspaces/{{workspace_id}}/tables/{{table_name}}/records"
+    
+    
 class MIMEType(Enum):
     """ MIME Type Enum.
     """
