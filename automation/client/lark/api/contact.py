@@ -21,8 +21,6 @@ logger = logging.getLogger("automation.client.lark.api.contact")
 class LarkContact(LarkClient):
     """Lark Contact API
     """
-    # Initialize UserAccessToken database on first use
-    UserAccessToken.init_database()
     
     def __init__(self, *, app_id, app_secret, master_info={"user_name": "", "user_email":""}, lark_host="https://open.feishu.cn"):
         """Init Lark Contact Object
@@ -86,8 +84,33 @@ class LarkContact(LarkClient):
         self.__user_access_token = token
     
     
-    
     def query_user_info(self, user_access_token: str) -> dict:
+        """Query user information using user_access_token
+        Reference doc:
+        https://open.feishu.cn/document/server-docs/authentication-management/login-state-management/get
+        
+        Args:
+        ---------
+            user_access_token: User access token string
+            
+        Returns:
+            Dict with user information: {
+                'user_id': str,
+                'name': str,
+                'en_name': str,
+                'email': str,
+                'mobile': str,
+                'tenant_key': str,
+                ...
+            }
+            
+        Raises:
+            Exception: If query fails
+        """
+        return self._query_user_info(user_access_token)
+    
+    @classmethod
+    def _query_user_info(cls, user_access_token: str) -> dict:
         """Query user information using user_access_token
         Reference doc:
         https://open.feishu.cn/document/server-docs/authentication-management/login-state-management/get
