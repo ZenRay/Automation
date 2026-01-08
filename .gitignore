@@ -192,6 +192,13 @@ dispatcher/docs/docker-compose-official.yaml
 .cursor/rules/data-engineer.md
 dispatcher/plugins/example_plugin.py
 dispatcher/mysql_backup.tar.gz
+
+# Keep AirflowService directories but ignore their contents
+/AirflowService/dags/*
+!/AirflowService/dags/.gitkeep
+
+/AirflowService/etl_sentence/*
+!/AirflowService/etl_sentence/.gitkeep
 dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/dimension/*.py
 dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/fact/*.py
 
