@@ -8,4 +8,4 @@ from .spreadsheet import LarkSheets
 from .im import LarkIM
 
 # aPaaS client
-from .aPaaS import LarkAPaaS
+from .aPaaS import LarkAPaaSClient

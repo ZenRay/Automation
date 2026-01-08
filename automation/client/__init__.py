@@ -2,6 +2,6 @@
 
 
 from .maxcomputer.odps import MaxComputerClient
-from .lark.api import LarkMultiDimTable, LarkSheets, LarkIM, LarkAPaaS
+from .lark.api import LarkMultiDimTable, LarkSheets, LarkIM, LarkAPaaSClient
 
 from .lark.base import LarkClient

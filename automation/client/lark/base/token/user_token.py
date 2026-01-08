@@ -294,6 +294,12 @@ class UserAccessToken:
         # ensure directory exists
         cls._ensure_table_exists()
 
+    def revoke(self) -> bool:
+        """Revoke Token"""
+        self.status = TokenStatus.REVOKED
+        return self.save(msg="Revoke Token")
+    
+    
     @classmethod
     def _get_connection(cls) -> sqlite3.Connection:
         """Get database connection"""
@@ -551,7 +557,7 @@ class UserAccessToken:
         buffer_time = datetime.now() + timedelta(minutes=buffer_minutes)
         return buffer_time >= self.expire_time
 
-    def auto_refresh(self, client) -> bool:
+    def auto_refresh(self, client) -> None:
         """Auto refresh Token
             
         Auto refresh the token using the stored refresh_token.
@@ -560,17 +566,12 @@ class UserAccessToken:
             logger.error(
                 f"Cannot refresh token for user {self}: no refresh token or already refreshing"
             )
-            return False
 
         # If refresh token itself has expired, cannot refresh
         if getattr(self, 'refresh_token_expires_at', None) and self.refresh_token_expires_at and datetime.now() >= self.refresh_token_expires_at:
             logger.error(f"Refresh token expired for user {self.user_id}; cannot auto-refresh")
             self.status = TokenStatus.INVALID
-            try:
-                self.save(msg="Transform Status to INVALID")
-            except Exception:
-                pass
-            return False
+            self.save(msg="Transform Status to INVALID")
 
         with self._lock:
             try:
@@ -613,10 +614,7 @@ class UserAccessToken:
             
 
 
-    def revoke(self) -> bool:
-        """Revoke Token"""
-        self.status = TokenStatus.REVOKED
-        return self.save(msg="Revoke Token")
+
 
 
     def to_dict(self) -> Dict[str, Any]:
@@ -784,7 +782,7 @@ class UserAccessToken:
 
 
     @classmethod
-    def extract_token_by_username(cls, client, user_name: str, force_refresh: bool = True) -> None:
+    def extract_token_by_username(cls, client, user_name: str, force_refresh: bool = False) -> None:
         """Class method: find token by `user_name` (limit=1) and invoke its `auto_refresh()`.
 
         Only this method is modified; other code remains untouched.
@@ -805,17 +803,15 @@ class UserAccessToken:
         # Condition refresh, token is invalid and needs refresh
         if not token.is_valid and token.needs_refresh():
             logger.info(f"Token for user_name={user_name} needs refresh; attempting auto-refresh")
-            is_success = token.auto_refresh(client=client)
+            token.auto_refresh(client=client)
             
-            if is_success:
-                logger.info(f"Token for user_name={user_name} refreshed successfully")
-                return token
-            else:
-                logger.error(f"Failed to refresh token for user_name={user_name}. `refresh_token` may be invalid or expired.")
-                raise LarkException(f"Failed to refresh token for user_name={user_name}. `refresh_token` may be invalid or expired.")
+            logger.info(f"Token for user_name={user_name} refreshed successfully")
+            return token
 
+        else:
+            return token
 
-    def refresh(self, client: Optional[object], user_info_fetcher: Optional[Callable] = None, save: bool = True) -> 'UserAccessToken':
+    def refresh(self, client: Optional[object], user_info_fetcher: Optional[Callable] = None) -> 'UserAccessToken':
         """Refresh this user's access token using the refresh_token.
 
         Args:
@@ -823,7 +819,6 @@ class UserAccessToken:
             client_secret: App client secret
             http_client: Optional HTTP client callable
             user_info_fetcher: Optional callable to update user info given new access token
-            save: Whether to persist changes via `save()`
         Returns:
             Updated self
         """
@@ -860,8 +855,7 @@ class UserAccessToken:
                 if result.get("code") != 0 and not result.get("access_token"):
                     error_msg = result.get("error_description") or result.get("msg") or result
                     self.status = TokenStatus.INVALID
-                    if save:
-                        self.save(msg="Transform Status to INVALID after failed refresh")
+                    self.save(msg="Transform Status to INVALID after failed refresh")
                     raise LarkException(f"Token refresh failed: {error_msg}")
 
                 # update fields
@@ -985,4 +979,23 @@ class UserAccessToken:
         return token
 
 
+    def check2refresh(self, client,  force_refresh: bool=False) -> bool:
+        """Check and refresh token if needed
+        
+        If `force_refresh` is True, always refresh the token. Otherwise token 
+        is unvalid and needs refresh, then refresh the token.
 
+        Args:
+        -----------
+            client: Lark client instance
+            force_refresh: Whether to force refresh the token
+        Returns:
+            True if token is valid after check/refresh, False otherwise
+        """
+        if force_refresh:
+            return self.auto_refresh(client=client)
+        
+        if not self.is_valid and self.needs_refresh():
+            return self.auto_refresh(client=client)
+        
+        return self.is_valid
