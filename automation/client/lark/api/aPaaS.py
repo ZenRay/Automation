@@ -201,7 +201,7 @@ class LarkAPaaS(LarkClient):
         
     def delete_table_records(self,
                              table_name: str,
-                             filter_conditions: List[dict],
+                             filter_conditions: str,
                              workspace_id: str=None):
         """Delete records from a table in a workspace.
 
@@ -215,7 +215,7 @@ class LarkAPaaS(LarkClient):
         ------------
             workspace_id: target workspace id
             table_name: target table name
-            filter_conditions: list of filter conditions to delete records
+            filter_conditions: str, filter conditions to delete records
         Returns:
             dict: parsed response from Feishu aPaaS endpoint
         Raises:
