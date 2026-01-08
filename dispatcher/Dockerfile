@@ -27,13 +27,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 
 # 设置环境变量
-ENV PYTHONPATH="/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher"
+ENV PYTHONPATH="/opt/airflow:/opt/airflow/automation:/opt/airflow/dispatcher"
 ENV AIRFLOW_HOME=/opt/airflow
 ENV AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Shanghai
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
 
 # 更新bash配置文件以包含Python搜索路径
-RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/Automation:$PYTHONPATH"' >> ~/.bashrc
+RUN echo 'export PYTHONPATH="/opt/airflow:/opt/airflow/automation:/opt/airflow/dispatcher:$PYTHONPATH"' >> ~/.bashrc
 
 
 # 健康检查

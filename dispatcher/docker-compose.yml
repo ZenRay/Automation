@@ -45,19 +45,18 @@ services:
       AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'Asia/Shanghai'
       AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: 10
       AIRFLOW__SCHEDULER__PARSING_PROCESSES: 4
-      PYTHONPATH: "/opt/airflow:/opt/airflow/Automation:/opt/airflow/Automation/automation:/opt/airflow/Automation/dispatcher:/opt/airflow/models"
+      # Use a single, consistent dispatcher package path and the project dags path
+      PYTHONPATH: "/opt/airflow:/opt/airflow/automation:/opt/airflow/dispatcher:/opt/airflow/models"
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     volumes:
       - ~/data:/opt/airflow/data
       - ~/models:/opt/airflow/models
-      - ./dags:/opt/airflow/dags
+      - ../AirflowService/dags:/opt/airflow/dags
+      - ../../Automation/dispatcher:/opt/airflow/dispatcher
+      - ../../Automation/automation:/opt/airflow/automation
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ./requirements.txt:/requirements.txt
-      - ./etl_sentence:/opt/airflow/Automation/dispatcher/etl_sentence
-      - ../Automation:/opt/airflow/Automation
-      - ../data:/opt/airflow/data
-      - ../models:/opt/airflow/models
     user: "airflow"
     ports:
       - "8080:8080"
