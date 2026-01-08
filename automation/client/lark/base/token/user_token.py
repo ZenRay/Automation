@@ -15,6 +15,8 @@ from typing import Optional, Dict, List, Any, Callable
 from enum import Enum
 
 
+
+
 from ...utils.oauth_local_server import OAuthCallbackServer
 from ...exceptions import LarkException
 from ...common import AuthURL
@@ -44,6 +46,7 @@ class UserAccessToken:
                  tenant_key: Optional[str] = None,
                  access_token: Optional[str] = None,
                  refresh_token: Optional[str] = None,
+                 refresh_token_expires_at: Optional[datetime] = None,
                  expire_time: Optional[datetime] = None,
                  scopes: Optional[List[str]] = None,
                  status: TokenStatus = TokenStatus.ACTIVE,
@@ -85,6 +88,7 @@ class UserAccessToken:
         self._tenant_key = tenant_key
         self._access_token = access_token
         self._refresh_token = refresh_token
+        self._refresh_token_expires_at = refresh_token_expires_at
         self._expire_time = expire_time
         self._scopes = scopes or []
         self._status = status
@@ -184,6 +188,14 @@ class UserAccessToken:
         self._refresh_token = value
 
     @property
+    def refresh_token_expires_at(self) -> Optional[datetime]:
+        return getattr(self, '_refresh_token_expires_at', None)
+
+    @refresh_token_expires_at.setter
+    def refresh_token_expires_at(self, value: Optional[datetime]):
+        self._refresh_token_expires_at = value
+
+    @property
     def expire_time(self) -> Optional[datetime]:
         return self._expire_time
 
@@ -236,7 +248,39 @@ class UserAccessToken:
         """Get user access token (alias)"""
         return self._access_token
     
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if Token is expired"""
+        if not self.expire_time:
+            return False
+        return datetime.now() >= self.expire_time
+
+    @property
+    def expires_in_seconds(self) -> Optional[int]:
+        """Get Token remaining valid time in seconds"""
+        if not self.expire_time:
+            return None
+        
+        delta = self.expire_time - datetime.now()
+        return max(0, int(delta.total_seconds()))
     
+    
+    @property
+    def is_valid(self) -> bool:
+        """Check if Token is valid"""
+        if self.status != TokenStatus.ACTIVE:
+            return False
+
+        if not self.access_token:
+            return False
+
+        if self.expire_time and datetime.now() >= self.expire_time:
+            return False
+
+        return True
+
+
     
     @classmethod
     def init_database(cls, db_path:str = ".", db_name: str = "user_tokens.db"):
@@ -296,6 +340,7 @@ class UserAccessToken:
                         tenant_key TEXT,
                         access_token TEXT NOT NULL,
                         refresh_token TEXT,
+                        refresh_token_expires_at TEXT,
                         expire_time TEXT,
                         scopes TEXT,
                         status TEXT NOT NULL DEFAULT 'active',
@@ -315,7 +360,8 @@ class UserAccessToken:
                 conn.commit()
             logger.info("UserAccessToken database initialized successfully")
 
-    def save(self) -> bool:
+
+    def save(self, msg: str="") -> bool:
         """Save or update Token to database"""
         # protect instance state and retry on busy/locked errors
         with self._lock:
@@ -331,8 +377,8 @@ class UserAccessToken:
                             cursor = conn.execute('''
                                 INSERT INTO user_access_tokens 
                                 (user_id, open_id, union_id, user_name, en_name, user_email, mobile, tenant_key,
-                                 access_token, refresh_token, expire_time, scopes, status, source, created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 access_token, refresh_token, refresh_token_expires_at, expire_time, scopes, status, source, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ON CONFLICT(open_id, tenant_key) DO UPDATE SET
                                     user_id=excluded.user_id,
                                     union_id=excluded.union_id,
@@ -342,6 +388,7 @@ class UserAccessToken:
                                     mobile=excluded.mobile,
                                     access_token=excluded.access_token,
                                     refresh_token=excluded.refresh_token,
+                                    refresh_token_expires_at=excluded.refresh_token_expires_at,
                                     expire_time=excluded.expire_time,
                                     scopes=excluded.scopes,
                                     status=excluded.status,
@@ -351,7 +398,8 @@ class UserAccessToken:
                                 self.user_id, self.open_id, self.union_id,
                                 self.user_name, self.en_name, self.user_email, self.mobile, self.tenant_key,
                                 self.access_token, self.refresh_token,
-                                self.expire_time.isoformat() if self.expire_time else None,
+                                (self.refresh_token_expires_at.isoformat() if self.refresh_token_expires_at else None),
+                                (self.expire_time.isoformat() if self.expire_time else None),
                                 json.dumps(self.scopes),
                                 self.status.value, self.source,
                                 self.created_at.isoformat(), self.updated_at.isoformat()
@@ -371,20 +419,21 @@ class UserAccessToken:
                             conn.execute('''
                                 UPDATE user_access_tokens SET
                                 user_id=?, open_id=?, union_id=?, user_name=?, en_name=?, user_email=?, mobile=?, tenant_key=?,
-                                access_token=?, refresh_token=?, expire_time=?, scopes=?, status=?, source=?, updated_at=?
+                                access_token=?, refresh_token=?, refresh_token_expires_at=?, expire_time=?, scopes=?, status=?, source=?, updated_at=?
                                 WHERE id=?
                             ''', (
                                 self.user_id, self.open_id, self.union_id,
                                 self.user_name, self.en_name, self.user_email, self.mobile, self.tenant_key,
                                 self.access_token, self.refresh_token,
-                                self.expire_time.isoformat() if self.expire_time else None,
+                                (self.refresh_token_expires_at.isoformat() if self.refresh_token_expires_at else None),
+                                (self.expire_time.isoformat() if self.expire_time else None),
                                 json.dumps(self.scopes),
                                 self.status.value, self.source, self.updated_at.isoformat(),
                                 self.id
                             ))
 
                         conn.commit()
-                        logger.info(f"Token saved successfully for user {self.user_id}")
+                        logger.info((msg and f"Execute Task<{msg}> .") + f"Token saved successfully for user {self.user_id}")
                         return True
 
                 except sqlite3.OperationalError as e:
@@ -395,23 +444,32 @@ class UserAccessToken:
                             backoff *= 2
                             continue
                         else:
-                            logger.error(f"Database locked, max retries reached: {e}")
+                            logger.error((msg and f"Execute Task<{msg}> .") + f"Token save failed. Database locked, max retries reached: {e}")
                             return False
                     else:
-                        logger.error(f"Operational error saving token: {e}")
+                        logger.error((msg and f"Execute Task<{msg}> .") + f"Operational error saving token: {e}")
                         return False
                 except sqlite3.IntegrityError as e:
-                    logger.error(f"Database integrity error: {e}")
+                    logger.error((msg and f"Execute Task<{msg}> .") + f"Token save failed. Database integrity error: {e}")
+                    
                     return False
                 except Exception as e:
-                    logger.error(f"Error saving token: {e}")
+                    logger.error((msg and f"Execute Task<{msg}> .") + f"Token save failed. Error saving token: {e}")
                     return False
 
 
 
     @classmethod
-    def where(cls, **conditions) -> List['UserAccessToken']:
-        """Query Token list by conditions"""
+    def where(cls, limit: int =1, **conditions) -> List['UserAccessToken']:
+        """Query Token list by conditions
+        
+        Args:
+        ----------
+            limit: Maximum number of results to return
+            **conditions: Filter conditions (user_id, open_id, union_id, user_name, en_name, user_email, mobile, tenant_key, status, source)
+        Returns:
+            List of UserAccessToken instances matching conditions
+        """
         try:
             with cls._get_connection() as conn:
                 # Build WHERE clause
@@ -424,12 +482,18 @@ class UserAccessToken:
                         params.append(value.value if isinstance(value, TokenStatus) else value)
 
                 where_clause = " AND ".join(where_parts) if where_parts else "1=1"
-                query = f"SELECT * FROM user_access_tokens WHERE {where_clause} ORDER BY updated_at DESC"
+                
+                query = f"SELECT * FROM user_access_tokens WHERE {where_clause} ORDER BY updated_at DESC {{limit_clause}}"
+                query = query.format(limit_clause =f"LIMIT {limit}" if limit > 0 else "")
+                
 
                 cursor = conn.execute(query, params)
-                rows = cursor.fetchall()
-
-                return [cls._from_db_row(row) for row in rows]
+                if limit == 1:
+                    row = cursor.fetchone()
+                    return cls._from_db_row(row) if row else None
+                else:
+                    rows = cursor.fetchall()
+                    return [cls._from_db_row(row) for row in rows]
 
         except Exception as e:
             logger.error(f"Error in where query: {e}")
@@ -448,9 +512,11 @@ class UserAccessToken:
                 return dt
             except Exception:
                 return None
-
+        
+        # transform row to dict
+        row = dict(row)
         return cls(
-            id=row['id'],
+            id=row.get('id'),
             user_id=row.get('user_id'),
             open_id=row.get('open_id'),
             union_id=row.get('union_id'),
@@ -461,6 +527,7 @@ class UserAccessToken:
             tenant_key=row.get('tenant_key'),
             access_token=row['access_token'],
             refresh_token=row['refresh_token'],
+            refresh_token_expires_at=_parse_dt(row.get('refresh_token_expires_at')),
             expire_time=_parse_dt(row['expire_time']),
             scopes=json.loads(row['scopes']) if row['scopes'] else [],
             status=TokenStatus(row['status']),
@@ -469,35 +536,8 @@ class UserAccessToken:
             updated_at=_parse_dt(row['updated_at']) or datetime.now()
         )
 
-    @property
-    def is_valid(self) -> bool:
-        """Check if Token is valid"""
-        if self.status != TokenStatus.ACTIVE:
-            return False
 
-        if not self.access_token:
-            return False
 
-        if self.expire_time and datetime.now() >= self.expire_time:
-            return False
-
-        return True
-
-    @property
-    def is_expired(self) -> bool:
-        """Check if Token is expired"""
-        if not self.expire_time:
-            return False
-        return datetime.now() >= self.expire_time
-
-    @property
-    def expires_in_seconds(self) -> Optional[int]:
-        """Get Token remaining valid time in seconds"""
-        if not self.expire_time:
-            return None
-        
-        delta = self.expire_time - datetime.now()
-        return max(0, int(delta.total_seconds()))
 
     def needs_refresh(self, buffer_minutes: int = 10) -> bool:
         """Check if Token needs refresh
@@ -511,11 +551,10 @@ class UserAccessToken:
         buffer_time = datetime.now() + timedelta(minutes=buffer_minutes)
         return buffer_time >= self.expire_time
 
-    def auto_refresh(self) -> bool:
+    def auto_refresh(self, client) -> bool:
         """Auto refresh Token
-        Returns:
-        ---------
-            bool: True if refresh succeeded, False otherwise
+            
+        Auto refresh the token using the stored refresh_token.
         """
         if not self.refresh_token or self.status == TokenStatus.REFRESHING:
             logger.error(
@@ -523,47 +562,61 @@ class UserAccessToken:
             )
             return False
 
+        # If refresh token itself has expired, cannot refresh
+        if getattr(self, 'refresh_token_expires_at', None) and self.refresh_token_expires_at and datetime.now() >= self.refresh_token_expires_at:
+            logger.error(f"Refresh token expired for user {self.user_id}; cannot auto-refresh")
+            self.status = TokenStatus.INVALID
+            try:
+                self.save(msg="Transform Status to INVALID")
+            except Exception:
+                pass
+            return False
+
         with self._lock:
             try:
                 self.status = TokenStatus.REFRESHING
                 # save status change; save() has its own locking and retry
-                self.save()
+                self.save(msg="Transform Status to REFRESHING")
 
-                logger.debug(f"Start refreshing token for user {self.user_id}")
+                logger.debug(f"Start auto refreshing token for user<id: {self.user_id} name: {self.user_name}>")
                 # Call refresh function (may block) — do not hold DB locks across this call
                 start_time = datetime.now()
-                new_token_data = self.refresh(self.refresh_token)
+                
+                new_token_data = self.refresh(client=client)
 
                 if new_token_data:
-                    self.access_token = new_token_data.get('access_token', self.access_token)
-                    self.refresh_token = new_token_data.get('refresh_token', self.refresh_token)
+                    self.access_token = getattr(new_token_data, 'access_token', self.access_token)
+                    self.refresh_token = getattr(new_token_data, 'refresh_token', self.refresh_token)
 
                     # Update expiration time
-                    if 'expires_in' in new_token_data:
-                        self.expire_time = start_time + timedelta(seconds=new_token_data['expires_in'])
-
+                    if hasattr(new_token_data, 'expires_in'):
+                        self.expire_time = start_time + timedelta(seconds=getattr(new_token_data, 'expires_in', 0))
+                    if hasattr(new_token_data, 'refresh_expires_in'):
+                        self.refresh_token_expires_at = start_time + timedelta(seconds=getattr(new_token_data, 'refresh_expires_in', 0))
+                    
+                    if hasattr(new_token_data, 'scope'):
+                        self.scopes = getattr(new_token_data, 'scope', "").split(" ") or self.scopes
                     self.status = TokenStatus.ACTIVE
-                    success = self.save()
-
-                    if success:
-                        logger.info(f"Token refreshed successfully for user {self.user_id}")
-                    return success
+                    logger.info(f"Token refreshed successfully for user<id: {self.user_id} name: {self.user_name}>")
+                    self.save(msg="Transform Status to ACTIVE after refresh")
                 else:
+                    logger.error(f"Token refresh returned no data for user<id: {self.user_id} name: {self.user_name}>")
                     self.status = TokenStatus.INVALID
-                    self.save()
-                    return False
+                    self.save(msg="Transform Status to INVALID after failed refresh")
 
             except Exception as e:
-                logger.error(f"Reefreshing token for user {self.user_id} failed: {e}")
+                logger.error(f"Refreshing token failed for user<id: {self.user_id} name: {self.user_name}> failed: {e}")
                 self.status = TokenStatus.INVALID
-                self.save()
-                return False
+                self.save(msg="Transform Status to INVALID after exception during refresh")
+                raise LarkException(f"Token auto-refresh failed: {e}")
+                
+            
 
 
     def revoke(self) -> bool:
         """Revoke Token"""
         self.status = TokenStatus.REVOKED
-        return self.save()
+        return self.save(msg="Revoke Token")
 
 
     def to_dict(self) -> Dict[str, Any]:
@@ -580,6 +633,7 @@ class UserAccessToken:
             'tenant_key': self.tenant_key,
             'access_token': self.access_token,
             'refresh_token': self.refresh_token,
+            'refresh_token_expires_at': self.refresh_token_expires_at.isoformat() if self.refresh_token_expires_at else None,
             'expire_time': self.expire_time.isoformat() if self.expire_time else None,
             'scopes': self.scopes,
             'status': self.status.value,
@@ -625,6 +679,15 @@ class UserAccessToken:
         except Exception:
             expire_time = None
 
+        # parse optional refresh token expiry (providers may return several keys)
+        refresh_token_expires_at = None
+        try:
+            refresh_expires_in = oauth_json.get('refresh_expires_in') or oauth_json.get('refresh_expires') or oauth_json.get('refresh_token_expires_in') or oauth_json.get('refresh_token_expires')
+            if refresh_expires_in:
+                refresh_token_expires_at = datetime.now() + timedelta(seconds=int(refresh_expires_in))
+        except Exception:
+            refresh_token_expires_at = None
+
         user_info = user_info or {}
 
         token = cls(
@@ -638,6 +701,7 @@ class UserAccessToken:
             tenant_key=user_info.get("tenant_key"),
             access_token=access_token,
             refresh_token=refresh_token,
+            refresh_token_expires_at=refresh_token_expires_at,
             expire_time=expire_time,
             scopes=scopes,
             status=TokenStatus.ACTIVE,
@@ -681,7 +745,6 @@ class UserAccessToken:
             body["redirect_uri"] = redirect_uri
 
         resp = requests.post(url=url, headers=headers, json=body).json()
-
         # Normalize response: Feishu may wrap payload under 'data'
         data = resp.get('data') if isinstance(resp, dict) and resp.get('data') else resp
 
@@ -716,7 +779,40 @@ class UserAccessToken:
             oauth_payload['refresh_token'] = refresh_token
 
         token = cls.from_oauth_response(oauth_payload, user_info=user_info, source="oauth_authorization")
+        token.save()
         return token
+
+
+    @classmethod
+    def extract_token_by_username(cls, client, user_name: str, force_refresh: bool = True) -> None:
+        """Class method: find token by `user_name` (limit=1) and invoke its `auto_refresh()`.
+
+        Only this method is modified; other code remains untouched.
+        """
+        token = cls.where(user_name=user_name, limit=1)
+        
+        if not token:
+            logger.error(f"No token found for user_name={user_name}")
+            raise LarkException(f"No token found for user_name={user_name}")
+
+        # Force refresh if specified
+        if force_refresh:
+            logger.info(f"Force refreshing token for user_name={user_name}")
+            token.auto_refresh(client=client)
+            logger.info(f"Token for user_name={user_name} refreshed successfully")
+            return token
+            
+        # Condition refresh, token is invalid and needs refresh
+        if not token.is_valid and token.needs_refresh():
+            logger.info(f"Token for user_name={user_name} needs refresh; attempting auto-refresh")
+            is_success = token.auto_refresh(client=client)
+            
+            if is_success:
+                logger.info(f"Token for user_name={user_name} refreshed successfully")
+                return token
+            else:
+                logger.error(f"Failed to refresh token for user_name={user_name}. `refresh_token` may be invalid or expired.")
+                raise LarkException(f"Failed to refresh token for user_name={user_name}. `refresh_token` may be invalid or expired.")
 
 
     def refresh(self, client: Optional[object], user_info_fetcher: Optional[Callable] = None, save: bool = True) -> 'UserAccessToken':
@@ -748,16 +844,14 @@ class UserAccessToken:
                 if not client_id or not client_secret:
                     raise LarkException("App credentials required: provide a `client` with `app_id` and `app_secret`")
 
-                    resp = requests.post(url, headers=headers, json=payload)
-                    return resp.json()
-
                 url = AuthURL.AUTH_USER_TOKEN.value
                 headers = {"Content-Type": "application/json; charset=utf-8"}
                 body = {
                     "grant_type": "refresh_token",
                     "client_id": client_id,
                     "client_secret": client_secret,
-                    "refresh_token": self.refresh_token
+                    "refresh_token": self.refresh_token,
+                    "scope": " ".join(self.scopes) if self.scopes else "offline_access"
                 }
 
                 import requests
@@ -767,7 +861,7 @@ class UserAccessToken:
                     error_msg = result.get("error_description") or result.get("msg") or result
                     self.status = TokenStatus.INVALID
                     if save:
-                        self.save()
+                        self.save(msg="Transform Status to INVALID after failed refresh")
                     raise LarkException(f"Token refresh failed: {error_msg}")
 
                 # update fields
@@ -780,9 +874,18 @@ class UserAccessToken:
                     except Exception:
                         self.expire_time = None
 
+                # handle refresh token expiry if provider returns it
+                refresh_expires_in = result.get('refresh_expires_in') or result.get('refresh_expires') or result.get('refresh_token_expires_in') or result.get('refresh_token_expires')
+                if refresh_expires_in:
+                    try:
+                        self.refresh_token_expires_at = start_time + timedelta(seconds=int(refresh_expires_in))
+                    except Exception:
+                        self.refresh_token_expires_at = None
+
                 scopes_raw = result.get("scope") or ""
                 self.scopes = scopes_raw.split() if isinstance(scopes_raw, str) and scopes_raw else self.scopes
-
+                logger.info('Authorization scopes: %s', " ".join(self.scopes) or '（无/使用应用默认）')
+                
                 # try to update user info
                 if user_info_fetcher and self.access_token:
                     try:
@@ -800,14 +903,13 @@ class UserAccessToken:
                         pass
 
                 self.status = TokenStatus.ACTIVE
-                if save:
-                    self.save()
+                self.save(msg="Update Token after refresh")
                 
 
             except Exception as e:
                 logger.error(f"Error refreshing token for user {self.user_id}: {e}")
                 self.status = TokenStatus.INVALID
-                self.save()
+                self.save(msg="Transform Status to INVALID after exception during refresh")
                 raise LarkException(f"Token refresh failed: {e}")
             return self    
             
