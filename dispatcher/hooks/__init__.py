@@ -14,7 +14,7 @@ from airflow.hooks.base import BaseHook
 from airflow.exceptions import AirflowNotFoundException
 
 from  automation.client import (
-    MaxComputerClient, LarkIM, LarkSheets, LarkMultiDimTable
+    MaxComputerClient, LarkIM, LarkSheets, LarkMultiDimTable, LarkAPaaS
 )
 
 
@@ -137,7 +137,8 @@ class LarkHook(BaseHook):
     _clients = {
         "im": None,
         "sheet": None,
-        "multi": None
+        "multi": None,
+        "apaas": None, # Lark aPaaS client
     }
     
     def __init__(self, conn_id: str = 'lark_app'):
@@ -210,3 +211,20 @@ class LarkHook(BaseHook):
             )
         return self._clients["multi"]
 
+
+    @property
+    def apaas_client(self) -> LarkAPaaS:
+        """Get Lark aPaaS instance
+
+        Returns:
+            LarkAPaaS instance
+        """
+        # TODO: Support redirect_uri with hard coded value for now
+        if self._clients.get("apaas") is None:
+            self._clients["apaas"] = LarkAPaaS(
+                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
+                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
+                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
+                redirect_uri=self.connection.extra_dejson.get('redirect_uri', 'http://localhost:9990/callback')
+            )
+        return self._clients["apaas"]

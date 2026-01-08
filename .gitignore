@@ -1,3 +1,9 @@
+# Ignore all files inside these two directories but keep the .gitkeep files
+/dispatcher/dags/*
+!/dispatcher/dags/.gitkeep
+
+/dispatcher/etl_sentence/*
+!/dispatcher/etl_sentence/.gitkeep
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

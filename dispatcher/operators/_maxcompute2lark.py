@@ -27,7 +27,7 @@ class Maxcompute2LarkOperator(BaseOperator):
     """
     Maxcompute to Lark Docs Operator
     1. Maxcompute ETL
-    2. Update Data to Lark Docs: Sheet or Multi Dimensional Table
+    2. Update Data to Lark Application: Sheet or Multi Dimensional Table, aPaaS Service Workspaces
     3. Send Message to Lark IM, argument `receive_type` is 'user' or 'group', if 'user' the send private message, 
         if 'group' send group message.
     """
@@ -75,6 +75,13 @@ class Maxcompute2LarkOperator(BaseOperator):
         # Update Lark Multi Dimension Table
         if client_type == "multi":
             self._update_lark_multi_dimension_table(
+                context=context
+                ,url=url
+                ,instance=instance
+            )
+        # Update Lark aPaaS Service Workspaces
+        elif client_type == "apaas":
+            self._update_lark_apaas_service_workspaces(
                 context=context
                 ,url=url
                 ,instance=instance
@@ -243,6 +250,47 @@ class Maxcompute2LarkOperator(BaseOperator):
             f"\tTable Title: {table_name}\n"
         )
 
+
+    def _update_lark_apaas_service_workspaces(self, context, url: str, instance=None, **kwargs):
+        """Update Lark aPaaS Service Workspaces
+        
+        Args:
+        ------------
+            context: Airflow context
+            url: Lark aPaaS Service Workspaces URL
+            instance: Maxcompute Execution SQL Instance
+        """
+        logger.info("Start Update Lark aPaaS Service Workspaces")
+        # extract parameters from context
+        workspace_id = self._check_context_params("workspace_id", context)
+        table_name = self._check_context_params("table_name", context)
+        # filter_conditions = self._check_context_params("filter_conditions", context)
+        
+        params = context.get('params', {})
+        filter_conditions = params.get("filter_conditions", None)
+        
+        # refresh client information
+        if not self.lark_hook:
+            self.lark_hook = LarkHook(
+                conn_id=self.lark_conn_id
+            )
+        client = self.lark_hook.apaas_client
+        # if filter_conditions is not None then clear the existing records
+        if filter_conditions is not None and len(filter_conditions) > 0:
+            client.delete_table_records(
+                table_name=table_name,
+                filter_conditions=filter_conditions,
+                workspace_id=workspace_id
+            )
+            logger.info(
+                f"Lark aPaaS Service Workspace Table Records Deleted Success:\n"
+                f"\tWorkspace ID: {workspace_id}\n"
+                f"\tTable Name: {table_name}\n"
+                f"\tFilter Conditions: {filter_conditions}\n"
+            )
+        
+        
+        
     
     def _send_lark_message(self, context, message: str, **kwargs):
         """Send Lark Message
