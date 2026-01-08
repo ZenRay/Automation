@@ -6,7 +6,7 @@ import logging
 from automation.conf import maxcomputer, lark
 from automation.client import (
     MaxComputerClient, LarkClient, LarkMultiDimTable
-    ,LarkSheets, LarkIM
+    ,LarkSheets, LarkIM, LarkAPaaS
 )
 
 
