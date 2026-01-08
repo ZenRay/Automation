@@ -2,7 +2,7 @@
 
 from .client import LarkClient
 
-from .token import AccessToken, UserAccessToken
+from .token import AccessToken, UserAccessToken, TokenStatus
 
 
 from .spreadsheet import (
