@@ -26,6 +26,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        AIRFLOW_UID: ${AIRFLOW_UID:-50000}
     env_file:
       - .env
     environment:
@@ -46,11 +48,14 @@ services:
       AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: 10
       AIRFLOW__SCHEDULER__PARSING_PROCESSES: 4
       # Use a single, consistent dispatcher package path and the project dags path
-      PYTHONPATH: "/opt/airflow:/opt/airflow/automation:/opt/airflow/dispatcher:/opt/airflow/models"
+      # 扩展 PYTHONPATH，加入 AirflowService 路径以便从该目录导入模块（方案2）
+      PYTHONPATH: "/opt/airflow:/opt/airflow/automation:/opt/airflow/dispatcher:/opt/airflow/models:/opt/airflow/AirflowService"
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     volumes:
-      - ~/data:/opt/airflow/data
+      - ../AirflowService/data:/opt/airflow/data
       - ~/models:/opt/airflow/models
+      # 把 AirflowService 整体挂载到容器，使其可以通过 PYTHONPATH 被 import
+      - ../AirflowService:/opt/airflow/AirflowService
       - ../AirflowService/dags:/opt/airflow/dags
       - ../../Automation/dispatcher:/opt/airflow/dispatcher
       - ../../Automation/automation:/opt/airflow/automation

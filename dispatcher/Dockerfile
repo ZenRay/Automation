@@ -11,13 +11,13 @@ RUN apt-get update && apt-get install -y git vim curl
 # 设置工作目录
 WORKDIR /opt/airflow
 
+# 在构建时允许通过 build-arg 传入 AIRFLOW_UID（默认 50000），创建并设置 data 目录权限
+ARG AIRFLOW_UID=50000
+RUN mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins /opt/airflow/Automation /opt/airflow/data \
+    && chown -R ${AIRFLOW_UID}:${AIRFLOW_UID} /opt/airflow
+
 # 切换到airflow用户
 USER airflow
-
-
-# 创建必要的目录，确保client目录及其子目录存在（如果不存在）
-RUN mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins \
-    /opt/airflow/Automation
 
 
 # 复制requirements文件
