@@ -52,7 +52,7 @@ class LarkAPaaSClient(LarkClient):
     
     def __init__(
         self, *, app_id, app_secret, lark_host="https://open.feishu.cn", 
-        user_name=None,
+        user_name=None, db_path=None,
         redirect_uri="http://localhost:9990/callback"
     ):
         """Initialize Lark aPaaS Client.
@@ -75,7 +75,7 @@ class LarkAPaaSClient(LarkClient):
         
         # FIXME: Initialize UserAccessToken database on first use, right now
         # just the persistent token information, don't use interactive method.
-        UserAccessToken.init_database()
+        UserAccessToken.init_database(db_path=db_path)
         # self._user_access_token = self.init_user_access_token(redirect_uri=redirect_uri)
         self._user_access_token = UserAccessToken.extract_token_by_username(client=self,user_name=user_name)  # type: Optional[UserAccessToken]
         
