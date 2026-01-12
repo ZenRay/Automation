@@ -225,6 +225,8 @@ class LarkHook(BaseHook):
                 app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
                 app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
                 lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
-                redirect_uri=self.connection.extra_dejson.get('redirect_uri', 'http://localhost:9990/callback')
+                redirect_uri=self.connection.extra_dejson.get('redirect_uri', 'http://localhost:9990/callback'),
+                user_name=self.connection.extra_dejson.get('user_name', None),
+                db_path=self.connection.extra_dejson.get('db_path', None)
             )
         return self._clients["apaas"]

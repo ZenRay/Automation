@@ -10,6 +10,7 @@ import logging
 import time
 import pandas as pd
 import numpy as np
+from decimal import Decimal
 
 
 from airflow.models import BaseOperator
@@ -61,7 +62,7 @@ class Maxcompute2LarkOperator(BaseOperator):
             context: Airflow context
         """
         sql = self._check_context_params("sql", context)
-        url = self._check_context_params("url", context)
+        
         client_type = self._check_context_params("client_type", context)
 
         message = context.get('params', {}).get("message", None)
@@ -74,6 +75,7 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         # Update Lark Multi Dimension Table
         if client_type == "multi":
+            url = self._check_context_params("url", context)
             self._update_lark_multi_dimension_table(
                 context=context
                 ,url=url
@@ -83,7 +85,6 @@ class Maxcompute2LarkOperator(BaseOperator):
         elif client_type == "apaas":
             self._update_lark_apaas_service_workspaces(
                 context=context
-                ,url=url
                 ,instance=instance
             )
         else:
@@ -251,30 +252,43 @@ class Maxcompute2LarkOperator(BaseOperator):
         )
 
 
-    def _update_lark_apaas_service_workspaces(self, context, url: str, instance=None, **kwargs):
+    def _update_lark_apaas_service_workspaces(self, context, instance=None, **kwargs):
         """Update Lark aPaaS Service Workspaces
         
         Args:
         ------------
             context: Airflow context
-            url: Lark aPaaS Service Workspaces URL
             instance: Maxcompute Execution SQL Instance
         """
         logger.info("Start Update Lark aPaaS Service Workspaces")
         # extract parameters from context
-        workspace_id = self._check_context_params("workspace_id", context)
         table_name = self._check_context_params("table_name", context)
-        # filter_conditions = self._check_context_params("filter_conditions", context)
+        
         
         params = context.get('params', {})
         filter_conditions = params.get("filter_conditions", None)
-        
+        # specify the preference for conflict resolution
+        prefer = params.get("prefer", "resolution=merge-duplicates, missing=default")
+        workspace_id = params.get("workspace_id", None)
+        workspace_url = params.get("workspace_url", None)
+
         # refresh client information
         if not self.lark_hook:
             self.lark_hook = LarkHook(
                 conn_id=self.lark_conn_id
             )
         client = self.lark_hook.apaas_client
+
+        if workspace_id is None:
+            if workspace_url is None:
+                msg = f"Missing Workspace URL and Workspace ID in context params. Those params must exist lest one"
+                logger.error(msg)
+                raise Exception(msg)
+            else:
+                workspace_id = client._extract_workspace_from_url(workspace_url)
+        
+        
+        
         # if filter_conditions is not None then clear the existing records
         if filter_conditions is not None and len(filter_conditions) > 0:
             client.delete_table_records(
@@ -282,12 +296,48 @@ class Maxcompute2LarkOperator(BaseOperator):
                 filter_conditions=filter_conditions,
                 workspace_id=workspace_id
             )
-            logger.info(
-                f"Lark aPaaS Service Workspace Table Records Deleted Success:\n"
-                f"\tWorkspace ID: {workspace_id}\n"
-                f"\tTable Name: {table_name}\n"
-                f"\tFilter Conditions: {filter_conditions}\n"
-            )
+            logger.info(f"Existing Records Deleted from aPaaS Service Workspace Table{workspace_id}:{table_name} with Filter Conditions: {filter_conditions}".format(
+                workspace_id=workspace_id,
+                table_name=table_name,
+                filter_conditions=filter_conditions
+            ))
+        
+        # Update records
+        if instance is not None:
+            for batch in instance.iter_pandas(batch_size=client.ADD_RECORD_LIMITATION):
+                # 1. convert Decimal type to float type
+                for col in batch.columns:
+                    if batch[col].dtype == 'object':
+                        # Check if the column contains Decimal type
+                        try:
+                            if batch[col].apply(lambda x: isinstance(x, Decimal) if pd.notna(x) else False).any():
+                                batch[col] = batch[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
+                        except:
+                            pass
+                
+                # 2. replace all NULL/NaN values with None
+                batch = batch.replace({np.nan: None, pd.NaT: None})
+                
+                records = batch.to_dict(orient="records")
+                
+                client.add_table_records(
+                    workspace_id=workspace_id
+                    ,table_name=table_name
+                    ,records=records
+                    ,columns=batch.columns.tolist()
+                    ,prefer=prefer
+                )
+            logger.info(f"Maxcompute ETL Records Send to aPaaS Service Workspace Table {workspace_id}:{table_name} Success".format(
+                workspace_id=workspace_id,
+                table_name=table_name
+            ))
+            time.sleep(2)
+        logger.info(
+            f"Lark aPaaS Service Workspace Table Records Delete And Update Success:\n"
+            f"\tWorkspace ID: {workspace_id}\n"
+            f"\tTable Name: {table_name}\n"
+            f"\tFilter Conditions: {filter_conditions}\n"
+        )
         
         
         
