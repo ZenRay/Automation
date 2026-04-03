@@ -19,6 +19,17 @@ from airflow.utils.decorators import apply_defaults
 
 from dispatcher.hooks import MaxcomputeHook, LarkHook
 from automation.utils.common.dataframe import dataframe2record
+from automation.client.lark.utils import (
+    offset_sheet_cell,
+    parse_column2index,
+    parse_index2column,
+    parse_sheet_cell,
+)
+
+from ._lark_sheet_dataframe import (
+    apply_lark_sheet_date_column,
+    extract_dataframe_to_sheet_values,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +39,7 @@ class Maxcompute2LarkOperator(BaseOperator):
     """
     Maxcompute to Lark Docs Operator
     1. Maxcompute ETL
-    2. Update Data to Lark Application: Sheet or Multi Dimensional Table, aPaaS Service Workspaces
+    2. Update Data to Lark Application: Sheet, Multi Dimensional Table, or aPaaS Service Workspaces
     3. Send Message to Lark IM, argument `receive_type` is 'user' or 'group', if 'user' the send private message, 
         if 'group' send group message.
     """
@@ -77,6 +88,14 @@ class Maxcompute2LarkOperator(BaseOperator):
         if client_type == "multi":
             url = self._check_context_params("url", context)
             self._update_lark_multi_dimension_table(
+                context=context
+                ,url=url
+                ,instance=instance
+            )
+        # Update Lark Sheet (row/column chunking in Lark layer, not tied to MC batch size)
+        elif client_type == "sheet":
+            url = self._check_context_params("url", context)
+            self._update_lark_sheet(
                 context=context
                 ,url=url
                 ,instance=instance
@@ -164,8 +183,8 @@ class Maxcompute2LarkOperator(BaseOperator):
             url: Lark Multi Dimension Table URL
             instance: Maxcompute Execution SQL Instance
         """
-        logger.info("Start Update Lark Sheet")
-        
+        logger.info("Start Update Lark Multi Dimension Table")
+
         # extract parameters from context
         table_name = self._check_context_params("table_name", context)
         params = context.get('params', {})
@@ -251,6 +270,101 @@ class Maxcompute2LarkOperator(BaseOperator):
             f"\tTable Title: {table_name}\n"
         )
 
+    def _update_lark_sheet(self, context, url: str, instance=None, **kwargs):
+        """Write MaxCompute SQL result rows to a Lark spreadsheet via sheet_client.
+
+        Result volume is determined by SQL only. Rows are streamed with
+        ``instance.iter_pandas()`` using PyODPS tunnel defaults (``batch_size`` defaults to
+        ``options.tunnel.read_row_batch_size`` when omitted), not an application cap.
+
+        Feishu per-request limits (e.g. 5000×100) are handled in
+        ``extract_dataframe_to_sheet_values`` / ``LarkSheets.batchupdate_values_single_sheet``.
+        """
+        logger.info("Start Update Lark Sheet")
+
+        sheet_title = self._check_context_params("sheet_title", context)
+        params = context.get("params", {})
+        start_cell = params.get("start_cell", "A1")
+        columns = params.get("columns")
+        batch_size = params.get("batch_size", 0)
+        filter_query = params.get("filter_query")
+
+        if not self.lark_hook:
+            self.lark_hook = LarkHook(conn_id=self.lark_conn_id)
+        client = self.lark_hook.sheet_client
+
+        client.extract_spreadsheet_info(url)
+        client.extract_sheets(client.spread_sheet)
+
+        if instance is None:
+            msg = "Maxcompute execution instance is missing."
+            logger.error(msg)
+            raise Exception(msg)
+
+        columns_fixed = list(columns) if columns is not None else None
+        current_cell = start_cell
+        include_header = True
+        total_rows_written = 0
+        batches = 0
+
+        for batch_df in instance.iter_pandas():
+            df = batch_df.copy()
+            if filter_query is not None:
+                try:
+                    df = df.query(filter_query).copy()
+                except Exception as e:
+                    raise ValueError(f"Error applying filter query '{filter_query}': {e}") from e
+
+            if df.shape[0] == 0:
+                continue
+
+            apply_lark_sheet_date_column(df, client)
+
+            if columns_fixed is None:
+                columns_fixed = df.columns.to_list()
+            else:
+                df = df.reindex(columns=columns_fixed)
+
+            extract_dataframe_to_sheet_values(
+                df=df,
+                columns=columns_fixed,
+                start_cell=current_cell,
+                sheet_title=sheet_title,
+                lark_sheets=client,
+                batch_size=batch_size,
+                include_header=include_header,
+            )
+
+            n = df.shape[0]
+            rows_this = (1 + n) if include_header else n
+            total_rows_written += rows_this
+            current_cell = offset_sheet_cell(current_cell, offset_row=rows_this)
+            include_header = False
+            batches += 1
+
+        if batches == 0:
+            logger.warning("No rows written to Lark Sheet (all iterator batches empty after filter).")
+            return
+
+        sheet_start_col, sheet_start_row = parse_sheet_cell(start_cell, parse_type="start")
+        end_row = sheet_start_row + total_rows_written - 1
+        end_col = parse_index2column(
+            parse_column2index(sheet_start_col) + len(columns_fixed) - 1
+        )
+        end_cell = f"{end_col}{end_row}"
+
+        logger.info(
+            "Maxcompute ETL rows sent to Lark Sheet success:\n"
+            "\tTarget URL: %s\n"
+            "\tSheet Title: %s\n"
+            "\tRange: %s:%s\n"
+            "\tColumns: %s\n",
+            url,
+            sheet_title,
+            start_cell,
+            end_cell,
+            columns_fixed,
+        )
 
     def _update_lark_apaas_service_workspaces(self, context, instance=None, **kwargs):
         """Update Lark aPaaS Service Workspaces

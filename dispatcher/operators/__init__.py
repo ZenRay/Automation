@@ -20,9 +20,7 @@ from airflow.utils.decorators import apply_defaults
 from dispatcher.hooks import MaxcomputeHook, LarkHook
 
 
-from automation.client.lark.utils import (
-    parse_column2index, parse_index2column, parse_sheet_cell, offset_sheet_cell
-)
+from automation.client.lark.utils import offset_sheet_cell
 
 from automation.client.lark import (
     LarkIM, LarkSheets
@@ -36,6 +34,10 @@ from automation.client.lark.base.im import (
 
 from ._maxcompute2lark import (
     Maxcompute2LarkOperator
+)
+from ._lark_sheet_dataframe import (
+    apply_lark_sheet_date_column,
+    extract_dataframe_to_sheet_values,
 )
 
 logger = logging.getLogger("dags.utils.operator")
@@ -204,24 +206,21 @@ class LarkOperator(BaseOperator):
             except Exception as e:
                 raise ValueError(f"Error applying filter query '{filter_query}': {e}")
             
-        # Fix Date Value to Int
-        if '日期' in df.columns and df['日期'].dtype != 'int64':
-            df["日期"] = pd.to_datetime(df["日期"], errors='coerce').apply(
-                lambda x: x - client._START_DATE if pd.notna(x) else x
-            ).dt.days
+        apply_lark_sheet_date_column(df, client)
 
         logger.info(f"Data file ({file}) read success")
         # adjust columns
         if columns is None:
             columns = df.columns.to_list()
-             
-        self._extract_data2sheet_values(
+
+        extract_dataframe_to_sheet_values(
             df=df,
             columns=columns,
             start_cell=start_cell,
             sheet_title=sheet_title,
             lark_sheets=client,
-            batch_size=batch_size
+            batch_size=batch_size,
+            include_header=True,
         )
         
         end_cell = offset_sheet_cell(start_cell, offset_col=len(columns)-1, offset_row=len(df)+1)
@@ -347,47 +346,6 @@ class LarkOperator(BaseOperator):
             raise ValueError("Unsupported file format. Only .csv and .xlsx are supported.")
         
         
-        
-    def _extract_data2sheet_values(self, df, columns, start_cell, sheet_title, lark_sheets, batch_size=0):
-        """Extract DataFrame to Lark Sheet Values
-        
-        Args:
-            df: DataFrame to send
-            columns: Columns to extract
-            start_cell: Starting cell in the sheet
-            sheet_title: Title of the sheet
-            lark_sheets: LarkSheets client instance
-            batch_size: Number of columns to send in each batch
-        """
-        if len(columns) > lark_sheets._UPDATE_COL_LIMITATION or batch_size > 0:
-            logger.warning("Data column count exceeds limit or specified batch size, splitting required.")
-            if batch_size == 0:
-                batch_size = 20
-            batch_indexes = list(range(0, len(columns) + 1, batch_size)) + [len(columns) + 1]
-        else:
-            batch_indexes = [0, len(columns) + 1]
-            
-        sheet_start_col, sheet_start_row = parse_sheet_cell(start_cell, parse_type="start")
-        start_column_index = batch_indexes[0]
-        for batch in batch_indexes[1:]:
-            # parse data records and columns
-            batch_columns = columns[start_column_index:batch]
-            data = [df.loc[:, batch_columns].columns.to_list()]
-            data += self._df2record(df.loc[:, batch_columns])
-
-            start_cell = f"{parse_index2column(parse_column2index(sheet_start_col) + start_column_index)}{sheet_start_row}"
-            end_cell = f"{parse_index2column(parse_column2index(sheet_start_col) + start_column_index + len(batch_columns) - 1)}{sheet_start_row + len(data) - 1}"
-            data_range = f"{start_cell}:{end_cell}"
-
-            lark_sheets.batchupdate_values_single_sheet(
-                data, data_range=data_range, sheet_id=lark_sheets.get_sheet_id(sheet_title)
-            )
-
-            logger.debug(f"Batch columns {batch_columns} sent to range {data_range}")
-            # next batch
-            start_column_index = batch
-            time.sleep(2)
-            
     def _df2record(self, df, type: str = "raw"):
         """Convert DataFrame to list of records
 
