@@ -54,15 +54,15 @@ class Maxcompute2LarkOperator(BaseOperator):
         """
         Initialize the Maxcompute to Lark Docs Operator
         """
+        # hints 不是 BaseOperator 的标准参数，需要在 super 之前取出
+        self.maxcompute_hints = kwargs.pop("hints", None)
+
         super().__init__(*args, **kwargs)
         self.maxcompute_conn_id = maxcompute_conn_id
         self.lark_conn_id = lark_conn_id
 
         self.maxcompute_hook = None
         self.lark_hook = None
-
-        # maxcompute hints
-        self.maxcompute_hints = kwargs.get("hints", None)
 
         
     def execute(self, context):
@@ -294,7 +294,24 @@ class Maxcompute2LarkOperator(BaseOperator):
         client = self.lark_hook.sheet_client
 
         client.extract_spreadsheet_info(url)
-        client.extract_sheets(client.spread_sheet)
+        
+        # 重试逻辑：处理飞书服务端临时错误
+        max_retries = 3
+        retry_delay = 5  # 秒
+        for attempt in range(max_retries):
+            try:
+                client.extract_sheets(client.spread_sheet)
+                break
+            except Exception as e:
+                error_msg = str(e)
+                # 如果是服务端错误（1315201 或 5xx），重试；否则直接抛出
+                if ('1315201' in error_msg or 'Server Error' in error_msg) and attempt < max_retries - 1:
+                    logger.warning(f"飞书服务端错误，{retry_delay}秒后重试（第{attempt + 1}次失败）: {error_msg}")
+                    import time
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"飞书 API 调用失败: {error_msg}")
+                    raise
 
         if instance is None:
             msg = "Maxcompute execution instance is missing."
