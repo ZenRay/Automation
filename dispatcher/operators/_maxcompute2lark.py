@@ -279,6 +279,9 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         Feishu per-request limits (e.g. 5000×100) are handled in
         ``extract_dataframe_to_sheet_values`` / ``LarkSheets.batchupdate_values_single_sheet``.
+
+        When ``is_clear`` is True, existing values in ``clear_range`` are cleared before writing
+        (via ``LarkSheets.clear_sheet_values``), analogous to multi-table ``is_clear``.
         """
         logger.info("Start Update Lark Sheet")
 
@@ -288,6 +291,8 @@ class Maxcompute2LarkOperator(BaseOperator):
         columns = params.get("columns")
         batch_size = params.get("batch_size", 0)
         filter_query = params.get("filter_query")
+        is_clear = params.get("is_clear", False)
+        clear_range = params.get("clear_range")
 
         if not self.lark_hook:
             self.lark_hook = LarkHook(conn_id=self.lark_conn_id)
@@ -300,6 +305,16 @@ class Maxcompute2LarkOperator(BaseOperator):
             msg = "Maxcompute execution instance is missing."
             logger.error(msg)
             raise Exception(msg)
+
+        sheet_id = client.get_sheet_id(sheet_title)
+        if is_clear:
+            if clear_range is None:
+                start_col, start_row = parse_sheet_cell(start_cell, parse_type="single")
+                # Default: from start_cell through ZZ × 50000 rows; override clear_range if wider.
+                clear_range = f"{start_col}{start_row}:ZZ50000"
+            logger.info("Clearing sheet range before write: %s", clear_range)
+            client.clear_sheet_values(clear_range, sheet_id=sheet_id)
+            time.sleep(2)
 
         columns_fixed = list(columns) if columns is not None else None
         current_cell = start_cell
