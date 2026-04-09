@@ -283,7 +283,8 @@ class Maxcompute2LarkOperator(BaseOperator):
         When ``is_clear`` is True, existing values in ``clear_range`` are cleared before writing
         (via ``LarkSheets.clear_sheet_values``), analogous to multi-table ``is_clear``.
         If ``clear_range`` is not provided, the operator infers clear ranges from
-        target sheet grid metadata (column_count / row_count) and clears in chunks.
+        target sheet grid metadata (column_count / row_count) and clears in
+        row/column chunks to satisfy Feishu clear limits.
         """
         logger.info("Start Update Lark Sheet")
 
@@ -346,6 +347,7 @@ class Maxcompute2LarkOperator(BaseOperator):
                 start_col, _ = parse_sheet_cell(start_cell, parse_type="single")
                 start_col_idx = parse_column2index(start_col)
                 col_limit = getattr(client, "_CLEAR_COL_LIMITATION", client._UPDATE_COL_LIMITATION)
+                row_limit = getattr(client, "_CLEAR_ROW_LIMITATION", client._UPDATE_ROW_LIMITATION)
                 total_clear_cols = 0
 
                 # Infer clear width from target sheet metadata first.
@@ -369,15 +371,19 @@ class Maxcompute2LarkOperator(BaseOperator):
                         "Please pass `clear_range` explicitly or provide `columns`."
                     )
 
-                clear_col_ranges = []
+                clear_ranges = []
                 for col_start in range(0, total_clear_cols, col_limit):
                     col_end = min(col_start + col_limit, total_clear_cols) - 1
                     clear_start_col = parse_index2column(start_col_idx + col_start)
                     clear_end_col = parse_index2column(start_col_idx + col_end)
-                    # Include row bounds to avoid extra read_sheet_values() probing inside clear_sheet_values.
-                    clear_col_ranges.append(f"{clear_start_col}1:{clear_end_col}{clear_end_row}")
+                    # Include row bounds and split by row limit to satisfy clear API constraints.
+                    for row_start in range(1, clear_end_row + 1, row_limit):
+                        row_end = min(row_start + row_limit - 1, clear_end_row)
+                        clear_ranges.append(
+                            f"{clear_start_col}{row_start}:{clear_end_col}{row_end}"
+                        )
 
-                for infer_range in clear_col_ranges:
+                for infer_range in clear_ranges:
                     logger.info("Clearing inferred sheet range before write: %s", infer_range)
                     client.clear_sheet_values(infer_range, sheet_id=sheet_id)
                     time.sleep(2)
