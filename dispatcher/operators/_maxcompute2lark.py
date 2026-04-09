@@ -282,8 +282,8 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         When ``is_clear`` is True, existing values in ``clear_range`` are cleared before writing
         (via ``LarkSheets.clear_sheet_values``), analogous to multi-table ``is_clear``.
-        If ``clear_range`` is not provided, the operator infers clear column ranges from ``columns``
-        and clears in chunks (<= 100 columns each) to satisfy Feishu range / write limits.
+        If ``clear_range`` is not provided, the operator infers clear ranges from
+        target sheet grid metadata (column_count / row_count) and clears in chunks.
         """
         logger.info("Start Update Lark Sheet")
 
@@ -315,7 +315,6 @@ class Maxcompute2LarkOperator(BaseOperator):
                 # 如果是服务端错误（1315201 或 5xx），重试；否则直接抛出
                 if ('1315201' in error_msg or 'Server Error' in error_msg) and attempt < max_retries - 1:
                     logger.warning(f"飞书服务端错误，{retry_delay}秒后重试（第{attempt + 1}次失败）: {error_msg}")
-                    import time
                     time.sleep(retry_delay)
                 else:
                     logger.error(f"飞书 API 调用失败: {error_msg}")
@@ -329,6 +328,14 @@ class Maxcompute2LarkOperator(BaseOperator):
         sheet_id = client.get_sheet_id(sheet_title)
         if sheet_id is None:
             raise ValueError(f"Sheet '{sheet_title}' not found in spreadsheet: {url}")
+        sheet_meta = next(
+            (
+                item
+                for item in (sheets_data or [])
+                if item.get("sheet_id") == sheet_id or item.get("title") == sheet_title
+            ),
+            None,
+        )
 
         if is_clear:
             if clear_range is not None:
@@ -338,23 +345,23 @@ class Maxcompute2LarkOperator(BaseOperator):
             else:
                 start_col, _ = parse_sheet_cell(start_cell, parse_type="single")
                 start_col_idx = parse_column2index(start_col)
-                col_limit = client._UPDATE_COL_LIMITATION
-                total_clear_cols = len(columns) if columns is not None and len(columns) > 0 else 0
+                col_limit = getattr(client, "_CLEAR_COL_LIMITATION", client._UPDATE_COL_LIMITATION)
+                total_clear_cols = 0
 
-                # If columns are not passed, infer clear width from target sheet grid metadata.
-                if total_clear_cols == 0:
-                    sheet_meta = next(
-                        (
-                            item
-                            for item in (sheets_data or [])
-                            if item.get("sheet_id") == sheet_id or item.get("title") == sheet_title
-                        ),
-                        None,
+                # Infer clear width from target sheet metadata first.
+                if sheet_meta is not None:
+                    total_clear_cols = (
+                        sheet_meta.get("grid_properties", {}).get("column_count", 0) or 0
                     )
-                    if sheet_meta is not None:
-                        total_clear_cols = (
-                            sheet_meta.get("grid_properties", {}).get("column_count", 0) or 0
-                        )
+
+                # Fallback: when metadata is unavailable, use write columns if provided.
+                if total_clear_cols == 0 and columns is not None and len(columns) > 0:
+                    total_clear_cols = len(columns)
+                clear_end_row = 50000
+                if sheet_meta is not None:
+                    clear_end_row = (
+                        sheet_meta.get("grid_properties", {}).get("row_count", 0) or clear_end_row
+                    )
 
                 if total_clear_cols <= 0:
                     raise ValueError(
@@ -367,7 +374,8 @@ class Maxcompute2LarkOperator(BaseOperator):
                     col_end = min(col_start + col_limit, total_clear_cols) - 1
                     clear_start_col = parse_index2column(start_col_idx + col_start)
                     clear_end_col = parse_index2column(start_col_idx + col_end)
-                    clear_col_ranges.append(f"{clear_start_col}:{clear_end_col}")
+                    # Include row bounds to avoid extra read_sheet_values() probing inside clear_sheet_values.
+                    clear_col_ranges.append(f"{clear_start_col}1:{clear_end_col}{clear_end_row}")
 
                 for infer_range in clear_col_ranges:
                     logger.info("Clearing inferred sheet range before write: %s", infer_range)
