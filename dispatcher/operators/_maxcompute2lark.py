@@ -282,6 +282,8 @@ class Maxcompute2LarkOperator(BaseOperator):
 
         When ``is_clear`` is True, existing values in ``clear_range`` are cleared before writing
         (via ``LarkSheets.clear_sheet_values``), analogous to multi-table ``is_clear``.
+        If ``clear_range`` is not provided, the operator infers clear column ranges from ``columns``
+        and clears in chunks (<= 100 columns each) to satisfy Feishu range / write limits.
         """
         logger.info("Start Update Lark Sheet")
 
@@ -303,9 +305,10 @@ class Maxcompute2LarkOperator(BaseOperator):
         # 重试逻辑：处理飞书服务端临时错误
         max_retries = 3
         retry_delay = 5  # 秒
+        sheets_data = None
         for attempt in range(max_retries):
             try:
-                client.extract_sheets(client.spread_sheet)
+                sheets_data = client.extract_sheets(client.spread_sheet)
                 break
             except Exception as e:
                 error_msg = str(e)
@@ -324,14 +327,52 @@ class Maxcompute2LarkOperator(BaseOperator):
             raise Exception(msg)
 
         sheet_id = client.get_sheet_id(sheet_title)
+        if sheet_id is None:
+            raise ValueError(f"Sheet '{sheet_title}' not found in spreadsheet: {url}")
+
         if is_clear:
-            if clear_range is None:
-                start_col, start_row = parse_sheet_cell(start_cell, parse_type="single")
-                # Default: from start_cell through ZZ × 50000 rows; override clear_range if wider.
-                clear_range = f"{start_col}{start_row}:ZZ50000"
-            logger.info("Clearing sheet range before write: %s", clear_range)
-            client.clear_sheet_values(clear_range, sheet_id=sheet_id)
-            time.sleep(2)
+            if clear_range is not None:
+                logger.info("Clearing sheet range before write: %s", clear_range)
+                client.clear_sheet_values(clear_range, sheet_id=sheet_id)
+                time.sleep(2)
+            else:
+                start_col, _ = parse_sheet_cell(start_cell, parse_type="single")
+                start_col_idx = parse_column2index(start_col)
+                col_limit = client._UPDATE_COL_LIMITATION
+                total_clear_cols = len(columns) if columns is not None and len(columns) > 0 else 0
+
+                # If columns are not passed, infer clear width from target sheet grid metadata.
+                if total_clear_cols == 0:
+                    sheet_meta = next(
+                        (
+                            item
+                            for item in (sheets_data or [])
+                            if item.get("sheet_id") == sheet_id or item.get("title") == sheet_title
+                        ),
+                        None,
+                    )
+                    if sheet_meta is not None:
+                        total_clear_cols = (
+                            sheet_meta.get("grid_properties", {}).get("column_count", 0) or 0
+                        )
+
+                if total_clear_cols <= 0:
+                    raise ValueError(
+                        "Unable to infer clear columns when `is_clear=True` and `clear_range` is not provided. "
+                        "Please pass `clear_range` explicitly or provide `columns`."
+                    )
+
+                clear_col_ranges = []
+                for col_start in range(0, total_clear_cols, col_limit):
+                    col_end = min(col_start + col_limit, total_clear_cols) - 1
+                    clear_start_col = parse_index2column(start_col_idx + col_start)
+                    clear_end_col = parse_index2column(start_col_idx + col_end)
+                    clear_col_ranges.append(f"{clear_start_col}:{clear_end_col}")
+
+                for infer_range in clear_col_ranges:
+                    logger.info("Clearing inferred sheet range before write: %s", infer_range)
+                    client.clear_sheet_values(infer_range, sheet_id=sheet_id)
+                    time.sleep(2)
 
         columns_fixed = list(columns) if columns is not None else None
         current_cell = start_cell
