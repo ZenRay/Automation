@@ -14,6 +14,11 @@ options.sql.settings = {
     "odps.sql.submit.mode": "script"
 }
 
+# 启用 Instance Tunnel 并关闭 10000 行限制
+# 参考: https://help.aliyun.com/zh/maxcompute/user-guide/faq-about-pyodps
+options.tunnel.use_instance_tunnel = True
+options.tunnel.limit_instance_tunnel = False
+
 
 logger = logging.getLogger("automation.maxcomputerClient")
 class MaxComputerClient:

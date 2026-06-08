@@ -1,5 +1,6 @@
 # coding:utf8
 import datetime
+import json
 import time
 from typing import List
 
@@ -164,6 +165,168 @@ class LarkMultiDimTable(LarkClient):
         
         
 
+    def list_fields(self, *, table_id: str = None, url: str = None) -> list[dict]:
+        """获取指定表格的字段列表
+
+        Args:
+            table_id: 表格 ID，与 url 二选一
+            url:      表格 URL，与 table_id 二选一
+
+        Returns:
+            list[dict]：字段列表，每个 dict 包含 field_name、type 等信息
+            参考: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/bitable-v1/app-table-field/list
+        """
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+
+        if table_id is not None:
+            _table_id = table_id
+        elif _table_id is None:
+            raise LarkException(msg="There isn't specified Table.")
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer ' + self.access_token,
+        }
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{_table_id}/fields"
+        resp = request("GET", url, headers)
+
+        if resp.get("code", -1) == 0:
+            items = resp.get("data", {}).get("items", [])
+            logger.debug(f"Listed {len(items)} fields from table {_table_id}")
+            return items
+        else:
+            logger.error(f"List fields from table {_table_id} failed: {resp}")
+            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "List fields failed"))
+
+    def create_table(
+        self,
+        name: str,
+        fields: list[dict],
+        default_view_name: str = None,
+        *,
+        app_token: str = None,
+    ) -> str:
+        """在多维表格中创建新数据表
+
+        Args:
+            name:                数据表名称（不可包含 / \\ ? * : [ ] 等特殊字符）
+            fields:              字段定义列表，每项格式 {"field_name": "xxx", "type": 1, "property": {...}}
+                                 第一个字段为索引字段，仅支持 type 1/2/5/13/15/20/22
+            default_view_name:   可选，默认表格视图名称
+            app_token:           可选，若为 None 则使用当前已解析的 self._app_token
+
+        Returns:
+            str：新创建数据表的 table_id
+
+        API 参考:
+            https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table/create
+        """
+        _app_token = app_token or self._app_token
+        if _app_token is None:
+            raise LarkException(msg="app_token is required. Call extract_app_information() first or pass app_token.")
+
+        if not name or not name.strip():
+            raise LarkException(msg="Table name cannot be empty")
+
+        if not fields:
+            raise LarkException(msg="At least one field is required (first field becomes the index field)")
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer ' + self.access_token,
+        }
+
+        payload = {
+            "table": {
+                "name": name.strip(),
+                "fields": fields,
+            }
+        }
+        if default_view_name:
+            payload["table"]["default_view_name"] = default_view_name.strip()
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{_app_token}/tables"
+        resp = request("POST", url, headers, payload)
+
+        if resp.get("code", -1) == 0:
+            table_id = resp.get("data", {}).get("table_id")
+            logger.info(f"Created table '{name}' in app {_app_token}, table_id={table_id}")
+
+            # 刷新 tables_map
+            try:
+                self.extract_table_information(app_token=_app_token)
+            except Exception as e:
+                logger.warning(f"Table created successfully but failed to refresh tables_map: {e}")
+
+            return table_id
+        else:
+            logger.error(f"Create table '{name}' failed: {resp}")
+            raise LarkException(
+                code=resp.get("code"),
+                msg=resp.get("msg", f"Create table '{name}' failed")
+            )
+
+
+    def create_field(
+        self,
+        field_def: dict,
+        *,
+        table_id: str = None,
+        url: str = None,
+    ) -> dict:
+        """在指定数据表中新增一个字段
+
+        Args:
+            field_def:  字段定义，格式 {"field_name": "xxx", "type": 2, "property": {...}}
+            table_id:   目标表 ID，与 url 二选一
+            url:        目标表 URL，与 table_id 二选一
+
+        Returns:
+            dict：API 响应中的字段信息
+
+        API 参考:
+            https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/bitable-v1/app-table-field/create
+        """
+        _table_id = None
+        if url is not None:
+            self._check_app_token(url=url)
+            _table_id = self._regex_pattern.match(url).group("table_id")
+
+        if table_id is not None:
+            _table_id = table_id
+        elif _table_id is None:
+            raise LarkException(msg="table_id or url is required")
+
+        if self._app_token is None:
+            raise LarkException(msg="app_token is required. Call extract_app_information() first.")
+
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer ' + self.access_token,
+        }
+
+        url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{_table_id}/fields"
+        resp = request("POST", url, headers, field_def)
+
+        if resp.get("code", -1) == 0:
+            field_info = resp.get("data", {}).get("field", {})
+            logger.info(
+                f"Created field '{field_def.get('field_name')}' in table {_table_id}, "
+                f"field_id={field_info.get('field_id')}"
+            )
+            return field_info
+        else:
+            logger.error(f"Create field '{field_def.get('field_name')}' failed: {resp}")
+            raise LarkException(
+                code=resp.get("code"),
+                msg=resp.get("msg", "Create field failed")
+            )
+
+
     def _check_app_token(self, url):
         """Check App Token Validate
         
@@ -218,15 +381,16 @@ class LarkMultiDimTable(LarkClient):
         if view_id: params['view_id'] = view_id
         if page_size: params["page_size"] = page_size
 
-        if isinstance(kwargs.get("field_names"), (list, tuple)): params["field_names"] = kwargs.get("field_names")
-        if isinstance(kwargs.get("sort"), (tuple, list)): params["sort"] = kwargs["sort"]
+        if isinstance(kwargs.get("field_names"), (list, tuple)): params["field_names"] = json.dumps(kwargs.get("field_names"))
+        if isinstance(kwargs.get("sort"), (tuple, list)): params["sort"] = json.dumps(kwargs["sort"])
 
         # filter condition
-        if isinstance(kwargs.get("filter"), dict): params["filter"] = kwargs.get("filter")
+        filter_obj = kwargs.get("filter") if isinstance(kwargs.get("filter"), dict) else None
         
         has_more = True
-        # if there is params, use POST method else use GET
-        if "filter" in params:
+        post_page_token = None
+        # if there is filter, use POST search method else use GET
+        if filter_obj is not None:
             method = "POST"
             url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records/search"
         else:
@@ -234,12 +398,25 @@ class LarkMultiDimTable(LarkClient):
             url = f"{self._host}/open-apis/bitable/v1/apps/{self._app_token}/tables/{table_id}/records"
 
         while has_more:
-            resp = request(method, url, headers, params=params)
+            if method == "POST":
+                # POST search: filter + pagination 必须在 JSON body 中
+                body = {"filter": filter_obj}
+                if page_size:
+                    body["page_size"] = page_size
+                if post_page_token:
+                    body["page_token"] = post_page_token
+                resp = request(method, url, headers, payload=body, params=params)
+            else:
+                resp = request(method, url, headers, params=params)
             yield resp
 
             # update continue boolean
             has_more = resp.get("data").get("has_more")
-            params["page_token"] = resp.get("data").get("page_token")
+            page_token = resp.get("data").get("page_token")
+            if method == "POST":
+                post_page_token = page_token
+            else:
+                params["page_token"] = page_token
             time.sleep(3)
 
 
