@@ -11,13 +11,19 @@ logger = logging.getLogger("automation.lark.utils.lark_request")
 
 
 
-def request(method, url, headers, payload={}, params=None, refresh_client=None, data=None, proxy={}):
-    """Lark API Request"""
+def request(method, url, headers, payload={}, params=None, refresh_client=None, data=None, proxy={}, timeout=(10, 60)):
+    """Lark API Request
+    
+    Args:
+        timeout: 请求超时时间，默认 (10, 60) 元组。
+                 connect_timeout=10s（连接建立），read_timeout=60s（读取响应）。
+                 防止 API 无响应时无限挂起。
+    """
     # # Refresh Access Token if needed
     # if refresh_client and hasattr(refresh_client, "_refresh_access_token") and callable(getattr(refresh_client, "_refresh_access_token")):
     #     refresh_client._refresh_access_token()
     response = requests.request(
-        method, url, headers=headers, json=payload, params=params, data=data, proxies=proxy
+        method, url, headers=headers, json=payload, params=params, data=data, proxies=proxy, timeout=timeout
     )
 
     resp = {}

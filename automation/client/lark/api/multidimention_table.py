@@ -153,7 +153,6 @@ class LarkMultiDimTable(LarkClient):
 
         url = f"{self._host}/open-apis/bitable/v1/apps/{app_token}/tables"
         resp = request("GET", url, headers)
-        print(resp)
         if resp.get("code", -1) == 0:
             tables = resp.get("data", {}).get("items", [])
             self._app_table_map = {table.get("name"): table.get("table_id") for table in tables}
@@ -410,6 +409,13 @@ class LarkMultiDimTable(LarkClient):
                 resp = request(method, url, headers, params=params)
             yield resp
 
+            # 空页早停：飞书 search API 在 filter 无匹配时可能仍返回 has_more=True，
+            # 导致无效遍历整个表。当前页无记录时直接终止分页。
+            items = resp.get("data", {}).get("items", [])
+            if not items:
+                logger.debug("Empty page with has_more=True, stopping pagination")
+                break
+
             # update continue boolean
             has_more = resp.get("data").get("has_more")
             page_token = resp.get("data").get("page_token")
@@ -417,7 +423,7 @@ class LarkMultiDimTable(LarkClient):
                 post_page_token = page_token
             else:
                 params["page_token"] = page_token
-            time.sleep(3)
+            time.sleep(1)
 
 
 
@@ -508,8 +514,13 @@ class LarkMultiDimTable(LarkClient):
         if resp.get("code", -1) == 0:
             result = [item.get("record_id") for item in resp.get("data", {}).get("records", [])]
             logger.info(f"Batch Delete {len(result)}/{len(records_id)} Records From Table {table_id} Success.")
-        
-        
+        else:
+            logger.error(
+                f"Batch Delete Records From Table {table_id} Failed: "
+                f"code={resp.get('code')}, msg={resp.get('msg')}"
+            )
+
+
 
     def add_record(self, fields: dict, *, table_id: str=None, url: str=None):
         """Add Single Record
