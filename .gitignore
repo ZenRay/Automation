@@ -223,3 +223,13 @@ dispatcher/etl_sentence/report_sql/merchant.py
 
 backup/
 项目启动规划.md
+.okr_pipeline.lock
+
+# Qoder IDE config
+.qoder/*
+!.qoder/commands/
+
+# Local dev directories (not project source)
+notes/
+scripts/
+tests/
