@@ -31,7 +31,8 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- All items pass validation. Spec is ready for `/speckit.plan`.
 - `.ini` file references are retained as they represent the project's configuration format, not an implementation detail.
 - `GHCR` is retained as the user's explicit registry choice, an operational requirement.
 - Git SHA + semver tagging strategy is a project-level operational requirement, not an implementation detail.
+- Technical Constraints section (added 2026-06-18) contains infrastructure-level requirements (`python:3.12-slim`, multi-stage builds, OCI compliance) — these are Constitution-mandated NON-NEGOTIABLE constraints, not application implementation details.

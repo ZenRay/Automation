@@ -14,6 +14,9 @@
 
 - Q: Production deployment branch strategy? → A: Environment branches model — `main` (development) → `staging` → `production`, each branch corresponds to a deployment environment.
 - Q: Container observability strategy? → A: Structured logging — JSON format to stdout with timestamp, log level, and module name.
+- Q: Runtime container engine? → A: Podman on deployment hosts; Docker on CI (GitHub Actions). Both share OCI image format — images built by Docker run on Podman without modification.
+- Q: Base image version policy? → A: Pinned to `python:3.12-slim`; `:latest` is FORBIDDEN (Constitution Principle VI NON-NEGOTIABLE).
+- Q: Build optimization strategy? → A: Multi-stage builds required — build stage for dependency installation, runtime stage with only necessary artifacts (Constitution Principle VI NON-NEGOTIABLE).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -93,6 +96,9 @@ A DevOps engineer deploys the full application stack — including the data pipe
 - **FR-014**: Previous image versions MUST be retained for at least 2 release cycles to support rollback.
 - **FR-015**: Production branch deployments MUST pass all gates: linting, unit tests, image build, and pre-production smoke tests.
 - **FR-016**: Container applications MUST emit structured logs in JSON format to stdout, including timestamp, log level, and module name fields.
+- **FR-017**: Container images MUST be built from a base image pinned to a specific version tag; use of `:latest` is FORBIDDEN.
+- **FR-018**: Containerfile MUST use multi-stage builds to minimize final image size.
+- **FR-019**: Container images MUST conform to OCI image specification to ensure interoperability between Docker (build) and Podman (runtime).
 
 ### Key Entities
 
@@ -113,13 +119,22 @@ A DevOps engineer deploys the full application stack — including the data pipe
 - **SC-006**: All container health checks report healthy status within 30 seconds of startup.
 - **SC-007**: Container processes run exclusively as non-root users — verified in CI.
 - **SC-008**: Container log output is valid JSON with required fields (timestamp, level, module) — verified by log format validation.
+- **SC-009**: Containerfile base image uses a specific version tag — verified by CI linting of Containerfile.
+- **SC-010**: Container images built in CI can be pulled and executed by Podman without modification — verified in staging deployment.
 
 ## Assumptions
 
 - The container registry (GHCR) is already configured with appropriate access permissions for the CI system.
 - Semantic version tags are managed externally (e.g., via git tags or a versioning tool) — the pipeline reads but does not compute the version.
 - The existing configuration loading logic requires no changes to read from volume-mounted `.ini` files — the configuration parser reads from standard file paths.
-- The CI environment has a container build engine pre-installed and available for image construction.
-- The host deployment environment has a rootless container engine installed and configured.
+- The CI environment (GitHub Actions) has Docker pre-installed and available for image construction.
+- The host deployment environment uses **Podman** as the container runtime.
+- CI builds use Docker; deployment hosts use Podman. Both engines share OCI image format compatibility — images built by Docker can be pulled and run by Podman without modification.
 - The scheduler service is containerized separately from the application worker.
 - Local development uses the same base image and build process as production to ensure parity.
+
+## Technical Constraints
+
+- Base image MUST be pinned to `python:3.12-slim` (or equivalent specific version tag). Use of `:latest` is FORBIDDEN.
+- Containerfile MUST use multi-stage builds to minimize final image size (build stage for dependency installation, runtime stage with only necessary artifacts).
+- Container images MUST conform to OCI image specification to ensure cross-engine compatibility between Docker (CI) and Podman (runtime).
