@@ -68,6 +68,7 @@ TARGET_CR_GOODS = LarkTargetConfig(
         FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
         FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
         FieldMapping(source_col="商品id", target_field="商品id", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(source_col="商品编码", target_field="商品编码", lark_type=LarkFieldType.TEXT),
         FieldMapping(source_col="商品名称", target_field="商品名称", lark_type=LarkFieldType.TEXT),
         # -- 商品扩展信息（来自 dim_goods_extra_info_daily_full）--
         FieldMapping(source_col="商品等级", target_field="商品等级", lark_type=LarkFieldType.TEXT),

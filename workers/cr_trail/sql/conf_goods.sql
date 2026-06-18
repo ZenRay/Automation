@@ -2,6 +2,7 @@ SELECT
     DATE(t1.dt) AS `日期`
     ,t1.mall_id AS `商城id`
     ,t1.sku_id AS `商品id`
+    ,t1.sku_code AS `商品编码`
     ,t1.sku_name AS `商品名称`
     ,t2.sku_grade AS `商品等级`
     ,t2.producing_area AS `产地`
