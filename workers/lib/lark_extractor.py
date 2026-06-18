@@ -254,7 +254,16 @@ def _normalize_field_value(value, field_type: Optional[LarkFieldType] = None):
             if isinstance(value, list):
                 return [item.get("id") for item in value if isinstance(item, dict)]
 
-        # 文本/数字/复选框/公式等 → 直接返回原值
+        # NUMBER 类型：飞书 API 可能以字符串形式返回数值
+        elif field_type == LarkFieldType.NUMBER:
+            if isinstance(value, str):
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return value
+            return value
+
+        # 文本/复选框/公式等 → 直接返回原值
         else:
             return value
 

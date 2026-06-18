@@ -233,4 +233,7 @@ backup/
 # Local dev directories (not project source)
 notes/
 scripts/
-tests/
+tests/*
+!tests/cr_trail_pricing/
+!tests/cr_trail_pricing/**
+tests/cr_trail_pricing/**/__pycache__/
