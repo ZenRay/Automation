@@ -1,11 +1,10 @@
-#coding:utf8
+# coding:utf8
 """Lark Instant Messaging (IM) module.
 
 This module provides functionalities to interact with Lark's IM services,
 including sending messages, managing chats, and handling user interactions.
 
 """
-
 
 import logging
 import json
@@ -16,15 +15,10 @@ from ..utils import request
 from ....utils.common import parse_file_size
 from ..exceptions import LarkException, LarkMessageException
 from ..base import LarkClient
-from ..base.im import (
-    ImageMessage
-)
-
+from ..base.im import ImageMessage
 
 
 from ..common import LarkImURL, LarkContactURL
-
-
 
 logger = logging.getLogger("automation.lark.api.im")
 
@@ -38,7 +32,12 @@ class LarkIM(LarkClient):
 
     _FILE_LIMIT_MB = 30  # 30 MB limit for file uploads
 
-    def __init__(self, app_id: str = None, app_secret: str = None, lark_host: str="https://open.feishu.cn"):
+    def __init__(
+        self,
+        app_id: str = None,
+        app_secret: str = None,
+        lark_host: str = "https://open.feishu.cn",
+    ):
         """Initialize the LarkIM client with optional app credentials.
 
         Args:
@@ -47,10 +46,15 @@ class LarkIM(LarkClient):
 
         """
         super().__init__(app_id=app_id, app_secret=app_secret, lark_host=lark_host)
-        
-    
+
     # TODO: This need user key, so need to be implemented later
-    def query_user_by_keyword(self, keyword: str = None, user_id_type: str = "open_id", page_size: int = 10, page_token: str = None):
+    def query_user_by_keyword(
+        self,
+        keyword: str = None,
+        user_id_type: str = "open_id",
+        page_size: int = 10,
+        page_token: str = None,
+    ):
         """Query users by a keyword from Lark's Contact service.
 
         This method is a placeholder for querying users by keyword and should be implemented.
@@ -60,42 +64,39 @@ class LarkIM(LarkClient):
 
         """
         url = LarkContactURL.SEARCH_USER_BY_KEYWORD.value
-        
+
         if user_id_type not in ("user_id", "open_id", "union_id"):
             user_id_type = "open_id"
-        
-        param = {
-            "user_id_type": user_id_type,
-            "page_size": page_size
-        }
-        
+
+        param = {"user_id_type": user_id_type, "page_size": page_size}
+
         if keyword is not None and len(keyword) > 0:
             param["keyword"] = keyword
 
         if page_token is not None and len(page_token) > 0:
             param["page_token"] = page_token
 
-        headers = {
-            "Authorization": f"Bearer {self.tenant_access_token}"
-        }
-        
-        
-        resp = request(
-            method="GET",
-            url=url,
-            headers=headers,
-            params=param
-        )
-        
+        headers = {"Authorization": f"Bearer {self.tenant_access_token}"}
+
+        resp = request(method="GET", url=url, headers=headers, params=param)
+
         if resp.get("code", -1) == 0:
             logger.info(f"Users queried successfully by keyword({keyword}):")
         else:
-            logger.error(f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}")
+            logger.error(
+                f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}"
+            )
+            raise LarkMessageException(
+                f"Failed to query users by keyword({keyword}): {resp.get('msg', '')}"
+            )
         return resp
-    
 
-    def query_single_user(self, user_id: str = None, user_id_type: str = None, department_id_type: str = None):
+    def query_single_user(
+        self,
+        user_id: str = None,
+        user_id_type: str = None,
+        department_id_type: str = None,
+    ):
         """Query a single user's information from Lark's Contact service.
 
         This method is a placeholder for querying user information and should be implemented.
@@ -105,37 +106,42 @@ class LarkIM(LarkClient):
 
         """
         url = LarkContactURL.QUERY_SINGLE_USER.value.format(user_id=user_id)
-        
-        if user_id_type is not None and user_id_type in ("user_id", "open_id", "union_id"):
-            param = {
-                "user_id_type": user_id_type
-            }
+
+        if user_id_type is not None and user_id_type in (
+            "user_id",
+            "open_id",
+            "union_id",
+        ):
+            param = {"user_id_type": user_id_type}
         else:
             param = {}
-        
-        if department_id_type is not None and department_id_type in ("department_id", "open_department_id"):
+
+        if department_id_type is not None and department_id_type in (
+            "department_id",
+            "open_department_id",
+        ):
             param["department_id_type"] = department_id_type
 
-        headers = {
-            "Authorization": f"Bearer {self.tenant_access_token}"
-        }
-        
-        
-        resp = request(
-            method="GET",
-            url=url,
-            headers=headers,
-            params=param
-        )
+        headers = {"Authorization": f"Bearer {self.tenant_access_token}"}
+
+        resp = request(method="GET", url=url, headers=headers, params=param)
         if resp.get("code", -1) == 0:
             logger.info(f"User({user_id}) information queried successfully:")
         else:
-            logger.error(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to query user({user_id}) information: {resp.get('msg', '')}")
+            logger.error(
+                f"Failed to query user({user_id}) information: {resp.get('msg', '')}"
+            )
+            raise LarkMessageException(
+                f"Failed to query user({user_id}) information: {resp.get('msg', '')}"
+            )
         return resp
-       
-    
-    def query_user_by_phone_email(self, emails: list[str] = None, mobiles: list[str] = None, user_id_type: str = "open_id"):
+
+    def query_user_by_phone_email(
+        self,
+        emails: list[str] = None,
+        mobiles: list[str] = None,
+        user_id_type: str = "open_id",
+    ):
         """Query users by their phone numbers or email addresses.
 
         This method is a placeholder for querying users by phone or email and should be implemented.
@@ -145,14 +151,12 @@ class LarkIM(LarkClient):
 
         """
         url = LarkContactURL.SEARCH_USER_BY_PHONE_OR_EMAIL.value
-        
+
         if user_id_type not in ("user_id", "open_id", "union_id"):
             user_id_type = "open_id"
-        
-        payload = {
-            "user_id_type": user_id_type
-        }
-        
+
+        payload = {"user_id_type": user_id_type}
+
         if emails is not None and isinstance(emails, list) and len(emails) > 0:
             payload["emails"] = emails
 
@@ -161,27 +165,21 @@ class LarkIM(LarkClient):
 
         headers = {
             "Authorization": f"Bearer {self.tenant_access_token}",
-            "Content-Type": "application/json; charset=utf-8"
+            "Content-Type": "application/json; charset=utf-8",
         }
-        
-        
-        resp = request(
-            method="POST",
-            url=url,
-            headers=headers,
-            payload=payload
-        )
-        
+
+        resp = request(method="POST", url=url, headers=headers, payload=payload)
+
         if resp.get("code", -1) == 0:
             logger.info(f"Users queried successfully by phone/email:")
         else:
             logger.error(f"Failed to query users by phone/email: {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to query users by phone/email: {resp.get('msg', '')}")
+            raise LarkMessageException(
+                f"Failed to query users by phone/email: {resp.get('msg', '')}"
+            )
         return resp
-    
-     
 
-    def upload_image(self, file=None,  image_type="message", need_binary=True):
+    def upload_image(self, file=None, image_type="message", need_binary=True):
         """Upload an image to Lark's IM service.
 
         This method uploads an image file or uses an existing image key.
@@ -203,50 +201,50 @@ class LarkIM(LarkClient):
             file = file.file
         elif isinstance(file, str):
             file_name = ""
-            
+
         # Prepare the file for upload
         if need_binary:
             with open(file, "rb") as f:
                 file = f.read()
-                
-        data = {
-            "image_type": image_type,
-            "image": file
-        }
-        
+
+        data = {"image_type": image_type, "image": file}
+
         url = LarkImURL.UPLOAD_IMAGE.value
 
         headers = {
-            'Authorization': f'Bearer {self.tenant_access_token}',
+            "Authorization": f"Bearer {self.tenant_access_token}",
         }
         form = MultipartEncoder(fields=data)
 
-        headers['Content-Type'] = form.content_type
-        
-        resp = request(
-            method="POST",
-            url=url,
-            headers=headers,
-            data=form
-        )
-        
+        headers["Content-Type"] = form.content_type
+
+        resp = request(method="POST", url=url, headers=headers, data=form)
+
         if resp.get("code", -1) == 0:
             msg = f"({file_name})" if len(file_name) > 0 else ""
             logger.info(f"Image file{msg} uploaded successfully:")
         else:
             logger.error(f"Failed to upload image file({file}): {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to upload image file({file}): {resp.get('msg', '')}")
+            raise LarkMessageException(
+                f"Failed to upload image file({file}): {resp.get('msg', '')}"
+            )
         return resp
-    
 
-    def upload_file(self, file=None, file_name=None, file_type="stream", mime_type=None, need_binary=True):
+    def upload_file(
+        self,
+        file=None,
+        file_name=None,
+        file_type="stream",
+        mime_type=None,
+        need_binary=True,
+    ):
         """Upload a file to Lark's IM service.
 
         This method uploads a file to Lark's IM service.
 
         Args:
             file (str, optional): The path to the file to upload.
-            file_type (str, optional): The type of file, Defaults to "stream". 
+            file_type (str, optional): The type of file, Defaults to "stream".
                 "stream" is for general file uploads. Other specified file types:
                 * "opus"
                 * "mp4"
@@ -265,51 +263,53 @@ class LarkIM(LarkClient):
         """
         if file is None:
             raise ValueError("File path must be provided for upload.")
-            
+
         # Raise Excelption if file size exceeds limit
-        file_size = parse_file_size(file, unit='mb')
-        
+        file_size = parse_file_size(file, unit="mb")
+
         if file_size > self._FILE_LIMIT_MB:
-            raise LarkException(f"File size {file_size} MB exceeds the limit of {self._FILE_LIMIT_MB} MB.")
-        
+            raise LarkException(
+                f"File size {file_size} MB exceeds the limit of {self._FILE_LIMIT_MB} MB."
+            )
+
         # Prepare the file for upload
         if need_binary:
             with open(file, "rb") as f:
                 file = f.read()
 
-
         url = LarkImURL.UPLOAD_FILE.value
         data = {
             "file": (file_name, file, mime_type),
             "file_type": file_type,
-            "file_name": file_name
+            "file_name": file_name,
         }
-        
+
         headers = {
-            'Authorization': f'Bearer {self.tenant_access_token}',
+            "Authorization": f"Bearer {self.tenant_access_token}",
         }
         form = MultipartEncoder(fields=data)
 
-        headers['Content-Type'] = form.content_type
-        
-        resp = request(
-            method="POST",
-            url=url,
-            headers=headers,
-            data=form
-        )
-        
+        headers["Content-Type"] = form.content_type
+
+        resp = request(method="POST", url=url, headers=headers, data=form)
+
         if resp.get("code", -1) == 0:
             logger.info(f"File({file_name}) uploaded successfully:")
         else:
             logger.error(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to upload file({file_name}): {resp.get('msg', '')}")
+            raise LarkMessageException(
+                f"Failed to upload file({file_name}): {resp.get('msg', '')}"
+            )
         return resp
 
-        
-
-
-    def send_message(self, receive_id_type:str="chat_id", content:dict=None, msg_type:str="text", receive_id:str=None, uuid:str=None):
+    def send_message(
+        self,
+        receive_id_type: str = "chat_id",
+        content: dict = None,
+        msg_type: str = "text",
+        receive_id: str = None,
+        uuid: str = None,
+    ):
         """Send a message via Lark's IM service.
 
         This method is a placeholder for sending messages and should be implemented.
@@ -319,40 +319,33 @@ class LarkIM(LarkClient):
 
         """
         url = LarkImURL.SEND_MESSAGE.value
-        param = {
-            "receive_id_type": receive_id_type
-        }
+        param = {"receive_id_type": receive_id_type}
 
         if not isinstance(content, str):
             content = json.dumps(content, ensure_ascii=False)
-        
-        payload = {
-            "receive_id": receive_id,
-            "msg_type": msg_type,
-            "content": content
-        }
-        
+
+        payload = {"receive_id": receive_id, "msg_type": msg_type, "content": content}
 
         headers = {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': f'Bearer {self.tenant_access_token}'
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {self.tenant_access_token}",
         }
-        
+
         resp = request(
-            method="POST",
-            url=url,
-            headers=headers,
-            params=param,
-            payload=payload
+            method="POST", url=url, headers=headers, params=param, payload=payload
         )
-        
+
         if uuid is not None:
             resp["uuid"] = uuid
-            
+
         if resp.get("code", -1) == 0:
             logger.info(f"Message sent successfully to {receive_id}:")
         else:
-            logger.error(f"Failed to send message to {receive_id}: {resp.get('msg', '')}")
-            raise LarkMessageException(f"Failed to send message to {receive_id}: {resp.get('msg', '')}")
-        
+            logger.error(
+                f"Failed to send message to {receive_id}: {resp.get('msg', '')}"
+            )
+            raise LarkMessageException(
+                f"Failed to send message to {receive_id}: {resp.get('msg', '')}"
+            )
+
         return resp

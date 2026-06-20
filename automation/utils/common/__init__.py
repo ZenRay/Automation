@@ -1,10 +1,11 @@
-#coding:utf8
-"""Common Utility Functions.
-"""
+# coding:utf8
+"""Common Utility Functions."""
+
 import inspect
 
 from configparser import ConfigParser
 from os import path
+
 
 def check_function_arg(func, arg_name) -> bool:
     """Return True if `func` is callable and accepts a 'file' keyword argument.
@@ -32,24 +33,29 @@ def check_function_arg(func, arg_name) -> bool:
             return True
 
     # Accept if explicit 'arg_name' parameter exists and is not positional-only
-    if arg_name in params and params[arg_name].kind != inspect.Parameter.POSITIONAL_ONLY:
+    if (
+        arg_name in params
+        and params[arg_name].kind != inspect.Parameter.POSITIONAL_ONLY
+    ):
         return True
 
     return False
 
-    
+
 def parse_conf(parser, file, template=None):
     """Parse Configuration File
-    
+
     Parse the configuration file, if not exists, create one with the template.
-    
+
     Args:
         parser (ConfigParser): ConfigParser instance.
         file (str): Configuration file path.
         template (str): Template content for the configuration file.
     """
     if not isinstance(parser, ConfigParser):
-        raise TypeError(f"parser must be an instance of 'ConfigParser', get {type(parser)}")
+        raise TypeError(
+            f"parser must be an instance of 'ConfigParser', get {type(parser)}"
+        )
 
     if not path.exists(file):
         with open(file, "w", encoding="utf8") as writer:
@@ -59,17 +65,16 @@ def parse_conf(parser, file, template=None):
                     " Get configuration file: {}".format(file)
                 )
             writer.write(template)
-    
+
     parser.read(file)
 
-    
 
-def parse_file_size(file_path, unit='bytes'):
+def parse_file_size(file_path, unit="bytes"):
     """Extract Size of a File.
 
     Args:
         file_path (str): The path to the file.
-        unit (str, optional): The unit for the file size. 
+        unit (str, optional): The unit for the file size.
             Supported units are 'bytes', 'kb', and 'mb'. Defaults to 'bytes'.
 
     Returns:
@@ -82,17 +87,17 @@ def parse_file_size(file_path, unit='bytes'):
     """
     if not path.exists(file_path):
         raise FileNotFoundError(f"The file '{file_path}' does not exist.")
-    
+
     if not path.isfile(file_path):
         raise ValueError(f"The path '{file_path}' is not a file.")
 
-    if unit == 'bytes':
+    if unit == "bytes":
         return round(path.getsize(file_path), 2)
 
-    elif unit == 'kb':
-        return round(path.getsize(file_path) / 1024, 2) 
+    elif unit == "kb":
+        return round(path.getsize(file_path) / 1024, 2)
 
-    elif unit == 'mb':
+    elif unit == "mb":
         return round(path.getsize(file_path) / (1024 * 1024), 2)
 
     raise ValueError(f"Unsupported unit: {unit}. Supported units are: bytes, kb, mb.")

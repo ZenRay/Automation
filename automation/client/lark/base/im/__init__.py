@@ -1,4 +1,4 @@
-#coding:utf8
+# coding:utf8
 """
 Lark Instant Message Base Module
 * message: Multi-type Message Class
@@ -10,16 +10,11 @@ from ._message import (
     ImageMessage,
     FileMessage,
     TextMessage,
-    StaticInteractiveMessage
+    StaticInteractiveMessage,
 )
 
 
-from ._content import (
-    ContentItem, SendContentItem
-)
+from ._content import ContentItem, SendContentItem
 
 
-from ._user import (
-    AllUser,
-    User
-)
+from ._user import AllUser, User
