@@ -39,9 +39,7 @@ class DataTransformer:
     # ------------------------------------------------------------------
 
     def register_step(
-        self,
-        name: str,
-        func: Callable[[pd.DataFrame], pd.DataFrame]
+        self, name: str, func: Callable[[pd.DataFrame], pd.DataFrame]
     ) -> "DataTransformer":
         """注册一个清洗/转换步骤
 
@@ -151,9 +149,7 @@ class DataTransformer:
             before_shape = df.shape
             try:
                 df = step(df)
-                logger.info(
-                    f"Step '{name}' completed: {before_shape} -> {df.shape}"
-                )
+                logger.info(f"Step '{name}' completed: {before_shape} -> {df.shape}")
             except Exception as e:
                 logger.error(f"Step '{name}' failed: {e}")
                 raise

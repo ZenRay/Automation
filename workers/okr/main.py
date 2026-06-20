@@ -49,7 +49,9 @@ def _init_lark_client() -> LarkMultiDimTable:
     app_secret = lark_conf.get("prod", "APP_SECRET")
     lark_host = lark_conf.get("prod", "LARK_HOST", fallback="https://open.feishu.cn")
 
-    logger.info(f"Initializing LarkMultiDimTable client (app_id={app_id}, host={lark_host})")
+    logger.info(
+        f"Initializing LarkMultiDimTable client (app_id={app_id}, host={lark_host})"
+    )
     return LarkMultiDimTable(
         app_id=app_id,
         app_secret=app_secret,
@@ -95,7 +97,11 @@ def _apply_date_range_to_lark_sources(
 
     只覆盖已配置 date_filter_field 的源，未配置日期筛选的源保持不变。
     """
-    ref = date_range.reference_date if date_range.reference_date is not None else _date.today()
+    ref = (
+        date_range.reference_date
+        if date_range.reference_date is not None
+        else _date.today()
+    )
     start_base = ref + _timedelta(days=date_range.start_offset)
     end_base = ref + _timedelta(days=date_range.end_offset)
     result = []
@@ -111,11 +117,13 @@ def _apply_date_range_to_lark_sources(
             if src.lark_extra_end_days != 0
             else None
         )
-        result.append(dataclasses.replace(
-            src,
-            date_filter_start_date=start_date,
-            date_filter_end_date=end_date,
-        ))
+        result.append(
+            dataclasses.replace(
+                src,
+                date_filter_start_date=start_date,
+                date_filter_end_date=end_date,
+            )
+        )
     return result
 
 
@@ -142,10 +150,15 @@ def _apply_date_range_to_routes(
     result = []
     for route in routes:
         target = route.target
-        if target.cleanup_conditions is not None and target.cleanup_conditions.is_runtime:
+        if (
+            target.cleanup_conditions is not None
+            and target.cleanup_conditions.is_runtime
+        ):
             # 运行时哨兵：替换为精确窗口
             new_cleanup = CleanupCondition.date_window(
-                "日期", cleanup_start, cleanup_end,
+                "日期",
+                cleanup_start,
+                cleanup_end,
             )
             new_target = dataclasses.replace(target, cleanup_conditions=new_cleanup)
             result.append(dataclasses.replace(route, target=new_target))
@@ -170,11 +183,14 @@ def run_okr_pipeline(
         date_range = DateRangeParams()  # 默认 T-7 到 T
 
     from datetime import date as _date
+
     ref_date = date_range.reference_date or _date.today()
     logger.info("=" * 60)
     logger.info("OKR Data Pipeline - START")
-    logger.info(f"Date range: T{date_range.start_offset} ~ T{date_range.end_offset} "
-                f"(cleanup_days={date_range.cleanup_days}, reference_date={ref_date})")
+    logger.info(
+        f"Date range: T{date_range.start_offset} ~ T{date_range.end_offset} "
+        f"(cleanup_days={date_range.cleanup_days}, reference_date={ref_date})"
+    )
     logger.info("=" * 60)
 
     # ------------------------------------------------------------------
@@ -197,12 +213,18 @@ def run_okr_pipeline(
     if LARK_SOURCES:
         try:
             # 用 date_range 计算各源的精确日期窗口（start_date/end_date）
-            effective_sources = _apply_date_range_to_lark_sources(LARK_SOURCES, date_range)
-            logger.info(f"[Step 2/7] Extracting {len(effective_sources)} Lark source(s) "
-                        f"(date_days={date_range.lark_days})...")
+            effective_sources = _apply_date_range_to_lark_sources(
+                LARK_SOURCES, date_range
+            )
+            logger.info(
+                f"[Step 2/7] Extracting {len(effective_sources)} Lark source(s) "
+                f"(date_days={date_range.lark_days})..."
+            )
             lark_data = extract_all_lark_sources(lark_client, effective_sources)
             for name, df in lark_data.items():
-                logger.info(f"  Lark source '{name}': {df.shape[0]} rows, {df.shape[1]} columns")
+                logger.info(
+                    f"  Lark source '{name}': {df.shape[0]} rows, {df.shape[1]} columns"
+                )
         except Exception as e:
             logger.error(f"[Step 2/7] Lark extraction failed: {e}")
             return 1
@@ -215,12 +237,16 @@ def run_okr_pipeline(
     try:
         logger.info(f"[Step 3/7] Executing {len(SQL_QUERIES)} SQL query/queries...")
         mc_data: dict[str, pd.DataFrame] = execute_all_queries(
-            mc_client, SQL_QUERIES, SQL_BASE_DIR,
+            mc_client,
+            SQL_QUERIES,
+            SQL_BASE_DIR,
             hints=MC_HINTS,
             params=date_range.sql_params(),
         )
         for name, df in mc_data.items():
-            logger.info(f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns")
+            logger.info(
+                f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns"
+            )
     except Exception as e:
         logger.error(f"[Step 3/7] SQL execution failed: {e}")
         return 1
@@ -232,7 +258,9 @@ def run_okr_pipeline(
         # 优先使用 OKR 专属多步融合逻辑（合并多个飞书源 + MaxCompute 结果）
         # 如需回退到单次 merge，删除以下 if 块，使用 lib.transformer.merge()
         if _is_merge_config_active(OKR_MERGE_CONFIG):
-            logger.info("[Step 4/7] Using OKR multi-step merge (Lark sources + MaxCompute)...")
+            logger.info(
+                "[Step 4/7] Using OKR multi-step merge (Lark sources + MaxCompute)..."
+            )
             merged_df = execute_okr_merge(lark_data, mc_data)
         else:
             logger.info("[Step 4/7] No active merge config, using SQL data directly")
@@ -241,8 +269,12 @@ def run_okr_pipeline(
             else:
                 first_name = SQL_QUERIES[0].name
                 merged_df = mc_data[first_name]
-                logger.info(f"  Multiple SQL results, using '{first_name}' as primary ({merged_df.shape})")
-        logger.info(f"  Data after merge/passthrough: {merged_df.shape[0]} rows, {merged_df.shape[1]} columns")
+                logger.info(
+                    f"  Multiple SQL results, using '{first_name}' as primary ({merged_df.shape})"
+                )
+        logger.info(
+            f"  Data after merge/passthrough: {merged_df.shape[0]} rows, {merged_df.shape[1]} columns"
+        )
     except Exception as e:
         logger.error(f"[Step 4/7] Data merge failed: {e}")
         return 1
@@ -253,13 +285,17 @@ def run_okr_pipeline(
     try:
         # execute_okr_merge 内部已执行过一次 transform，跳过重复调用
         if _is_merge_config_active(OKR_MERGE_CONFIG):
-            logger.info("[Step 5/7] Transform already done in execute_okr_merge, skipping...")
+            logger.info(
+                "[Step 5/7] Transform already done in execute_okr_merge, skipping..."
+            )
             result_df = merged_df  # merged_df 已经是 transform 后的结果
         else:
             logger.info("[Step 5/7] Running transform pipeline...")
             transformer = build_okr_transformer()
             result_df = transformer.transform(merged_df)
-        logger.info(f"  Transform result: {result_df.shape[0]} rows, {result_df.shape[1]} columns")
+        logger.info(
+            f"  Transform result: {result_df.shape[0]} rows, {result_df.shape[1]} columns"
+        )
     except Exception as e:
         logger.error(f"[Step 5/7] Transform pipeline failed: {e}")
         return 1
@@ -272,6 +308,7 @@ def run_okr_pipeline(
         if DATA_ROUTES:
             # 新模式：按路由写入（用 date_range 覆盖清理窗口）
             from workers.lib import DataRouter, SchemaValidator
+
             effective_routes = _apply_date_range_to_routes(DATA_ROUTES, date_range)
             router = DataRouter(lark_client, coercer, validator=SchemaValidator())
             logger.info(router.describe_routes(effective_routes))
@@ -306,7 +343,9 @@ def run_okr_pipeline(
         logger.info(f"  Target tables written:  {len(LARK_TARGETS)}")
     logger.info("=" * 60)
     if routes_had_failure:
-        logger.warning("OKR Data Pipeline - COMPLETED WITH FAILURES (some routes failed)")
+        logger.warning(
+            "OKR Data Pipeline - COMPLETED WITH FAILURES (some routes failed)"
+        )
         logger.info("=" * 60)
         return 1
     logger.info("OKR Data Pipeline - COMPLETED SUCCESSFULLY")
@@ -324,14 +363,14 @@ def main():
         python -m workers.okr.main --date 2026-05-30 --start -14 --end 0  # 14天窗口
     """
     parser = argparse.ArgumentParser(description="OKR 数据管道")
-    parser.add_argument("--date", type=str, default=None,
-                        help="基准日期 (YYYY-MM-DD)，默认今天")
-    parser.add_argument("--start", type=int, default=-7,
-                        help="起始日偏移量 (默认 -7)")
-    parser.add_argument("--end", type=int, default=0,
-                        help="结束日偏移量 (默认 0)")
-    parser.add_argument("--buffer", type=int, default=0,
-                        help="清理窗口额外回溯天数 (默认 0)")
+    parser.add_argument(
+        "--date", type=str, default=None, help="基准日期 (YYYY-MM-DD)，默认今天"
+    )
+    parser.add_argument("--start", type=int, default=-7, help="起始日偏移量 (默认 -7)")
+    parser.add_argument("--end", type=int, default=0, help="结束日偏移量 (默认 0)")
+    parser.add_argument(
+        "--buffer", type=int, default=0, help="清理窗口额外回溯天数 (默认 0)"
+    )
     args = parser.parse_args()
 
     ref_date = None

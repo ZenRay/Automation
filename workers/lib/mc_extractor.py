@@ -80,9 +80,13 @@ def execute_all_queries(
     for query in sorted_queries:
         logger.info(f"Executing SQL query: {query.name} (file: {query.sql_file})")
         try:
-            df = _execute_single_query(client, query, sql_base_dir, hints=hints, params=params)
+            df = _execute_single_query(
+                client, query, sql_base_dir, hints=hints, params=params
+            )
             results[query.name] = df
-            logger.info(f"Query '{query.name}' completed: {len(df)} rows, {len(df.columns)} columns")
+            logger.info(
+                f"Query '{query.name}' completed: {len(df)} rows, {len(df.columns)} columns"
+            )
         except Exception as e:
             logger.error(f"Failed to execute SQL query '{query.name}': {e}")
             raise
@@ -153,6 +157,7 @@ def _execute_single_query(
 # 临时表模式
 # --------------------------------------------------------------------------
 
+
 def _execute_via_temp_table(
     client,
     query: SQLQueryConfig,
@@ -195,13 +200,11 @@ def _execute_via_temp_table(
     full_table_name = ".".join(full_name_parts)
 
     # 去除原始 SQL 末尾分号（CTAS 语法要求）
-    clean_sql = re.sub(r';\s*$', '', sql_content)
+    clean_sql = re.sub(r";\s*$", "", sql_content)
 
     # 构建 CTAS 语句（LIFECYCLE 1 作为安全网：即使 DROP 失败，1 天后自动清理）
     ctas_sql = f"CREATE TABLE {full_table_name} LIFECYCLE 1 AS\n{clean_sql};"
-    logger.info(
-        f"Query '{query.name}': using temp table mode -> {full_table_name}"
-    )
+    logger.info(f"Query '{query.name}': using temp table mode -> {full_table_name}")
     logger.debug(f"CTAS SQL:\n{ctas_sql[:500]}...")
 
     # 1. 执行 CTAS
@@ -214,11 +217,13 @@ def _execute_via_temp_table(
     #    避免 Table Tunnel 端点配置问题。
     try:
         odps_client = client._client
-        records = list(odps_client.read_table(
-            temp_table_name,
-            project=project,
-            schema=schema,
-        ))
+        records = list(
+            odps_client.read_table(
+                temp_table_name,
+                project=project,
+                schema=schema,
+            )
+        )
         if records:
             columns = [col.name for col in records[0]._columns]
             data = [[record[col] for col in columns] for record in records]
@@ -239,7 +244,7 @@ def _generate_temp_table_name(query_name: str) -> str:
     """生成唯一临时表名: _tmp_{query_name}_{timestamp}"""
     timestamp = int(time.time())
     # MaxCompute 表名只允许字母、数字、下划线
-    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', query_name)
+    safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", query_name)
     return f"_tmp_{safe_name}_{timestamp}"
 
 
@@ -302,8 +307,6 @@ def _topological_sort(queries: list[SQLQueryConfig]) -> list[SQLQueryConfig]:
     if len(sorted_names) != len(queries):
         # 存在环
         remaining = [name for name, deg in in_degree.items() if deg > 0]
-        raise ValueError(
-            f"Circular dependency detected among SQL queries: {remaining}"
-        )
+        raise ValueError(f"Circular dependency detected among SQL queries: {remaining}")
 
     return [name_to_query[name] for name in sorted_names]

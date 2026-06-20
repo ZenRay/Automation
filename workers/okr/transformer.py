@@ -39,10 +39,10 @@ logger = logging.getLogger("workers.okr.transformer")
 #   "mc:<name>"   -> MaxCompute 查询结果
 # --------------------------------------------------------------------------
 OKR_MERGE_CONFIG: dict = {
-    "left":  "lark:quality_reject_tasks",
+    "left": "lark:quality_reject_tasks",
     "right": "lark:ka_cat4_operate",
-    "how":   "left",
-    "on":    "日期",
+    "how": "left",
+    "on": "日期",
 }
 
 # --------------------------------------------------------------------------
@@ -96,11 +96,16 @@ def preprocess_lark_dates(
                     if pd.api.types.is_datetime64_any_dtype(df_processed[col]):
                         # 已是 datetime 类型，直接截断时间
                         df_processed[col] = df_processed[col].dt.normalize()
-                    elif pd.api.types.is_integer_dtype(df_processed[col]) or pd.api.types.is_float_dtype(df_processed[col]):
+                    elif pd.api.types.is_integer_dtype(
+                        df_processed[col]
+                    ) or pd.api.types.is_float_dtype(df_processed[col]):
                         # 飞书可能返回 Excel 序列号格式的日期（如 46167 = 2026-06-01）
                         # 需要用 origin='1899-12-30', unit='D' 转换
                         df_processed[col] = pd.to_datetime(
-                            df_processed[col], origin="1899-12-30", unit="D", errors="coerce"
+                            df_processed[col],
+                            origin="1899-12-30",
+                            unit="D",
+                            errors="coerce",
                         ).dt.normalize()
                         logger.info(f"  [{name}] 日期字段 '{col}' 从 Excel 序列号转换")
                     else:
@@ -164,9 +169,12 @@ def _aggregate_quality_reject(
     if group_by_cols is None:
         group_by_cols = ["日期"]
 
-    # 日期字段已由 preprocess_lark_dates 规范化（去掉时间部分）
-    # 此处直接使用即可，无需再做 .dt.normalize()
+    # 确保日期字段为 datetime 类型（支持字符串和 Timestamp 输入）
     df_work = df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(df_work["日期"]):
+        df_work["日期"] = pd.to_datetime(df_work["日期"])
+    # 规范化日期（去掉时间部分）
+    df_work["日期"] = pd.to_datetime(df_work["日期"].dt.date)
 
     # 聚合指标定义（可扩展）
     agg_funcs = {
@@ -174,8 +182,7 @@ def _aggregate_quality_reject(
         "打回水果商品数": ("商品id", "nunique"),  # 每天有多少个不同的商品被打回
     }
 
-    df_agg = df_work.groupby(group_by_cols[0], as_index=False).agg(**agg_funcs)
-    df_agg = df_agg.rename(columns={group_by_cols[0]: "日期"})
+    df_agg = df_work.groupby(group_by_cols, as_index=False).agg(**agg_funcs)
 
     # 7日内重复打回商品数（仅在 group_by_cols 为 ["日期"] 时计算）
     if group_by_cols == ["日期"]:
@@ -242,7 +249,9 @@ def _widen_ka_to_long(ka_df: pd.DataFrame) -> pd.DataFrame:
         else:
             mask = ka_df[col] == 1
 
-        logger.debug(f"  字段 '{col}': dtype={ka_df[col].dtype}, 唯一值={ka_df[col].unique().tolist()[:5]}, mask.sum()={mask.sum()}")
+        logger.debug(
+            f"  字段 '{col}': dtype={ka_df[col].dtype}, 唯一值={ka_df[col].unique().tolist()[:5]}, mask.sum()={mask.sum()}"
+        )
 
         sub = ka_df[mask][["日期", "店铺ID"]].copy()
         sub["四级类目名称"] = cat4_name
@@ -329,10 +338,18 @@ def _aggregate_ka_operate(
         return pd.DataFrame(columns=["日期"])
 
     # 调试：输出关键列的数据分布
-    logger.info(f"  网格运营类型分布: {ka_merged['网格运营类型'].value_counts().to_dict()}")
-    logger.info(f"  是否试验区域分布: {ka_merged['是否试验区域'].value_counts().to_dict()}")
-    logger.info(f"  一级类目名称分布: {ka_merged['一级类目名称'].value_counts().head(5).to_dict()}")
-    logger.info(f"  送达金额 dtype={ka_merged['送达金额'].dtype}, 范围={ka_merged['送达金额'].min()}~{ka_merged['送达金额'].max()}")
+    logger.info(
+        f"  网格运营类型分布: {ka_merged['网格运营类型'].value_counts().to_dict()}"
+    )
+    logger.info(
+        f"  是否试验区域分布: {ka_merged['是否试验区域'].value_counts().to_dict()}"
+    )
+    logger.info(
+        f"  一级类目名称分布: {ka_merged['一级类目名称'].value_counts().head(5).to_dict()}"
+    )
+    logger.info(
+        f"  送达金额 dtype={ka_merged['送达金额'].dtype}, 范围={ka_merged['送达金额'].min()}~{ka_merged['送达金额'].max()}"
+    )
 
     # 3. 确保数值列为 numeric 类型（MC read_table 可能返回 object 类型的 Decimal）
     numeric_cols = ["送达金额", "赔付金额", "下单数量", "抽佣金额"]
@@ -356,9 +373,7 @@ def _aggregate_ka_operate(
     ka_merged["_实验送达金额"] = ka_merged["送达金额"].where(is_trial_treatment, 0)
 
     # 蔬菜/干货 + 直营的店铺id（非匹配行设为 NaN，nunique 会忽略）
-    is_veg_direct = (
-        ka_merged["一级类目名称"].isin(["蔬菜", "干货"]) & is_direct
-    )
+    is_veg_direct = ka_merged["一级类目名称"].isin(["蔬菜", "干货"]) & is_direct
     ka_merged["_蔬菜干货直营"] = ka_merged["店铺id"].where(is_veg_direct)
 
     # --- 新增指标条件 ---
@@ -393,10 +408,18 @@ def _aggregate_ka_operate(
 
     # --- 水果抽佣/送达金额（剔除特殊运营品类：一级类目=水果 且 非榴莲类）---
     is_not_special = ~is_durian  # 是否特殊品类运营=0（排除榴莲类）
-    ka_merged["_直营水果抽佣_ex"] = ka_merged["抽佣金额"].where(is_fruit & is_direct & is_not_special, 0)
-    ka_merged["_代理人水果抽佣_ex"] = ka_merged["抽佣金额"].where(is_fruit & is_agent & is_not_special, 0)
-    ka_merged["_直营水果送达_ex"] = ka_merged["送达金额"].where(is_fruit & is_direct & is_not_special, 0)
-    ka_merged["_代理人水果送达_ex"] = ka_merged["送达金额"].where(is_fruit & is_agent & is_not_special, 0)
+    ka_merged["_直营水果抽佣_ex"] = ka_merged["抽佣金额"].where(
+        is_fruit & is_direct & is_not_special, 0
+    )
+    ka_merged["_代理人水果抽佣_ex"] = ka_merged["抽佣金额"].where(
+        is_fruit & is_agent & is_not_special, 0
+    )
+    ka_merged["_直营水果送达_ex"] = ka_merged["送达金额"].where(
+        is_fruit & is_direct & is_not_special, 0
+    )
+    ka_merged["_代理人水果送达_ex"] = ka_merged["送达金额"].where(
+        is_fruit & is_agent & is_not_special, 0
+    )
 
     # --- KA 已运营指标（基于 left join 后的 是否ka已运营 字段）---
     # 是否ka已运营: matched=1, unmatched=NaN → fillna(0) 后 sum 即为 KA 已运营的店铺品类组合数
@@ -431,18 +454,32 @@ def _aggregate_ka_operate(
     )
     # 6. 计算比率指标（除法需后置，在聚合完成后计算）
     ka_agg["直营区域水果抽佣率"] = (
-        ka_agg["直营区域水果抽佣金额"] / ka_agg["直营区域水果送达金额"]
-    ).replace([float("inf"), float("-inf")], 0).fillna(0)
+        (ka_agg["直营区域水果抽佣金额"] / ka_agg["直营区域水果送达金额"])
+        .replace([float("inf"), float("-inf")], 0)
+        .fillna(0)
+    )
     ka_agg["代理人区域水果抽佣率"] = (
-        ka_agg["代理人区域水果抽佣金额"] / ka_agg["代理人区域水果送达金额"]
-    ).replace([float("inf"), float("-inf")], 0).fillna(0)
+        (ka_agg["代理人区域水果抽佣金额"] / ka_agg["代理人区域水果送达金额"])
+        .replace([float("inf"), float("-inf")], 0)
+        .fillna(0)
+    )
     # 剔除特殊运营品类的抽佣率
     ka_agg["直营区域水果抽佣率【剔除特殊运营品类】"] = (
-        ka_agg["直营区域水果抽佣金额【剔除特殊运营品类】"] / ka_agg["直营区域水果送达金额【剔除特殊运营品类】"]
-    ).replace([float("inf"), float("-inf")], 0).fillna(0)
+        (
+            ka_agg["直营区域水果抽佣金额【剔除特殊运营品类】"]
+            / ka_agg["直营区域水果送达金额【剔除特殊运营品类】"]
+        )
+        .replace([float("inf"), float("-inf")], 0)
+        .fillna(0)
+    )
     ka_agg["代理人区域水果抽佣率【剔除特殊运营品类】"] = (
-        ka_agg["代理人区域水果抽佣金额【剔除特殊运营品类】"] / ka_agg["代理人区域水果送达金额【剔除特殊运营品类】"]
-    ).replace([float("inf"), float("-inf")], 0).fillna(0)
+        (
+            ka_agg["代理人区域水果抽佣金额【剔除特殊运营品类】"]
+            / ka_agg["代理人区域水果送达金额【剔除特殊运营品类】"]
+        )
+        .replace([float("inf"), float("-inf")], 0)
+        .fillna(0)
+    )
 
     logger.info(f"ka_operate aggregated by date: {ka_agg.shape}")
     return ka_agg
@@ -510,7 +547,9 @@ def execute_okr_merge(
         elif name in mc_data:
             mc_data[name] = cleaner.transform(mc_data[name])
         else:
-            logger.warning(f"Source cleaner registered for '{name}' but not found in data")
+            logger.warning(
+                f"Source cleaner registered for '{name}' but not found in data"
+            )
 
     # 重新获取引用（源级清洗后）
     quality_df = lark_data["quality_reject_tasks"]
@@ -561,6 +600,7 @@ def execute_okr_merge(
 # 每个数据源可注册独立的 DataTransformer，互不干扰。
 # -------------------------------------------------------------------------
 
+
 def _dedup_quality_reject(df: pd.DataFrame) -> pd.DataFrame:
     """quality_reject_tasks 去重：同一日期+商品id 只保留一条
 
@@ -571,7 +611,9 @@ def _dedup_quality_reject(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop_duplicates(subset=["日期", "商品id"])
     after = len(df)
     if before != after:
-        logger.info(f"quality_reject_tasks dedup: {before} -> {after} rows (removed {before - after} duplicates)")
+        logger.info(
+            f"quality_reject_tasks dedup: {before} -> {after} rows (removed {before - after} duplicates)"
+        )
     return df
 
 
@@ -606,6 +648,7 @@ def build_okr_source_cleaners() -> dict[str, DataTransformer]:
 # OKR 输出清洗步骤（post-merge，由 build_okr_transformer 注册）
 # -------------------------------------------------------------------------
 
+
 def _drop_internal_columns(df: pd.DataFrame) -> pd.DataFrame:
     """删除融合过程中产生的中间计算列（以 _ 开头的列）
 
@@ -614,7 +657,9 @@ def _drop_internal_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     internal_cols = [c for c in df.columns if c.startswith("_")]
     if internal_cols:
-        logger.info(f"Dropping {len(internal_cols)} internal column(s): {internal_cols}")
+        logger.info(
+            f"Dropping {len(internal_cols)} internal column(s): {internal_cols}"
+        )
         df = df.drop(columns=internal_cols)
     return df
 
@@ -629,7 +674,5 @@ def build_okr_transformer() -> DataTransformer:
     t = DataTransformer()
     t.register_step("drop_internal_columns", _drop_internal_columns)
 
-    logger.info(
-        f"OKR transformer built with {len(t._steps)} registered step(s)"
-    )
+    logger.info(f"OKR transformer built with {len(t._steps)} registered step(s)")
     return t

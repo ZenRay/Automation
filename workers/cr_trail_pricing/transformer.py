@@ -31,6 +31,7 @@ def _in_date_range(series_start, series_end, target_date):
 # Stage 1: 数据提取
 # ---------------------------------------------------------------------------
 
+
 def extract_sources(lark_client, sources):
     """从飞书拉取 6 张配置表，返回 {name: DataFrame}
 
@@ -53,7 +54,7 @@ def extract_sources(lark_client, sources):
     _UTC_OFFSET = timedelta(hours=8)
 
     # 缓存 app_token 和 tables_map，避免每张表重复 2 次 API 调用
-    _app_cache: dict[str, str] = {}      # url_prefix -> app_token
+    _app_cache: dict[str, str] = {}  # url_prefix -> app_token
     _tables_cache: dict[str, dict] = {}  # app_token -> {table_name: table_id}
 
     data = {}
@@ -69,7 +70,9 @@ def extract_sources(lark_client, sources):
 
         # 2. 获取表格列表（缓存）
         if app_token not in _tables_cache:
-            _tables_cache[app_token] = lark_client.extract_table_information(app_token=app_token)
+            _tables_cache[app_token] = lark_client.extract_table_information(
+                app_token=app_token
+            )
         tables_map = _tables_cache[app_token]
 
         # 3. 按 table_name 匹配 table_id
@@ -109,9 +112,7 @@ def extract_sources(lark_client, sources):
             if col not in df.columns:
                 continue
             # 将 pd.Timestamp (UTC naive) 转为 datetime64，加 +8h 得到北京时间，再取 .date
-            df[col] = (
-                pd.to_datetime(df[col]) + _UTC_OFFSET
-            ).dt.date
+            df[col] = (pd.to_datetime(df[col]) + _UTC_OFFSET).dt.date
 
         # UTC+8 时区感知的日期过滤
         if (
@@ -162,6 +163,7 @@ def extract_sources(lark_client, sources):
 # Stage 2: 商品筛选
 # ---------------------------------------------------------------------------
 
+
 def filter_trial_products(conf_goods, conf_trial_goods, target_date):
     """INNER JOIN on 商品id，筛选试验商品
 
@@ -175,7 +177,9 @@ def filter_trial_products(conf_goods, conf_trial_goods, target_date):
 
     # 仅保留 conf_trial_goods 的 商品id + 非试验区域抽佣率
     trial_cols = ["商品id", "非试验区域抽佣率"]
-    trial_subset = conf_trial_goods[[c for c in trial_cols if c in conf_trial_goods.columns]]
+    trial_subset = conf_trial_goods[
+        [c for c in trial_cols if c in conf_trial_goods.columns]
+    ]
 
     result = conf_goods.merge(
         trial_subset,
@@ -198,6 +202,7 @@ def filter_trial_products(conf_goods, conf_trial_goods, target_date):
 # Stage 3: 区域标记
 # ---------------------------------------------------------------------------
 
+
 def mark_trial_regions(conf_county, conf_trial_group, target_date):
     """LEFT JOIN on 市id=区域id, 标记是否试验区域"""
     city_groups = conf_trial_group[
@@ -208,16 +213,19 @@ def mark_trial_regions(conf_county, conf_trial_group, target_date):
             target_date,
         )
     ]
-    join_cols = ["区域id", "区域类型", "试验分组",
-                 "试验起始日期", "试验结束日期"]
+    join_cols = ["区域id", "区域类型", "试验分组", "试验起始日期", "试验结束日期"]
     city_groups = city_groups[[c for c in join_cols if c in city_groups.columns]]
 
     overlap = set(city_groups.columns) & set(conf_county.columns)
-    county_clean = conf_county.drop(columns=[c for c in overlap if c in conf_county.columns],
-                                    errors="ignore")
+    county_clean = conf_county.drop(
+        columns=[c for c in overlap if c in conf_county.columns], errors="ignore"
+    )
 
     result = county_clean.merge(
-        city_groups, left_on="市id", right_on="区域id", how="left",
+        city_groups,
+        left_on="市id",
+        right_on="区域id",
+        how="left",
     )
     result["是否试验区域"] = result["试验分组"].notna().astype(int)
 
@@ -225,14 +233,18 @@ def mark_trial_regions(conf_county, conf_trial_group, target_date):
         if col in result.columns:
             result[col] = result[col].fillna("")
 
-    keep = [c for c in list(county_clean.columns) + ["是否试验区域", "试验分组"]
-            if c in result.columns]
+    keep = [
+        c
+        for c in list(county_clean.columns) + ["是否试验区域", "试验分组"]
+        if c in result.columns
+    ]
     return result[keep].copy()
 
 
 # ---------------------------------------------------------------------------
 # Stage 4: 抽佣关联
 # ---------------------------------------------------------------------------
+
 
 def associate_commission(regions_df, conf_trial_commission, target_date):
     """LEFT JOIN on 试验分组 + 运营类型, 关联抽佣率
@@ -261,6 +273,7 @@ def associate_commission(regions_df, conf_trial_commission, target_date):
 # Stage 5: 隐形物流费
 # ---------------------------------------------------------------------------
 
+
 def _parse_mapping(mapping_str):
     """解析单条区县费率映射 JSON，失败返回 None"""
     if pd.isna(mapping_str) or mapping_str == "":
@@ -286,23 +299,25 @@ def associate_logistics_fee(regions_df, conf_hidden_logistics, target_date):
 
     result = regions_df.merge(
         logistics[["市id", "_fee_rate", "区县费率映射"]],
-        on="市id", how="left",
+        on="市id",
+        how="left",
     )
 
     # 向量化 4-branch 逻辑
     mapping_parsed = result["区县费率映射"].apply(_parse_mapping)
-    county_ids = result["区县id"].apply(
-        lambda x: str(int(x)) if pd.notna(x) else ""
-    )
+    county_ids = result["区县id"].apply(lambda x: str(int(x)) if pd.notna(x) else "")
 
     # 默认：使用城市级别费率
     rates = result["_fee_rate"].copy()
 
     # 区县级别覆盖：mapping 存在且包含该区县id
-    has_override = pd.Series([
-        m is not None and cid != "" and cid in m
-        for m, cid in zip(mapping_parsed, county_ids)
-    ], index=result.index)
+    has_override = pd.Series(
+        [
+            m is not None and cid != "" and cid in m
+            for m, cid in zip(mapping_parsed, county_ids)
+        ],
+        index=result.index,
+    )
     # 逐行应用覆盖（仅对有的行）
     for idx in result.index[has_override]:
         m = mapping_parsed.loc[idx]
@@ -311,14 +326,14 @@ def associate_logistics_fee(regions_df, conf_hidden_logistics, target_date):
 
     # 不填充 0：未匹配物流表的行保留 NaN
     result["隐形物流费率"] = rates
-    result = result.drop(columns=["_fee_rate", "区县费率映射"],
-                         errors="ignore")
+    result = result.drop(columns=["_fee_rate", "区县费率映射"], errors="ignore")
     return result
 
 
 # ---------------------------------------------------------------------------
 # Stage 6: 笛卡尔积计算
 # ---------------------------------------------------------------------------
+
 
 def compute_pricing(products_df, regions_df):
     """笛卡尔积 + 计算抽佣比例/货值/调价方向"""
@@ -341,7 +356,9 @@ def compute_pricing(products_df, regions_df):
     raw_diff = result["抽佣率"] - result["非试验区域抽佣率"]
     result["固定抽佣比例"] = np.where(is_trial, raw_diff, np.nan)
     result["固定抽佣货值"] = np.where(
-        ~is_trial, result["隐形物流费率"] * result["毛重"], np.nan,
+        ~is_trial,
+        result["隐形物流费率"] * result["毛重"],
+        np.nan,
     )
 
     def _direction(row):
@@ -372,6 +389,7 @@ def compute_pricing(products_df, regions_df):
 # Stage 7: Excel 输出
 # ---------------------------------------------------------------------------
 
+
 def export_excel(df, output_path):
     """重命名列、选择输出列、导出 Excel"""
     if df.empty:
@@ -382,8 +400,11 @@ def export_excel(df, output_path):
     out = out[[c for c in OUTPUT_COLUMNS if c in out.columns]]
     # 将比例类列从小数转为百分比显示（0.05 → 5）
     _RATE_COLS = [
-        "固定抽佣比例", "平台基础抽佣率", "平台总抽佣率",
-        "总抽佣率", "隐形物流费率",
+        "固定抽佣比例",
+        "平台基础抽佣率",
+        "平台总抽佣率",
+        "总抽佣率",
+        "隐形物流费率",
     ]
     for col in _RATE_COLS:
         if col in out.columns:

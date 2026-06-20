@@ -28,29 +28,30 @@ class LarkFieldType(IntEnum):
 
     参考文档：https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/bitable-v1/app-table-field/guide
     """
-    TEXT = 1            # 文本（默认）、条码（ui_type=Barcode）、邮箱（ui_type=Email）
-    NUMBER = 2          # 数字（默认）、进度（ui_type=Progress）、货币（ui_type=Currency）、评分（ui_type=Rating）
-    PERCENT = 2         # 百分比/进度（NUMBER 的 ui_type 别名，语义等价于 NUMBER）
-    SINGLE_SELECT = 3   # 单选
-    MULTI_SELECT = 4    # 多选
-    DATE = 5            # 日期
-    CHECKBOX = 7        # 复选框
-    PERSON = 11         # 人员
-    PHONE = 13          # 电话号码
-    URL = 15            # 超链接
-    ATTACHMENT = 17     # 附件
-    SINGLE_LINK = 18    # 单向关联
-    LOOKUP = 19         # 查找引用
-    FORMULA = 20        # 公式
-    DUPLEX_LINK = 21    # 双向关联
-    LOCATION = 22       # 地理位置
-    GROUP = 23          # 群组
-    STAGE = 24          # 流程（只读）
-    CREATED_TIME = 1001     # 创建时间（只读）
-    MODIFIED_TIME = 1002    # 最后更新时间（只读）
-    CREATED_USER = 1003     # 创建人（只读）
-    MODIFIED_USER = 1004    # 修改人（只读）
-    AUTO_NUMBER = 1005      # 自动编号（只读）
+
+    TEXT = 1  # 文本（默认）、条码（ui_type=Barcode）、邮箱（ui_type=Email）
+    NUMBER = 2  # 数字（默认）、进度（ui_type=Progress）、货币（ui_type=Currency）、评分（ui_type=Rating）
+    PERCENT = 2  # 百分比/进度（NUMBER 的 ui_type 别名，语义等价于 NUMBER）
+    SINGLE_SELECT = 3  # 单选
+    MULTI_SELECT = 4  # 多选
+    DATE = 5  # 日期
+    CHECKBOX = 7  # 复选框
+    PERSON = 11  # 人员
+    PHONE = 13  # 电话号码
+    URL = 15  # 超链接
+    ATTACHMENT = 17  # 附件
+    SINGLE_LINK = 18  # 单向关联
+    LOOKUP = 19  # 查找引用
+    FORMULA = 20  # 公式
+    DUPLEX_LINK = 21  # 双向关联
+    LOCATION = 22  # 地理位置
+    GROUP = 23  # 群组
+    STAGE = 24  # 流程（只读）
+    CREATED_TIME = 1001  # 创建时间（只读）
+    MODIFIED_TIME = 1002  # 最后更新时间（只读）
+    CREATED_USER = 1003  # 创建人（只读）
+    MODIFIED_USER = 1004  # 修改人（只读）
+    AUTO_NUMBER = 1005  # 自动编号（只读）
 
 
 class FilterOperator(str, Enum):
@@ -62,16 +63,17 @@ class FilterOperator(str, Enum):
     注意：部分运算符不支持日期字段，详见飞书文档：
     https://open.feishu.cn/document/docs/bitable-v1/app-table-record/record-filter-guide
     """
-    IS = "is"                           # 等于（所有字段类型）
-    IS_NOT = "isNot"                    # 不等于（日期不支持）
-    CONTAINS = "contains"               # 包含（日期不支持）
-    DOES_NOT_CONTAIN = "doesNotContain" # 不包含（日期不支持）
-    IS_EMPTY = "isEmpty"                # 为空（所有字段类型）
-    IS_NOT_EMPTY = "isNotEmpty"         # 不为空（所有字段类型）
-    IS_GREATER = "isGreater"            # 大于（数字、日期）
-    IS_GREATER_EQUAL = "isGreaterEqual" # 大于等于（日期不支持）
-    IS_LESS = "isLess"                  # 小于（数字、日期）
-    IS_LESS_EQUAL = "isLessEqual"       # 小于等于（日期不支持）
+
+    IS = "is"  # 等于（所有字段类型）
+    IS_NOT = "isNot"  # 不等于（日期不支持）
+    CONTAINS = "contains"  # 包含（日期不支持）
+    DOES_NOT_CONTAIN = "doesNotContain"  # 不包含（日期不支持）
+    IS_EMPTY = "isEmpty"  # 为空（所有字段类型）
+    IS_NOT_EMPTY = "isNotEmpty"  # 不为空（所有字段类型）
+    IS_GREATER = "isGreater"  # 大于（数字、日期）
+    IS_GREATER_EQUAL = "isGreaterEqual"  # 大于等于（日期不支持）
+    IS_LESS = "isLess"  # 小于（数字、日期）
+    IS_LESS_EQUAL = "isLessEqual"  # 小于等于（日期不支持）
 
 
 # 不需要 value 的运算符（isEmpty / isNotEmpty 要求 value=[]）
@@ -110,7 +112,9 @@ def _to_lark_timestamp(value: Any) -> int:
         if not pd.isna(ts):
             return calendar.timegm(ts.date().timetuple()) * 1000
         raise ValueError(f"Cannot parse date string: {value!r}")
-    raise TypeError(f"Unsupported type for timestamp: {type(value).__name__}, value={value!r}")
+    raise TypeError(
+        f"Unsupported type for timestamp: {type(value).__name__}, value={value!r}"
+    )
 
 
 def _convert_filter_value(value: Any) -> list[str]:
@@ -135,6 +139,7 @@ def _convert_filter_value(value: Any) -> list[str]:
 # 日期范围参数
 # --------------------------------------------------------------------------
 
+
 @dataclass
 class DateRangeParams:
     """日期范围参数，驱动 SQL 查询、飞书拉取、目标表清理的日期窗口
@@ -158,6 +163,7 @@ class DateRangeParams:
                     AND DATEADD(${date_param}, ${end_offset}, "dd")
         保留 DATEADD 结构让人工维护 SQL 时语义清晰、可读性强。
     """
+
     start_offset: int = -7
     end_offset: int = 0
     cleanup_buffer: int = 0
@@ -185,6 +191,7 @@ class DateRangeParams:
             tuple[date, date]: (cleanup_start, cleanup_end) 闭区间
         """
         from datetime import timedelta
+
         ref = self.reference_date if self.reference_date is not None else date.today()
         start = ref + timedelta(days=self.start_offset - self.cleanup_buffer)
         end = ref + timedelta(days=self.end_offset)
@@ -207,9 +214,9 @@ class DateRangeParams:
         """
         dp = self._normalize_date_param(self.date_param)
         return {
-            "date_param":   dp,
+            "date_param": dp,
             "start_offset": str(self.start_offset),
-            "end_offset":   str(self.end_offset),
+            "end_offset": str(self.end_offset),
         }
 
     @staticmethod
@@ -241,6 +248,7 @@ class FilterCondition:
                     空值运算符（isEmpty/isNotEmpty）时传 [] 或省略。
                     示例: [datetime(2026, 5, 1)]、["标果长沙"]、[100.0]
     """
+
     field_name: str
     operator: FilterOperator
     value: list[Any] = field(default_factory=list)
@@ -273,6 +281,7 @@ class CleanupCondition:
         conditions:  筛选条件列表
         conjunction: 条件间逻辑关系，"and"（默认）或 "or"
     """
+
     conditions: list[FilterCondition]
     conjunction: str = "and"
     _is_runtime: bool = field(default=False, repr=False, compare=False)
@@ -316,6 +325,7 @@ class CleanupCondition:
                             避免清理窗口锚定在「今天」导致误删。
         """
         from datetime import timedelta
+
         anchor = reference_date if reference_date is not None else date.today()
         cutoff = datetime.combine(anchor, datetime.min.time()) - timedelta(days=days)
         return cls(
@@ -347,14 +357,17 @@ class CleanupCondition:
             end_date:   窗口结束日期（含）
         """
         from datetime import timedelta
+
         # IS_GREATER start_date → 实测语义为 >= start_date（包含边界）
         lower = datetime.combine(start_date, datetime.min.time())
         # IS_LESS (end_date + 1day) → 严格小于，等价于 <= end_date
         upper = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
-        return cls(conditions=[
-            FilterCondition(date_field, FilterOperator.IS_GREATER, [lower]),
-            FilterCondition(date_field, FilterOperator.IS_LESS, [upper]),
-        ])
+        return cls(
+            conditions=[
+                FilterCondition(date_field, FilterOperator.IS_GREATER, [lower]),
+                FilterCondition(date_field, FilterOperator.IS_LESS, [upper]),
+            ]
+        )
 
     def to_lark_filter(self) -> dict:
         """转换为飞书 search API 的 filter 参数格式
@@ -394,11 +407,13 @@ class CleanupCondition:
                 # 对于非空值运算符，取第一个元素作为条件值
                 api_value = _convert_filter_value(cond.value[0])
 
-            api_conditions.append({
-                "field_name": cond.field_name,
-                "operator": cond.operator.value,
-                "value": api_value,
-            })
+            api_conditions.append(
+                {
+                    "field_name": cond.field_name,
+                    "operator": cond.operator.value,
+                    "value": api_value,
+                }
+            )
 
         return {
             "conjunction": self.conjunction,
@@ -440,6 +455,7 @@ class LarkSourceConfig:
                                 根据 reference_date + start_offset + lark_extra_start_days 自动设置）。
                                 不应在 config.py 中硬编码此字段。
     """
+
     name: str
     url: str
     table_name: str
@@ -477,6 +493,7 @@ class SQLQueryConfig:
           3. DROP TABLE 清理临时表
         临时表命名自动生成为 _tmp_{query_name}_{timestamp}，确保唯一性。
     """
+
     name: str
     sql_file: str
     depends_on: list[str] = field(default_factory=list)
@@ -495,6 +512,7 @@ class FieldMapping:
         lark_type:      飞书字段类型，使用 LarkFieldType 枚举（也接受 int，向后兼容）
         lark_ui_type:   可选 ui_type，用于精确转换（如 DateTime vs Date）
     """
+
     source_col: str
     target_field: str
     lark_type: int  # LarkFieldType 或 int，IntEnum 保证两者可互操作
@@ -513,6 +531,7 @@ class LarkTargetConfig:
         cleanup_conditions:     写入前清理旧数据的条件，None 表示不清理
                                 示例: CleanupCondition.recent_days("日期", 30)
     """
+
     name: str
     url: str
     table_name: str
@@ -549,6 +568,7 @@ class DataRoute:
                             "warn":   校验失败仅警告，继续写入
                             "skip":   跳过校验
     """
+
     name: str
     target: LarkTargetConfig
     source_ref: str = "result"

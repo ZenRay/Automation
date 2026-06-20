@@ -34,7 +34,5 @@ def build_cr_trail_transformer() -> DataTransformer:
     """
     t = DataTransformer()
     # 当前无需注册步骤，SQL 已产出最终所需字段
-    logger.info(
-        f"CR trail transformer built with {len(t._steps)} registered step(s)"
-    )
+    logger.info(f"CR trail transformer built with {len(t._steps)} registered step(s)")
     return t

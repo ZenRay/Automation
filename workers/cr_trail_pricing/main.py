@@ -34,7 +34,9 @@ def _init_lark_client():
     app_id = lark_conf.get("prod", "APP_ID")
     app_secret = lark_conf.get("prod", "APP_SECRET")
     lark_host = lark_conf.get("prod", "LARK_HOST", fallback="https://open.feishu.cn")
-    logger.info("Initializing LarkMultiDimTable client (app_id=%s, host=%s)", app_id, lark_host)
+    logger.info(
+        "Initializing LarkMultiDimTable client (app_id=%s, host=%s)", app_id, lark_host
+    )
     return LarkMultiDimTable(
         app_id=app_id,
         app_secret=app_secret,
@@ -49,17 +51,20 @@ def _apply_target_date(sources, target_date):
     其余日期过滤源使用 target_date。
     """
     from datetime import timedelta
+
     yesterday = target_date - timedelta(days=1)
     result = []
     for src in sources:
         if src.date_filter_field:
             # conf_goods 筛选昨日数据，其余筛选今日数据
             effective_date = yesterday if src.name == "conf_goods" else target_date
-            result.append(dataclasses.replace(
-                src,
-                date_filter_start_date=effective_date,
-                date_filter_end_date=effective_date,
-            ))
+            result.append(
+                dataclasses.replace(
+                    src,
+                    date_filter_start_date=effective_date,
+                    date_filter_end_date=effective_date,
+                )
+            )
         else:
             result.append(src)
     return result
@@ -80,14 +85,30 @@ def run_cr_trail_pricing_pipeline(target_date: date, output_path: str) -> int:
 
     stages = [
         ("数据提取", lambda: extract_sources(lark_client, sources)),
-        ("商品筛选", lambda: filter_trial_products(
-            lark_data["conf_goods"], lark_data["conf_trial_goods"], target_date)),
-        ("区域标记", lambda: mark_trial_regions(
-            lark_data["conf_county"], lark_data["conf_trial_group"], target_date)),
-        ("抽佣关联", lambda: associate_commission(
-            regions_df, lark_data["conf_trial_commission"], target_date)),
-        ("隐形物流费", lambda: associate_logistics_fee(
-            regions_df, lark_data["conf_hidden_logistics"], target_date)),
+        (
+            "商品筛选",
+            lambda: filter_trial_products(
+                lark_data["conf_goods"], lark_data["conf_trial_goods"], target_date
+            ),
+        ),
+        (
+            "区域标记",
+            lambda: mark_trial_regions(
+                lark_data["conf_county"], lark_data["conf_trial_group"], target_date
+            ),
+        ),
+        (
+            "抽佣关联",
+            lambda: associate_commission(
+                regions_df, lark_data["conf_trial_commission"], target_date
+            ),
+        ),
+        (
+            "隐形物流费",
+            lambda: associate_logistics_fee(
+                regions_df, lark_data["conf_hidden_logistics"], target_date
+            ),
+        ),
         ("笛卡尔积计算", lambda: compute_pricing(products_df, regions_df)),
         ("Excel 输出", lambda: export_excel(result_df, output_path)),
     ]
@@ -135,11 +156,13 @@ def main():
         description="试验区域抽佣调价方案生成器",
     )
     parser.add_argument(
-        "--date", default=str(date.today()),
+        "--date",
+        default=str(date.today()),
         help="目标日期 (YYYY-MM-DD, 默认 today)",
     )
     parser.add_argument(
-        "--output", default=None,
+        "--output",
+        default=None,
         help="输出 Excel 路径 (默认 cr_trail_pricing_{date}.xlsx)",
     )
     args = parser.parse_args()

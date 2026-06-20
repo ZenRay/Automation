@@ -10,8 +10,15 @@ lib 层不引用本文件，保证 lib 的通用性。
 from pathlib import Path
 
 from workers.lib import (
-    LarkSourceConfig, SQLQueryConfig, FieldMapping, LarkTargetConfig, LarkFieldType,
-    CleanupCondition, FilterCondition, FilterOperator, DataRoute,
+    LarkSourceConfig,
+    SQLQueryConfig,
+    FieldMapping,
+    LarkTargetConfig,
+    LarkFieldType,
+    CleanupCondition,
+    FilterCondition,
+    FilterOperator,
+    DataRoute,
 )
 
 # --------------------------------------------------------------------------
@@ -94,46 +101,200 @@ TARGET_OKR_CAT1 = LarkTargetConfig(
     "?table=tbls6KSijm1R6chr&view=vew2WvvDaN",
     table_name="一级类目维度",
     field_mappings=[
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
-        FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="一级类目id", target_field="一级类目id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目名称", target_field="一级类目名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="下单店铺数", target_field="下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="日活覆盖率", target_field="日活覆盖率", lark_type=LarkFieldType.PERCENT),
-        FieldMapping(source_col="送达金额", target_field="送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="过滤后送达金额", target_field="过滤后送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="赔付金额", target_field="赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="送达数量", target_field="送达数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="售后数量", target_field="售后数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="过滤后赔付金额", target_field="过滤后赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="在售sku数", target_field="在售sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="动销sku数", target_field="动销sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="ka运营品类送达金额", target_field="ka运营品类送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="ka运营品类赔付金额", target_field="ka运营品类赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="在售四级类目数", target_field="在售四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="动销四级类目数", target_field="动销四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过35点的四级类目数", target_field="一级类目渗透率超过35点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【25,35）的四级类目数", target_field="一级类目渗透率【25,35）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【15,25）的四级类目数", target_field="一级类目渗透率【15,25）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【5,15）的四级类目数", target_field="一级类目渗透率【5,15）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率低于5点的四级类目数", target_field="一级类目渗透率低于5点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过15点的四级类目数", target_field="一级类目渗透率超过15点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过15点且排名top3的四级类目数", target_field="一级类目渗透率超过15点且排名top3的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类送达金额", target_field="特殊运营品类送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过10点的特殊运营四级类目数", target_field="一级类目渗透率超过10点的特殊运营四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类商品一级类目渗透率超10点的商品数", target_field="特殊运营品类商品一级类目渗透率超10点的商品数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类明细单量", target_field="特殊运营品类明细单量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类售后数量", target_field="特殊运营品类售后数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非品质问题赔付金额", target_field="非品质问题赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非品质问题售后数量", target_field="非品质问题售后数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非品质问题售后单量", target_field="非品质问题售后单量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="升级售后总赔付金额", target_field="升级售后总赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="升级售后平台赔付金额", target_field="升级售后平台赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="升级售后单量", target_field="升级售后单量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="曝光店铺数", target_field="曝光店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="买过页面曝光店铺数", target_field="买过页面曝光店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="买过页面曝光数量", target_field="买过页面曝光数量", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="一级类目id",
+            target_field="一级类目id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目名称",
+            target_field="一级类目名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="下单店铺数",
+            target_field="下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="日活覆盖率",
+            target_field="日活覆盖率",
+            lark_type=LarkFieldType.PERCENT,
+        ),
+        FieldMapping(
+            source_col="送达金额",
+            target_field="送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="过滤后送达金额",
+            target_field="过滤后送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="赔付金额",
+            target_field="赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="送达数量",
+            target_field="送达数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="售后数量",
+            target_field="售后数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="过滤后赔付金额",
+            target_field="过滤后赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="在售sku数",
+            target_field="在售sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="动销sku数",
+            target_field="动销sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="ka运营品类送达金额",
+            target_field="ka运营品类送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="ka运营品类赔付金额",
+            target_field="ka运营品类赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="在售四级类目数",
+            target_field="在售四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="动销四级类目数",
+            target_field="动销四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过35点的四级类目数",
+            target_field="一级类目渗透率超过35点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【25,35）的四级类目数",
+            target_field="一级类目渗透率【25,35）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【15,25）的四级类目数",
+            target_field="一级类目渗透率【15,25）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【5,15）的四级类目数",
+            target_field="一级类目渗透率【5,15）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率低于5点的四级类目数",
+            target_field="一级类目渗透率低于5点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过15点的四级类目数",
+            target_field="一级类目渗透率超过15点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过15点且排名top3的四级类目数",
+            target_field="一级类目渗透率超过15点且排名top3的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类送达金额",
+            target_field="特殊运营品类送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过10点的特殊运营四级类目数",
+            target_field="一级类目渗透率超过10点的特殊运营四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类商品一级类目渗透率超10点的商品数",
+            target_field="特殊运营品类商品一级类目渗透率超10点的商品数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类明细单量",
+            target_field="特殊运营品类明细单量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类售后数量",
+            target_field="特殊运营品类售后数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非品质问题赔付金额",
+            target_field="非品质问题赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非品质问题售后数量",
+            target_field="非品质问题售后数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非品质问题售后单量",
+            target_field="非品质问题售后单量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="升级售后总赔付金额",
+            target_field="升级售后总赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="升级售后平台赔付金额",
+            target_field="升级售后平台赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="升级售后单量",
+            target_field="升级售后单量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="曝光店铺数",
+            target_field="曝光店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="买过页面曝光店铺数",
+            target_field="买过页面曝光店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="买过页面曝光数量",
+            target_field="买过页面曝光数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
     ],
     # 写入前清理条件：运行时由 DateRangeParams 决定精确窗口
     cleanup_conditions=CleanupCondition.runtime_window(),
@@ -159,14 +320,40 @@ TARGET_OKR_CAT4_AS_TYPE = LarkTargetConfig(
     ),
     table_name="四级类目售后类型维度",
     field_mappings=[
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
-        FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目id", target_field="一级类目id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="四级类目id", target_field="四级类目id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="四级类目名称", target_field="四级类目名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="售后类型", target_field="售后类型", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="售后赔付率", target_field="售后赔付率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="售后赔付率排名", target_field="售后赔付率排名", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="一级类目id",
+            target_field="一级类目id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="四级类目id",
+            target_field="四级类目id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="四级类目名称",
+            target_field="四级类目名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="售后类型", target_field="售后类型", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="售后赔付率",
+            target_field="售后赔付率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="售后赔付率排名",
+            target_field="售后赔付率排名",
+            lark_type=LarkFieldType.NUMBER,
+        ),
     ],
     cleanup_conditions=CleanupCondition.runtime_window(),
 )
@@ -180,91 +367,377 @@ TARGET_OKR_MALL = LarkTargetConfig(
     table_name="商城维度表",
     field_mappings=[
         # -- 日期 --
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
         # -- mall_stat: 基础维度 --
-        FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT
+        ),
         # -- mall_stat: 店铺统计 --
-        FieldMapping(source_col="下单店铺数", target_field="下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="老客户下单店铺数", target_field="老客户下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="新客户下单店铺数", target_field="新客户下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="流失客户下单店铺数", target_field="流失客户下单店铺数", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="下单店铺数",
+            target_field="下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="老客户下单店铺数",
+            target_field="老客户下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="新客户下单店铺数",
+            target_field="新客户下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="流失客户下单店铺数",
+            target_field="流失客户下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: 金额 --
-        FieldMapping(source_col="送达金额", target_field="送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="赔付金额", target_field="赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="售后赔付率", target_field="售后赔付率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="过滤后送达金额", target_field="过滤后送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="过滤后赔付金额", target_field="过滤后赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="过滤后售后赔付率", target_field="过滤后售后赔付率", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="送达金额",
+            target_field="送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="赔付金额",
+            target_field="赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="售后赔付率",
+            target_field="售后赔付率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="过滤后送达金额",
+            target_field="过滤后送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="过滤后赔付金额",
+            target_field="过滤后赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="过滤后售后赔付率",
+            target_field="过滤后售后赔付率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: SKU --
-        FieldMapping(source_col="在售sku数", target_field="在售sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="动销sku数", target_field="动销sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="动销水果sku数", target_field="动销水果sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="ka运营品类送达金额", target_field="ka运营品类送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="ka运营品类赔付金额", target_field="ka运营品类赔付金额", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="在售sku数",
+            target_field="在售sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="动销sku数",
+            target_field="动销sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="动销水果sku数",
+            target_field="动销水果sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="ka运营品类送达金额",
+            target_field="ka运营品类送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="ka运营品类赔付金额",
+            target_field="ka运营品类赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: 四级类目渗透率 --
-        FieldMapping(source_col="在售四级类目数", target_field="在售四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="动销四级类目数", target_field="动销四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过35点的四级类目数", target_field="一级类目渗透率超过35点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【25,35）的四级类目数", target_field="一级类目渗透率【25,35）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【15,25）的四级类目数", target_field="一级类目渗透率【15,25）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率【5,15）的四级类目数", target_field="一级类目渗透率【5,15）的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率低于5点的四级类目数", target_field="一级类目渗透率低于5点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过15点的四级类目数", target_field="一级类目渗透率超过15点的四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过15点且排名top3的四级类目数", target_field="一级类目渗透率超过15点且排名top3的四级类目数", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="在售四级类目数",
+            target_field="在售四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="动销四级类目数",
+            target_field="动销四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过35点的四级类目数",
+            target_field="一级类目渗透率超过35点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【25,35）的四级类目数",
+            target_field="一级类目渗透率【25,35）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【15,25）的四级类目数",
+            target_field="一级类目渗透率【15,25）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率【5,15）的四级类目数",
+            target_field="一级类目渗透率【5,15）的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率低于5点的四级类目数",
+            target_field="一级类目渗透率低于5点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过15点的四级类目数",
+            target_field="一级类目渗透率超过15点的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过15点且排名top3的四级类目数",
+            target_field="一级类目渗透率超过15点且排名top3的四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: 流量 --
-        FieldMapping(source_col="曝光店铺数", target_field="曝光店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="买过页面曝光店铺数", target_field="买过页面曝光店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="买过页面曝光数量", target_field="买过页面曝光数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="买过页面使用率", target_field="买过页面使用率", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="曝光店铺数",
+            target_field="曝光店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="买过页面曝光店铺数",
+            target_field="买过页面曝光店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="买过页面曝光数量",
+            target_field="买过页面曝光数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="买过页面使用率",
+            target_field="买过页面使用率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: 规模（蔬菜/水果） --
-        FieldMapping(source_col="蔬菜在售sku数", target_field="蔬菜在售sku数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="蔬菜送达金额", target_field="蔬菜送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="蔬菜赔付金额", target_field="蔬菜赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="蔬菜赔付率", target_field="蔬菜赔付率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="水果送达金额", target_field="水果送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="水果送达金额占比", target_field="水果货值占比", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="蔬菜在售sku数",
+            target_field="蔬菜在售sku数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜送达金额",
+            target_field="蔬菜送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜赔付金额",
+            target_field="蔬菜赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜赔付率",
+            target_field="蔬菜赔付率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="水果送达金额",
+            target_field="水果送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="水果送达金额占比",
+            target_field="水果货值占比",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- mall_stat: 特殊品类运营 --
-        FieldMapping(source_col="特殊运营品类送达金额", target_field="特殊运营品类送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类明细单量", target_field="特殊运营品类明细单量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="一级类目渗透率超过10点的特殊运营四级类目数", target_field="一级类目渗透率超过10点的特殊运营四级类目数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类商品一级类目渗透率超10点的商品数", target_field="特殊运营品类商品一级类目渗透率超10点的商品数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类售后单数量", target_field="特殊运营品类售后单数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类非品质问题赔付金额", target_field="特殊运营品类非品质问题赔付金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类非品质问题售后数量", target_field="特殊运营品类非品质问题售后数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类非品质问题售后单量", target_field="特殊运营品类非品质问题售后单量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营品类赔付率", target_field="特殊运营品类赔付率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="特殊运营非品质问题售后单占比", target_field="特殊运营非品质问题售后单占比", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="特殊运营品类送达金额",
+            target_field="特殊运营品类送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类明细单量",
+            target_field="特殊运营品类明细单量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率超过10点的特殊运营四级类目数",
+            target_field="一级类目渗透率超过10点的特殊运营四级类目数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类商品一级类目渗透率超10点的商品数",
+            target_field="特殊运营品类商品一级类目渗透率超10点的商品数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类售后单数量",
+            target_field="特殊运营品类售后单数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类非品质问题赔付金额",
+            target_field="特殊运营品类非品质问题赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类非品质问题售后数量",
+            target_field="特殊运营品类非品质问题售后数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类非品质问题售后单量",
+            target_field="特殊运营品类非品质问题售后单量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营品类赔付率",
+            target_field="特殊运营品类赔付率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="特殊运营非品质问题售后单占比",
+            target_field="特殊运营非品质问题售后单占比",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- quality_reject_tasks 聚合指标 --
-        FieldMapping(source_col="打回水果次数", target_field="打回水果次数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="打回水果商品数", target_field="打回水果商品数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="7日重复打回商品数", target_field="7日重复打回商品数", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="打回水果次数",
+            target_field="打回水果次数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="打回水果商品数",
+            target_field="打回水果商品数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="7日重复打回商品数",
+            target_field="7日重复打回商品数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- ka_cat4_operate + store_cat4_stat 聚合指标 --
-        FieldMapping(source_col="直营区域送达金额", target_field="直营区域送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域送达金额", target_field="代理人区域送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="实验区域送达金额", target_field="实验区域送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="蔬菜干货直营下单店铺数", target_field="蔬菜干货直营下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域榴莲下单数量", target_field="代理人区域榴莲下单数量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="榴莲下单店铺数", target_field="榴莲下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试点区域对比送达金额", target_field="试点区域对比送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试点品类售后店铺数", target_field="试点品类售后店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试点品类8日售后复购店铺数", target_field="试点品类8日售后复购店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试点KA品类门店数", target_field="试点KA品类门店数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试点KA品类门店8日复购品类门店数", target_field="试点KA品类门店8日复购品类门店数", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="直营区域送达金额",
+            target_field="直营区域送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域送达金额",
+            target_field="代理人区域送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="实验区域送达金额",
+            target_field="实验区域送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜干货直营下单店铺数",
+            target_field="蔬菜干货直营下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域榴莲下单数量",
+            target_field="代理人区域榴莲下单数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="榴莲下单店铺数",
+            target_field="榴莲下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试点区域对比送达金额",
+            target_field="试点区域对比送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试点品类售后店铺数",
+            target_field="试点品类售后店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试点品类8日售后复购店铺数",
+            target_field="试点品类8日售后复购店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试点KA品类门店数",
+            target_field="试点KA品类门店数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试点KA品类门店8日复购品类门店数",
+            target_field="试点KA品类门店8日复购品类门店数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- ka_cat4_operate: 水果抽佣/送达金额 + 抽佣率 --
-        FieldMapping(source_col="直营区域水果抽佣金额", target_field="直营区域水果抽佣金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果抽佣金额", target_field="代理人区域水果抽佣金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="直营区域水果送达金额", target_field="直营区域水果送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果送达金额", target_field="代理人区域水果送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="直营区域水果抽佣率", target_field="直营区域水果抽佣率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果抽佣率", target_field="代理人区域水果抽佣率", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="直营区域水果抽佣金额",
+            target_field="直营区域水果抽佣金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果抽佣金额",
+            target_field="代理人区域水果抽佣金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="直营区域水果送达金额",
+            target_field="直营区域水果送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果送达金额",
+            target_field="代理人区域水果送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="直营区域水果抽佣率",
+            target_field="直营区域水果抽佣率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果抽佣率",
+            target_field="代理人区域水果抽佣率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- ka_cat4_operate: 水果抽佣/送达金额 + 抽佣率（剔除特殊运营品类）--
-        FieldMapping(source_col="直营区域水果抽佣金额【剔除特殊运营品类】", target_field="直营区域水果抽佣金额【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果抽佣金额【剔除特殊运营品类】", target_field="代理人区域水果抽佣金额【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="直营区域水果送达金额【剔除特殊运营品类】", target_field="直营区域水果送达金额【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果送达金额【剔除特殊运营品类】", target_field="代理人区域水果送达金额【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="直营区域水果抽佣率【剔除特殊运营品类】", target_field="直营区域水果抽佣率【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="代理人区域水果抽佣率【剔除特殊运营品类】", target_field="代理人区域水果抽佣率【剔除特殊运营品类】", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="直营区域水果抽佣金额【剔除特殊运营品类】",
+            target_field="直营区域水果抽佣金额【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果抽佣金额【剔除特殊运营品类】",
+            target_field="代理人区域水果抽佣金额【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="直营区域水果送达金额【剔除特殊运营品类】",
+            target_field="直营区域水果送达金额【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果送达金额【剔除特殊运营品类】",
+            target_field="代理人区域水果送达金额【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="直营区域水果抽佣率【剔除特殊运营品类】",
+            target_field="直营区域水果抽佣率【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="代理人区域水果抽佣率【剔除特殊运营品类】",
+            target_field="代理人区域水果抽佣率【剔除特殊运营品类】",
+            lark_type=LarkFieldType.NUMBER,
+        ),
     ],
     cleanup_conditions=CleanupCondition.runtime_window(),
 )
@@ -277,17 +750,51 @@ TARGET_OKR_BD = LarkTargetConfig(
     ),
     table_name="BD维度统计",
     field_mappings=[
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
-        FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="网格运营类型", target_field="网格运营类型", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="bdid", target_field="bdid", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="bd姓名", target_field="bd姓名", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="下单店铺数", target_field="下单店铺数", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="送达金额", target_field="送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="送达重量", target_field="送达重量", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="剔除特殊运营品类送达金额", target_field="剔除特殊运营品类送达金额", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="剔除特殊运营品类升级售后总赔付金额", target_field="剔除特殊运营品类升级售后总赔付金额", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="网格运营类型",
+            target_field="网格运营类型",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="bdid", target_field="bdid", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="bd姓名", target_field="bd姓名", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="下单店铺数",
+            target_field="下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="送达金额",
+            target_field="送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="送达重量",
+            target_field="送达重量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="剔除特殊运营品类送达金额",
+            target_field="剔除特殊运营品类送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="剔除特殊运营品类升级售后总赔付金额",
+            target_field="剔除特殊运营品类升级售后总赔付金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
     ],
     cleanup_conditions=CleanupCondition.runtime_window(),
 )

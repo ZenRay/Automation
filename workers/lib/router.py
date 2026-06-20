@@ -33,9 +33,11 @@ logger = logging.getLogger("workers.lib.router")
 # 路由执行报告
 # --------------------------------------------------------------------------
 
+
 @dataclass
 class RouteResult:
     """单条路由的执行结果"""
+
     route_name: str
     source_ref: str
     source_shape: tuple
@@ -48,6 +50,7 @@ class RouteResult:
 @dataclass
 class RouteReport:
     """所有路由的执行结果汇总"""
+
     results: list[RouteResult] = field(default_factory=list)
 
     @property
@@ -74,6 +77,7 @@ class RouteReport:
 # 路由执行器
 # --------------------------------------------------------------------------
 
+
 class DataRouter:
     """数据路由执行器
 
@@ -95,7 +99,9 @@ class DataRouter:
         logger.info(report.summary)
     """
 
-    def __init__(self, lark_client, coercer, validator: Optional[SchemaValidator] = None):
+    def __init__(
+        self, lark_client, coercer, validator: Optional[SchemaValidator] = None
+    ):
         """
         Args:
             lark_client: LarkMultiDimTable 客户端实例
@@ -206,9 +212,7 @@ class DataRouter:
                         f"Route '{route.name}': transform[{i}] "
                         f"{before_shape} -> {df.shape}"
                     )
-                logger.info(
-                    f"Route '{route.name}': after all transforms {df.shape}"
-                )
+                logger.info(f"Route '{route.name}': after all transforms {df.shape}")
             else:
                 df = source_df
 
@@ -220,7 +224,10 @@ class DataRouter:
                 )
                 logger.info(validation_report.summary)
 
-                if validation_report.has_critical and route.validation_level == "strict":
+                if (
+                    validation_report.has_critical
+                    and route.validation_level == "strict"
+                ):
                     details = validation_report.format_details(min_level="CRITICAL")
                     error_msg = f"Validation failed (strict mode):\n{details}"
                     return RouteResult(
@@ -245,7 +252,8 @@ class DataRouter:
             #     自动填充 NaN 以避免 coercer 报错，确保独立路由仍能写入。
             if route.validation_level != "strict":
                 missing_cols = [
-                    m.source_col for m in route.target.field_mappings
+                    m.source_col
+                    for m in route.target.field_mappings
                     if m.source_col not in df.columns
                 ]
                 if missing_cols:
@@ -281,7 +289,7 @@ class DataRouter:
             return RouteResult(
                 route_name=route.name,
                 source_ref=route.source_ref,
-                source_shape=source_df.shape if 'source_df' in dir() else (0, 0),
+                source_shape=source_df.shape if "source_df" in dir() else (0, 0),
                 final_shape=(0, 0),
                 success=False,
                 error=str(e),
@@ -344,12 +352,20 @@ class DataRouter:
             # 字段类型统计
             type_counts: dict[str, int] = {}
             for m in route.target.field_mappings:
-                type_name = m.lark_type.name if hasattr(m.lark_type, 'name') else str(m.lark_type)
+                type_name = (
+                    m.lark_type.name
+                    if hasattr(m.lark_type, "name")
+                    else str(m.lark_type)
+                )
                 type_counts[type_name] = type_counts.get(type_name, 0) + 1
-            type_summary = ", ".join(f"{k} x{v}" for k, v in sorted(type_counts.items()))
-            lines.append(f"  Fields: {len(route.target.field_mappings)} mappings ({type_summary})")
+            type_summary = ", ".join(
+                f"{k} x{v}" for k, v in sorted(type_counts.items())
+            )
+            lines.append(
+                f"  Fields: {len(route.target.field_mappings)} mappings ({type_summary})"
+            )
 
             if route.target.cleanup_conditions:
-                lines.append(f"  Cleanup: enabled")
+                lines.append("  Cleanup: enabled")
 
         return "\n".join(lines)

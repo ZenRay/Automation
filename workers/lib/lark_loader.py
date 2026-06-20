@@ -19,8 +19,12 @@ from typing import Optional
 import pandas as pd
 
 from .models import (
-    LarkTargetConfig, FieldMapping, CleanupCondition, LarkFieldType,
-    FilterOperator, _to_lark_timestamp,
+    LarkTargetConfig,
+    FieldMapping,
+    CleanupCondition,
+    LarkFieldType,
+    FilterOperator,
+    _to_lark_timestamp,
 )
 
 logger = logging.getLogger("workers.lib.lark_loader")
@@ -32,13 +36,13 @@ DELETE_BATCH_SIZE = 500
 # 飞书索引字段支持的类型（第一个字段自动成为索引字段）
 # 参考: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table/create
 _INDEX_FIELD_TYPES = {
-    LarkFieldType.TEXT,       # 1
-    LarkFieldType.NUMBER,     # 2
-    LarkFieldType.DATE,       # 5
-    LarkFieldType.PHONE,      # 13
-    LarkFieldType.URL,        # 15
-    LarkFieldType.FORMULA,    # 20
-    LarkFieldType.LOCATION,   # 22
+    LarkFieldType.TEXT,  # 1
+    LarkFieldType.NUMBER,  # 2
+    LarkFieldType.DATE,  # 5
+    LarkFieldType.PHONE,  # 13
+    LarkFieldType.URL,  # 15
+    LarkFieldType.FORMULA,  # 20
+    LarkFieldType.LOCATION,  # 22
 }
 
 
@@ -101,8 +105,12 @@ def write_to_all_targets(
         logger.info(f"Writing to target: {target.name} ({target.url})")
         try:
             _write_single_target(
-                client, target, result_df, coercer,
-                validator=validator, validation_level=validation_level,
+                client,
+                target,
+                result_df,
+                coercer,
+                validator=validator,
+                validation_level=validation_level,
             )
             logger.info(f"Target '{target.name}' write completed successfully")
         except Exception as e:
@@ -194,7 +202,9 @@ def _write_single_target(
         records = coercer.apply_to_dataframe(result_df, target.field_mappings)
     else:
         # 假定 result_df 已经是 records 格式（list of {"fields": {...}}）
-        records = result_df if isinstance(result_df, list) else result_df.to_dict("records")
+        records = (
+            result_df if isinstance(result_df, list) else result_df.to_dict("records")
+        )
 
     # 4. 分批写入
     _write_records_batched(client, table_id, target.name, records)
@@ -260,9 +270,7 @@ def _do_cleanup(
             page_size=500,
         )
     else:
-        logger.info(
-            f"Cleaning up target '{target.name}': filter={filter_obj}"
-        )
+        logger.info(f"Cleaning up target '{target.name}': filter={filter_obj}")
         # Non-date-range condition: use POST search with filter
         records_gen = client.request_records_generator(
             table_id=table_id,
@@ -275,8 +283,12 @@ def _do_cleanup(
     for resp in records_gen:
         if resp.get("code", -1) != 0:
             msg = resp.get("msg", "Unknown error")
-            logger.error(f"Failed to fetch records for cleanup: [{resp.get('code')}] {msg}")
-            raise RuntimeError(f"Lark API error during cleanup fetch: [{resp.get('code')}] {msg}")
+            logger.error(
+                f"Failed to fetch records for cleanup: [{resp.get('code')}] {msg}"
+            )
+            raise RuntimeError(
+                f"Lark API error during cleanup fetch: [{resp.get('code')}] {msg}"
+            )
 
         items = resp.get("data", {}).get("items", [])
         if not items:
@@ -302,11 +314,13 @@ def _do_cleanup(
     # 批量删除
     deleted_count = 0
     for i in range(0, len(all_record_ids), DELETE_BATCH_SIZE):
-        batch = all_record_ids[i:i + DELETE_BATCH_SIZE]
+        batch = all_record_ids[i : i + DELETE_BATCH_SIZE]
         try:
             client.delete_batch_records(batch, table_id=table_id)
             deleted_count += len(batch)
-            logger.debug(f"Deleted batch {i // DELETE_BATCH_SIZE + 1}: {len(batch)} records")
+            logger.debug(
+                f"Deleted batch {i // DELETE_BATCH_SIZE + 1}: {len(batch)} records"
+            )
         except Exception as e:
             logger.error(f"Failed to delete batch {i // DELETE_BATCH_SIZE + 1}: {e}")
             raise
@@ -386,7 +400,7 @@ def _write_records_batched(
     failed_batches = []
 
     for i in range(0, total, WRITE_BATCH_SIZE):
-        batch = records[i:i + WRITE_BATCH_SIZE]
+        batch = records[i : i + WRITE_BATCH_SIZE]
         batch_num = i // WRITE_BATCH_SIZE + 1
         total_batches = (total + WRITE_BATCH_SIZE - 1) // WRITE_BATCH_SIZE
 
@@ -412,12 +426,13 @@ def _write_records_batched(
     # 汇总结果
     if failed_batches:
         error_summary = "; ".join(
-            f"batch {bn} ({cnt} records): {err}"
-            for bn, cnt, err in failed_batches
+            f"batch {bn} ({cnt} records): {err}" for bn, cnt, err in failed_batches
         )
         raise RuntimeError(
             f"Target '{target_name}': {len(failed_batches)} batch(es) failed. "
             f"Written: {success_count}/{total}. Errors: {error_summary}"
         )
 
-    logger.info(f"Target '{target_name}': all {success_count} records written successfully")
+    logger.info(
+        f"Target '{target_name}': all {success_count} records written successfully"
+    )

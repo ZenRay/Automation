@@ -29,6 +29,7 @@ logger = logging.getLogger("workers.lib.validator")
 # 校验结果数据模型
 # --------------------------------------------------------------------------
 
+
 @dataclass
 class ValidationIssue:
     """单条校验问题
@@ -39,6 +40,7 @@ class ValidationIssue:
         message: 问题描述
         sample:  问题值样例（可选，便于调试）
     """
+
     level: str
     field: str
     message: str
@@ -54,6 +56,7 @@ class ValidationReport:
         issues:      校验问题列表
         total_rows:  校验的 DataFrame 总行数
     """
+
     target_name: str
     issues: list[ValidationIssue] = field(default_factory=list)
     total_rows: int = 0
@@ -87,14 +90,19 @@ class ValidationReport:
             return ""
         lines = []
         for issue in filtered:
-            sample_str = f" (sample: {issue.sample!r})" if issue.sample is not None else ""
-            lines.append(f"  [{issue.level}] {issue.field}: {issue.message}{sample_str}")
+            sample_str = (
+                f" (sample: {issue.sample!r})" if issue.sample is not None else ""
+            )
+            lines.append(
+                f"  [{issue.level}] {issue.field}: {issue.message}{sample_str}"
+            )
         return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------
 # 校验器
 # --------------------------------------------------------------------------
+
 
 class SchemaValidator:
     """写入前数据校验器
@@ -176,14 +184,16 @@ class SchemaValidator:
         issues = []
         missing = [m for m in field_mappings if m.source_col not in df.columns]
         for m in missing:
-            issues.append(ValidationIssue(
-                level="CRITICAL",
-                field=m.source_col,
-                message=(
-                    f"Column '{m.source_col}' not found in DataFrame. "
-                    f"Available columns: {list(df.columns)}"
-                ),
-            ))
+            issues.append(
+                ValidationIssue(
+                    level="CRITICAL",
+                    field=m.source_col,
+                    message=(
+                        f"Column '{m.source_col}' not found in DataFrame. "
+                        f"Available columns: {list(df.columns)}"
+                    ),
+                )
+            )
         if missing:
             logger.error(
                 f"Missing columns: {[m.source_col for m in missing]}. "
@@ -211,11 +221,13 @@ class SchemaValidator:
             col = df[m.source_col]
             non_null = col.dropna()
             if non_null.empty:
-                issues.append(ValidationIssue(
-                    level="WARNING",
-                    field=m.source_col,
-                    message="Date column is entirely null/NaN",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        level="WARNING",
+                        field=m.source_col,
+                        message="Date column is entirely null/NaN",
+                    )
+                )
                 continue
 
             # 检查 dtype 分布
@@ -241,20 +253,24 @@ class SchemaValidator:
                     unparseable.append(val)
 
             # INFO: 记录格式分布
-            issues.append(ValidationIssue(
-                level="INFO",
-                field=m.source_col,
-                message=f"Date column dtype kinds: {dtype_kinds}",
-            ))
+            issues.append(
+                ValidationIssue(
+                    level="INFO",
+                    field=m.source_col,
+                    message=f"Date column dtype kinds: {dtype_kinds}",
+                )
+            )
 
             # CRITICAL: 存在无法解析的值
             if unparseable:
-                issues.append(ValidationIssue(
-                    level="CRITICAL",
-                    field=m.source_col,
-                    message=f"Found {len(unparseable)} unparseable date value(s) in sample",
-                    sample=unparseable[0],
-                ))
+                issues.append(
+                    ValidationIssue(
+                        level="CRITICAL",
+                        field=m.source_col,
+                        message=f"Found {len(unparseable)} unparseable date value(s) in sample",
+                        sample=unparseable[0],
+                    )
+                )
 
         return issues
 
@@ -281,40 +297,48 @@ class SchemaValidator:
                 non_null_converted = converted.dropna()
                 lost = len(non_null_original) - len(non_null_converted)
                 if lost > 0:
-                    issues.append(ValidationIssue(
-                        level="WARNING",
-                        field=m.source_col,
-                        message=(
-                            f"Column dtype is '{col.dtype}' (not numeric). "
-                            f"{lost} non-null values cannot be converted to number."
-                        ),
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            level="WARNING",
+                            field=m.source_col,
+                            message=(
+                                f"Column dtype is '{col.dtype}' (not numeric). "
+                                f"{lost} non-null values cannot be converted to number."
+                            ),
+                        )
+                    )
 
             # 检查 NaN 比例
             if len(col) > 0:
                 nan_ratio = col.isna().sum() / len(col)
                 if nan_ratio > self.NAN_RATIO_THRESHOLD:
-                    issues.append(ValidationIssue(
-                        level="WARNING",
-                        field=m.source_col,
-                        message=f"NaN ratio is {nan_ratio:.1%} (threshold: {self.NAN_RATIO_THRESHOLD:.0%})",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            level="WARNING",
+                            field=m.source_col,
+                            message=f"NaN ratio is {nan_ratio:.1%} (threshold: {self.NAN_RATIO_THRESHOLD:.0%})",
+                        )
+                    )
 
             # PERCENT 字段值域检查
-            if m.lark_type == LarkFieldType.PERCENT and pd.api.types.is_numeric_dtype(col):
+            if m.lark_type == LarkFieldType.PERCENT and pd.api.types.is_numeric_dtype(
+                col
+            ):
                 non_null = col.dropna()
                 if not non_null.empty:
                     out_of_range = non_null[(non_null < 0) | (non_null > 1)]
                     if len(out_of_range) > 0:
-                        issues.append(ValidationIssue(
-                            level="WARNING",
-                            field=m.source_col,
-                            message=(
-                                f"PERCENT field has {len(out_of_range)} values outside [0, 1]. "
-                                f"Lark progress fields require 0-1 range."
-                            ),
-                            sample=out_of_range.iloc[0],
-                        ))
+                        issues.append(
+                            ValidationIssue(
+                                level="WARNING",
+                                field=m.source_col,
+                                message=(
+                                    f"PERCENT field has {len(out_of_range)} values outside [0, 1]. "
+                                    f"Lark progress fields require 0-1 range."
+                                ),
+                                sample=out_of_range.iloc[0],
+                            )
+                        )
 
         return issues
 
@@ -340,11 +364,13 @@ class SchemaValidator:
             max_len = str_lengths.max()
             mean_len = str_lengths.mean()
 
-            issues.append(ValidationIssue(
-                level="INFO",
-                field=m.source_col,
-                message=f"Text column length: max={max_len}, mean={mean_len:.1f}, rows={len(non_null)}",
-            ))
+            issues.append(
+                ValidationIssue(
+                    level="INFO",
+                    field=m.source_col,
+                    message=f"Text column length: max={max_len}, mean={mean_len:.1f}, rows={len(non_null)}",
+                )
+            )
 
         return issues
 
@@ -366,7 +392,22 @@ class SchemaValidator:
                 continue
 
             # 检查值域是否合法
-            valid_values = {True, False, 0, 1, "true", "false", "True", "False", "1", "0", "yes", "no", "是", "否"}
+            valid_values = {
+                True,
+                False,
+                0,
+                1,
+                "true",
+                "false",
+                "True",
+                "False",
+                "1",
+                "0",
+                "yes",
+                "no",
+                "是",
+                "否",
+            }
             invalid = []
             sample_size = min(50, len(non_null))
             for val in non_null.head(sample_size):
@@ -374,12 +415,14 @@ class SchemaValidator:
                     invalid.append(val)
 
             if invalid:
-                issues.append(ValidationIssue(
-                    level="WARNING",
-                    field=m.source_col,
-                    message=f"Found {len(invalid)} values not in expected checkbox domain",
-                    sample=invalid[0],
-                ))
+                issues.append(
+                    ValidationIssue(
+                        level="WARNING",
+                        field=m.source_col,
+                        message=f"Found {len(invalid)} values not in expected checkbox domain",
+                        sample=invalid[0],
+                    )
+                )
 
         return issues
 
@@ -404,13 +447,15 @@ class SchemaValidator:
             unique_vals = non_null.unique()
             # 限制记录的唯一值数量，避免日志过长
             display_vals = unique_vals[:20]
-            issues.append(ValidationIssue(
-                level="INFO",
-                field=m.source_col,
-                message=(
-                    f"Select column has {len(unique_vals)} unique values. "
-                    f"Sample: {list(display_vals)}"
-                ),
-            ))
+            issues.append(
+                ValidationIssue(
+                    level="INFO",
+                    field=m.source_col,
+                    message=(
+                        f"Select column has {len(unique_vals)} unique values. "
+                        f"Sample: {list(display_vals)}"
+                    ),
+                )
+            )
 
         return issues

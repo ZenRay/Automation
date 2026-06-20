@@ -24,8 +24,7 @@ logger = logging.getLogger("workers.lib.lark_extractor")
 
 
 def extract_all_lark_sources(
-    client,
-    sources: list[LarkSourceConfig]
+    client, sources: list[LarkSourceConfig]
 ) -> dict[str, pd.DataFrame]:
     """批量拉取多个飞书多维表格数据源
 
@@ -50,10 +49,7 @@ def extract_all_lark_sources(
     return result
 
 
-def extract_single_source(
-    client,
-    source: LarkSourceConfig
-) -> pd.DataFrame:
+def extract_single_source(client, source: LarkSourceConfig) -> pd.DataFrame:
     """拉取单个飞书多维表格数据源
 
     步骤：
@@ -206,7 +202,9 @@ def _records_to_dataframe(
         rows.append(row)
 
     df = pd.DataFrame(rows)
-    logger.info(f"Converted {len(records)} records to DataFrame with {len(df.columns)} columns")
+    logger.info(
+        f"Converted {len(records)} records to DataFrame with {len(df.columns)} columns"
+    )
     return df
 
 
@@ -232,7 +230,11 @@ def _normalize_field_value(value, field_type: Optional[LarkFieldType] = None):
     # ── 基于 field_type 精确分发 ──────────────────────────────────
     if field_type is not None:
         # 日期类字段（DATE / CREATED_TIME / MODIFIED_TIME）→ datetime
-        if field_type in (LarkFieldType.DATE, LarkFieldType.CREATED_TIME, LarkFieldType.MODIFIED_TIME):
+        if field_type in (
+            LarkFieldType.DATE,
+            LarkFieldType.CREATED_TIME,
+            LarkFieldType.MODIFIED_TIME,
+        ):
             if isinstance(value, (int, float)):
                 try:
                     return pd.Timestamp(value, unit="ms")
@@ -250,7 +252,11 @@ def _normalize_field_value(value, field_type: Optional[LarkFieldType] = None):
                 return [item.get("text") for item in value if isinstance(item, dict)]
 
         # 人员/创建人/修改人 → 提取 id 列表
-        elif field_type in (LarkFieldType.PERSON, LarkFieldType.CREATED_USER, LarkFieldType.MODIFIED_USER):
+        elif field_type in (
+            LarkFieldType.PERSON,
+            LarkFieldType.CREATED_USER,
+            LarkFieldType.MODIFIED_USER,
+        ):
             if isinstance(value, list):
                 return [item.get("id") for item in value if isinstance(item, dict)]
 
@@ -280,11 +286,21 @@ def _normalize_field_value(value, field_type: Optional[LarkFieldType] = None):
         return value.get("text")
 
     # 多选字段 [{"text": "..."}, ...]
-    if isinstance(value, list) and value and isinstance(value[0], dict) and "text" in value[0]:
+    if (
+        isinstance(value, list)
+        and value
+        and isinstance(value[0], dict)
+        and "text" in value[0]
+    ):
         return [item.get("text") for item in value]
 
     # 人员字段 [{"id": "...", "name": "..."}]
-    if isinstance(value, list) and value and isinstance(value[0], dict) and "id" in value[0]:
+    if (
+        isinstance(value, list)
+        and value
+        and isinstance(value[0], dict)
+        and "id" in value[0]
+    ):
         return [item.get("id") for item in value]
 
     return value
@@ -380,15 +396,19 @@ def _apply_date_filter(
         if isinstance(end_date, datetime):
             end_dt = end_date
         else:
-            end_dt = datetime.combine(end_date, datetime.max.time().replace(microsecond=0))
+            end_dt = datetime.combine(
+                end_date, datetime.max.time().replace(microsecond=0)
+            )
         mask = mask & (date_col <= end_dt)
-        end_str = end_dt.strftime('%Y-%m-%d')
+        end_str = end_dt.strftime("%Y-%m-%d")
     else:
         end_str = "(no upper limit)"
 
     filtered = df[mask].copy()
 
-    cutoff_str = cutoff.strftime('%Y-%m-%d') if cutoff is not None else "(no lower limit)"
+    cutoff_str = (
+        cutoff.strftime("%Y-%m-%d") if cutoff is not None else "(no lower limit)"
+    )
     logger.info(
         f"Date filter on '{date_field}': kept {len(filtered)}/{original_len} rows "
         f"(cutoff={cutoff_str}, end={end_str}, "

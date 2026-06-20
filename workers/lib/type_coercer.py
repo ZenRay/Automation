@@ -74,7 +74,9 @@ class FieldTypeCoercer:
                 return self._coerce_url(value)
             else:
                 # 未知类型原样传递，避免数据丢失
-                logger.debug(f"Unknown lark_type={lark_type}, passing value as-is: {value!r}")
+                logger.debug(
+                    f"Unknown lark_type={lark_type}, passing value as-is: {value!r}"
+                )
                 return value
         except Exception as e:
             logger.warning(
@@ -110,10 +112,7 @@ class FieldTypeCoercer:
         """
         if isinstance(value, list):
             # 已经是列表格式，确保每个元素都是 {"text": ...}
-            return [
-                {"text": str(v)} if not isinstance(v, dict) else v
-                for v in value
-            ]
+            return [{"text": str(v)} if not isinstance(v, dict) else v for v in value]
         text = str(value)
         # 按逗号分割
         return [{"text": v.strip()} for v in text.split(",") if v.strip()]
@@ -224,16 +223,16 @@ class FieldTypeCoercer:
                 pass
             raise ValueError(f"Cannot parse date string: {value!r}")
 
-        raise TypeError(f"Unsupported type for date conversion: {type(value).__name__}, value={value!r}")
+        raise TypeError(
+            f"Unsupported type for date conversion: {type(value).__name__}, value={value!r}"
+        )
 
     # ------------------------------------------------------------------
     # DataFrame 批量转换
     # ------------------------------------------------------------------
 
     def apply_to_dataframe(
-        self,
-        df: pd.DataFrame,
-        field_mappings: list[FieldMapping]
+        self, df: pd.DataFrame, field_mappings: list[FieldMapping]
     ) -> list[dict]:
         """将整个 DataFrame 按 field_mappings 转换为飞书 batch_create 所需的 records 列表
 
@@ -249,9 +248,13 @@ class FieldTypeCoercer:
             KeyError: 当 DataFrame 中缺少 field_mapping 指定的 source_col
         """
         records = []
-        missing_cols = [m.source_col for m in field_mappings if m.source_col not in df.columns]
+        missing_cols = [
+            m.source_col for m in field_mappings if m.source_col not in df.columns
+        ]
         if missing_cols:
-            logger.error(f"DataFrame missing columns: {missing_cols}. Available: {list(df.columns)}")
+            logger.error(
+                f"DataFrame missing columns: {missing_cols}. Available: {list(df.columns)}"
+            )
             raise KeyError(f"DataFrame missing required columns: {missing_cols}")
 
         for row_idx, row in df.iterrows():

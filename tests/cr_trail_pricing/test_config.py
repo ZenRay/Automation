@@ -44,12 +44,12 @@ class TestLarkSources:
 
     def test_all_urls_have_table_param(self):
         for src in LARK_SOURCES:
-            assert "table=" in src.url, (
-                f"{src.name}: URL missing table= parameter"
-            )
+            assert "table=" in src.url, f"{src.name}: URL missing table= parameter"
 
     def test_known_table_ids(self):
-        table_ids = {s.name: s.url.split("table=")[1].split("&")[0] for s in LARK_SOURCES}
+        table_ids = {
+            s.name: s.url.split("table=")[1].split("&")[0] for s in LARK_SOURCES
+        }
         assert table_ids["conf_county"] == "tblBgJYpBRT18Uvp"
         assert table_ids["conf_goods"] == "tblevDYqsTdwu8fo"
 
@@ -57,7 +57,10 @@ class TestLarkSources:
         """conf_county, conf_goods, conf_trial_goods, conf_hidden_logistics use API-level date filter"""
         date_filtered = {s.name: s for s in LARK_SOURCES if s.date_filter_field}
         assert set(date_filtered.keys()) == {
-            "conf_county", "conf_goods", "conf_trial_goods", "conf_hidden_logistics",
+            "conf_county",
+            "conf_goods",
+            "conf_trial_goods",
+            "conf_hidden_logistics",
         }
         for name, src in date_filtered.items():
             assert src.date_filter_field == "日期", f"{name}: wrong date_filter_field"
@@ -67,7 +70,8 @@ class TestLarkSources:
         """conf_trial_group, conf_trial_commission have no API date filter (pandas range filter)"""
         unfiltered = {s.name: s for s in LARK_SOURCES if not s.date_filter_field}
         assert set(unfiltered.keys()) == {
-            "conf_trial_group", "conf_trial_commission",
+            "conf_trial_group",
+            "conf_trial_commission",
         }
 
     def test_date_range_sources_have_date_fields(self):
@@ -75,9 +79,9 @@ class TestLarkSources:
         range_sources = {"conf_trial_group", "conf_trial_commission"}
         for src in LARK_SOURCES:
             if src.name in range_sources:
-                assert len(src.date_fields) >= 2, (
-                    f"{src.name}: range-filtered source should have >= 2 date_fields"
-                )
+                assert (
+                    len(src.date_fields) >= 2
+                ), f"{src.name}: range-filtered source should have >= 2 date_fields"
 
     def test_conf_county_fields_include_city_id(self):
         county = next(s for s in LARK_SOURCES if s.name == "conf_county")
@@ -85,19 +89,34 @@ class TestLarkSources:
 
     def test_conf_goods_fields(self):
         goods = next(s for s in LARK_SOURCES if s.name == "conf_goods")
-        for field in ["日期", "商品id", "商品编码", "商品名称", "后台类目名称", "非试验区域抽佣率", "毛重"]:
+        for field in [
+            "日期",
+            "商品id",
+            "商品编码",
+            "商品名称",
+            "后台类目名称",
+            "非试验区域抽佣率",
+            "毛重",
+        ]:
             assert field in goods.field_names, f"conf_goods missing field: {field}"
 
     def test_conf_hidden_logistics_fields(self):
         logistics = next(s for s in LARK_SOURCES if s.name == "conf_hidden_logistics")
         for field in ["日期", "市id", "费率", "区县费率映射"]:
-            assert field in logistics.field_names, f"conf_hidden_logistics missing field: {field}"
+            assert (
+                field in logistics.field_names
+            ), f"conf_hidden_logistics missing field: {field}"
 
 
 class TestProductKeepFields:
     EXPECTED = [
-        "商品id", "商品编码", "商品名称", "后台类目名称",
-        "非试验区域抽佣率", "毛重", "是否试验区域",
+        "商品id",
+        "商品编码",
+        "商品名称",
+        "后台类目名称",
+        "非试验区域抽佣率",
+        "毛重",
+        "是否试验区域",
     ]
 
     def test_exact_fields(self):
@@ -109,8 +128,16 @@ class TestProductKeepFields:
 
 class TestRegionOutputFields:
     EXPECTED = [
-        "日期", "试验区域id", "试验区域名称", "市id", "省id", "区县id",
-        "是否试验区域", "试验分组", "运营类型", "抽佣率",
+        "日期",
+        "试验区域id",
+        "试验区域名称",
+        "市id",
+        "省id",
+        "区县id",
+        "是否试验区域",
+        "试验分组",
+        "运营类型",
+        "抽佣率",
     ]
 
     def test_exact_fields(self):
@@ -136,11 +163,17 @@ class TestColumnRenameMap:
 
 class TestOutputColumns:
     EXPECTED = [
-        "区域id", "区域名称",
-        "商品SKU", "商品名称",
-        "调价方向", "调价幅度", "设置状态",
-        "固定抽佣比例", "固定抽佣货值",
-        "商品id", "后台类目名称",
+        "区域id",
+        "区域名称",
+        "商品SKU",
+        "商品名称",
+        "调价方向",
+        "调价幅度",
+        "设置状态",
+        "固定抽佣比例",
+        "固定抽佣货值",
+        "商品id",
+        "后台类目名称",
     ]
 
     def test_exact_order(self):

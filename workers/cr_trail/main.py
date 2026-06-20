@@ -55,7 +55,9 @@ def _init_lark_client() -> LarkMultiDimTable:
     app_secret = lark_conf.get("prod", "APP_SECRET")
     lark_host = lark_conf.get("prod", "LARK_HOST", fallback="https://open.feishu.cn")
 
-    logger.info(f"Initializing LarkMultiDimTable client (app_id={app_id}, host={lark_host})")
+    logger.info(
+        f"Initializing LarkMultiDimTable client (app_id={app_id}, host={lark_host})"
+    )
     return LarkMultiDimTable(
         app_id=app_id,
         app_secret=app_secret,
@@ -107,20 +109,32 @@ def _apply_date_scoped_cleanup(
             "Falling back to no cleanup."
         )
         return [
-            dataclasses.replace(r, target=dataclasses.replace(r.target, cleanup_conditions=None))
-            if r.target.cleanup_conditions and r.target.cleanup_conditions.is_runtime
-            else r
+            (
+                dataclasses.replace(
+                    r, target=dataclasses.replace(r.target, cleanup_conditions=None)
+                )
+                if r.target.cleanup_conditions
+                and r.target.cleanup_conditions.is_runtime
+                else r
+            )
             for r in routes
         ]
 
     # 提取日期范围：兼容 datetime64、date、str 多种格式
     dates = pd.to_datetime(result_df[date_col], errors="coerce").dropna()
     if dates.empty:
-        logger.warning(f"No valid dates found in '{date_col}', falling back to no cleanup")
+        logger.warning(
+            f"No valid dates found in '{date_col}', falling back to no cleanup"
+        )
         return [
-            dataclasses.replace(r, target=dataclasses.replace(r.target, cleanup_conditions=None))
-            if r.target.cleanup_conditions and r.target.cleanup_conditions.is_runtime
-            else r
+            (
+                dataclasses.replace(
+                    r, target=dataclasses.replace(r.target, cleanup_conditions=None)
+                )
+                if r.target.cleanup_conditions
+                and r.target.cleanup_conditions.is_runtime
+                else r
+            )
             for r in routes
         ]
 
@@ -133,10 +147,15 @@ def _apply_date_scoped_cleanup(
 
     result = []
     for route in routes:
-        if route.target.cleanup_conditions and route.target.cleanup_conditions.is_runtime:
+        if (
+            route.target.cleanup_conditions
+            and route.target.cleanup_conditions.is_runtime
+        ):
             # 替换 runtime_window 哨兵为精确日期窗口
             new_cleanup = CleanupCondition.date_window(date_col, min_date, max_date)
-            new_target = dataclasses.replace(route.target, cleanup_conditions=new_cleanup)
+            new_target = dataclasses.replace(
+                route.target, cleanup_conditions=new_cleanup
+            )
             result.append(dataclasses.replace(route, target=new_target))
         else:
             result.append(route)
@@ -178,12 +197,16 @@ def run_cr_trail_pipeline() -> int:
         # 使用空 DateRangeParams 生成默认 sql_params，SQL 中 MAX_PT 不依赖日期参数
         default_params = DateRangeParams().sql_params()
         mc_data: dict[str, pd.DataFrame] = execute_all_queries(
-            mc_client, SQL_QUERIES, SQL_BASE_DIR,
+            mc_client,
+            SQL_QUERIES,
+            SQL_BASE_DIR,
             hints=MC_HINTS,
             params=default_params,
         )
         for name, df in mc_data.items():
-            logger.info(f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns")
+            logger.info(
+                f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns"
+            )
     except Exception as e:
         logger.error(f"[Step 2/5] SQL execution failed: {e}")
         return 1
@@ -223,14 +246,12 @@ def run_cr_trail_pipeline() -> int:
                 else:
                     source_df = pd.DataFrame()
                 # 仅对该路由的源数据计算日期窗口
-                effective_routes.extend(
-                    _apply_date_scoped_cleanup([route], source_df)
-                )
+                effective_routes.extend(_apply_date_scoped_cleanup([route], source_df))
             router = DataRouter(lark_client, coercer, validator=SchemaValidator())
             logger.info(router.describe_routes(effective_routes))
             report = router.route(
                 effective_routes,
-                lark_data={},       # 无飞书源
+                lark_data={},  # 无飞书源
                 mc_data=mc_data,
                 result_df=None,
             )
@@ -238,9 +259,12 @@ def run_cr_trail_pipeline() -> int:
         else:
             # 回退模式：直接写入 LARK_TARGETS
             from workers.lib import write_to_all_targets
+
             first_name = SQL_QUERIES[0].name
             logger.info(f"[Step 4/5] Writing to {len(LARK_TARGETS)} target table(s)...")
-            write_to_all_targets(lark_client, mc_data[first_name], LARK_TARGETS, coercer=coercer)
+            write_to_all_targets(
+                lark_client, mc_data[first_name], LARK_TARGETS, coercer=coercer
+            )
     except Exception as e:
         logger.error(f"[Step 4/5] Target write had failures: {e}")
         routes_had_failure = True
@@ -276,7 +300,7 @@ def main():
         python -m workers.cr_trail.main
     """
     parser = argparse.ArgumentParser(description="CR试验 商品配置 ETL 管道")
-    args = parser.parse_args()
+    parser.parse_args()  # parse but ignore args; pipeline uses config.py
     sys.exit(run_cr_trail_pipeline())
 
 

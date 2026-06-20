@@ -20,8 +20,12 @@ lib 层不引用本文件，保证 lib 的通用性。
 from pathlib import Path
 
 from workers.lib import (
-    SQLQueryConfig, FieldMapping, LarkTargetConfig, LarkFieldType,
-    CleanupCondition, DataRoute,
+    SQLQueryConfig,
+    FieldMapping,
+    LarkTargetConfig,
+    LarkFieldType,
+    CleanupCondition,
+    DataRoute,
 )
 
 # --------------------------------------------------------------------------
@@ -65,38 +69,110 @@ TARGET_CR_GOODS = LarkTargetConfig(
     table_name="conf_商品信息",
     field_mappings=[
         # -- 基础维度 --
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
-        FieldMapping(source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商品id", target_field="商品id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商品编码", target_field="商品编码", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="商品名称", target_field="商品名称", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商品id", target_field="商品id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商品编码", target_field="商品编码", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="商品名称", target_field="商品名称", lark_type=LarkFieldType.TEXT
+        ),
         # -- 商品扩展信息（来自 dim_goods_extra_info_daily_full）--
-        FieldMapping(source_col="商品等级", target_field="商品等级", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="产地", target_field="产地", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="包装类型", target_field="包装类型", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="单果大小", target_field="单果大小", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="色号", target_field="色号", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="商品头数", target_field="商品头数", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="商品等级", target_field="商品等级", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="产地", target_field="产地", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="包装类型", target_field="包装类型", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="单果大小", target_field="单果大小", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="色号", target_field="色号", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="商品头数", target_field="商品头数", lark_type=LarkFieldType.TEXT
+        ),
         # -- 商家信息 --
-        FieldMapping(source_col="商家id", target_field="商家id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="商家名称", target_field="商家名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="商家类型", target_field="商家类型", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="商家id", target_field="商家id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商家名称", target_field="商家名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="商家类型", target_field="商家类型", lark_type=LarkFieldType.TEXT
+        ),
         # -- 类目信息 --
-        FieldMapping(source_col="后台类目id", target_field="后台类目id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="后台类目名称", target_field="后台类目名称", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="后台类目id",
+            target_field="后台类目id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="后台类目名称",
+            target_field="后台类目名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
         # -- 重量 --
-        FieldMapping(source_col="净重", target_field="净重", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="毛重", target_field="毛重", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="净重", target_field="净重", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="毛重", target_field="毛重", lark_type=LarkFieldType.NUMBER
+        ),
         # -- 非试验区域定价 --
-        FieldMapping(source_col="非试验区域平台销售斤单价", target_field="非试验区域平台销售斤单价", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非试验区域平台销售件单价", target_field="非试验区域平台销售件单价", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非试验区域抽佣率", target_field="非试验区域抽佣率", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非试验区域商家供货斤单价", target_field="非试验区域商家供货斤单价", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="非试验区域商家供货件单价", target_field="非试验区域商家供货件单价", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="非试验区域平台销售斤单价",
+            target_field="非试验区域平台销售斤单价",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非试验区域平台销售件单价",
+            target_field="非试验区域平台销售件单价",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非试验区域抽佣率",
+            target_field="非试验区域抽佣率",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非试验区域商家供货斤单价",
+            target_field="非试验区域商家供货斤单价",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="非试验区域商家供货件单价",
+            target_field="非试验区域商家供货件单价",
+            lark_type=LarkFieldType.NUMBER,
+        ),
         # -- 标记字段 --
-        FieldMapping(source_col="是否当日上架", target_field="是否当日上架", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="是否试验周期", target_field="是否试验周期", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="是否试验商品", target_field="是否试验商品", lark_type=LarkFieldType.NUMBER),
+        FieldMapping(
+            source_col="是否当日上架",
+            target_field="是否当日上架",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="是否试验周期",
+            target_field="是否试验周期",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="是否试验商品",
+            target_field="是否试验商品",
+            lark_type=LarkFieldType.NUMBER,
+        ),
     ],
     # 日期作用域清理：运行时由 main.py 根据 SQL 结果的实际日期动态生成清理窗口
     # 重跑时仅删除并替换对应日期的旧数据，不影响其他历史日期
@@ -112,31 +188,89 @@ TARGET_CR_AREA = LarkTargetConfig(
     table_name="conf_区县信息",
     field_mappings=[
         # -- 基础维度 --
-        FieldMapping(source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE),
-        FieldMapping(source_col="试验区域id", target_field="试验区域id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试验区域名称", target_field="试验区域名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="修正区域名称", target_field="修正区域名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="区域别名", target_field="区域别名", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="试验区域id",
+            target_field="试验区域id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试验区域名称",
+            target_field="试验区域名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="修正区域名称",
+            target_field="修正区域名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="区域别名", target_field="区域别名", lark_type=LarkFieldType.TEXT
+        ),
         # -- 行政层级：地址 → 街道 → 区县 → 市 → 省 --
-        FieldMapping(source_col="地址id", target_field="地址id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="地址名称", target_field="地址名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="街道id", target_field="街道id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="街道名称", target_field="街道名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="区县id", target_field="区县id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="区县名称", target_field="区县名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="市id", target_field="市id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="市名称", target_field="市名称", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="省id", target_field="省id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="省名称", target_field="省名称", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="地址id", target_field="地址id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="地址名称", target_field="地址名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="街道id", target_field="街道id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="街道名称", target_field="街道名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="区县id", target_field="区县id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="区县名称", target_field="区县名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="市id", target_field="市id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="市名称", target_field="市名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="省id", target_field="省id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="省名称", target_field="省名称", lark_type=LarkFieldType.TEXT
+        ),
         # -- 地理坐标 --
-        FieldMapping(source_col="经度", target_field="经度", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="纬度", target_field="纬度", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="经度", target_field="经度", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="纬度", target_field="纬度", lark_type=LarkFieldType.TEXT
+        ),
         # -- 区域属性 --
-        FieldMapping(source_col="父级区域id", target_field="父级区域id", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="是否有效", target_field="是否有效", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="区域等级", target_field="区域等级", lark_type=LarkFieldType.NUMBER),
-        FieldMapping(source_col="试验区域类型", target_field="试验区域类型", lark_type=LarkFieldType.TEXT),
-        FieldMapping(source_col="运营类型", target_field="运营类型", lark_type=LarkFieldType.TEXT),
+        FieldMapping(
+            source_col="父级区域id",
+            target_field="父级区域id",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="是否有效",
+            target_field="是否有效",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="区域等级",
+            target_field="区域等级",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="试验区域类型",
+            target_field="试验区域类型",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="运营类型", target_field="运营类型", lark_type=LarkFieldType.TEXT
+        ),
     ],
     # 日期作用域清理：与 conf_goods 一致，运行时根据 SQL 结果的实际日期动态生成清理窗口
     cleanup_conditions=CleanupCondition.runtime_window(),
