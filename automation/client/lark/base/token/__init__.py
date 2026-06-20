@@ -1,5 +1,6 @@
-#coding:utf8
+# coding:utf8
 """Lark Client Base Class"""
+
 import logging
 
 from datetime import datetime
@@ -13,10 +14,13 @@ logger = logging.getLogger("automation.lark.base.token")
 
 class AccessToken:
     """Lark Access Token"""
-    def __init__(self, 
-                 tenant_access_token: Optional[str] = None, 
-                 app_access_token: Optional[str] = None, 
-                 expire_time: Optional[datetime] = None):
+
+    def __init__(
+        self,
+        tenant_access_token: Optional[str] = None,
+        app_access_token: Optional[str] = None,
+        expire_time: Optional[datetime] = None,
+    ):
         """Access Token Information
 
         Args:
@@ -32,19 +36,14 @@ class AccessToken:
     def is_valid(self) -> bool:
         """Check Token Validate"""
         has_tokens = (
-            self.app_access_token is not None and 
-            self.tenant_access_token is not None
+            self.app_access_token is not None and self.tenant_access_token is not None
         )
 
         is_not_expired = (
-            self.expire_time is not None and 
-            datetime.now() < self.expire_time
+            self.expire_time is not None and datetime.now() < self.expire_time
         )
 
         return has_tokens and is_not_expired
-
-
-
 
 
 # User Access Token

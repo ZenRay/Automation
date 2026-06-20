@@ -1,4 +1,4 @@
-#coding:utf-8
+# coding:utf-8
 """Airflow Hook
 * MaxComputeHook, Maxcompute hook
 """
@@ -13,16 +13,20 @@ from airflow.models import Connection
 from airflow.hooks.base import BaseHook
 from airflow.exceptions import AirflowNotFoundException
 
-from  automation.client import (
-    MaxComputerClient, LarkIM, LarkSheets, LarkMultiDimTable, LarkAPaaSClient
+from automation.client import (
+    MaxComputerClient,
+    LarkIM,
+    LarkSheets,
+    LarkMultiDimTable,
+    LarkAPaaSClient,
 )
 
 
 from automation.client.lark.utils import (
-    parse_column2index, parse_index2column, parse_sheet_cell
+    parse_column2index,
+    parse_index2column,
+    parse_sheet_cell,
 )
-
-
 
 logger = logging.getLogger("dispatcher.hooks")
 
@@ -30,14 +34,15 @@ logger = logging.getLogger("dispatcher.hooks")
 class MaxcomputeHook(BaseHook):
     """
     MaxCompute Hook
-    
+
     Provides a Hook to MaxCompute and methods to execute SQL statements.
     """
+
     _client = None
-    
-    def __init__(self, conn_id: str = 'maxcompute_dev'):
+
+    def __init__(self, conn_id: str = "maxcompute_dev"):
         """Init MaxCompute Hook
-        
+
         Args:
             conn_id: Airflow connection ID for MaxCompute
         """
@@ -45,10 +50,9 @@ class MaxcomputeHook(BaseHook):
         self.conn_id = conn_id
         self.connection = self._get_connection()
 
-
     def _get_connection(self) -> Connection:
         """Get Airflow Connection
-        
+
         Returns:
             Connection object
         """
@@ -57,93 +61,94 @@ class MaxcomputeHook(BaseHook):
             return Connection.get_connection_from_secrets(self.conn_id)
         except AirflowNotFoundException:
             return self.get_connection(self.conn_id)
-    
 
     def get_client(self) -> MaxComputerClient:
         """Get a new MaxComputerClient instance
-        
+
         Returns:
             MaxComputerClient instance
         """
         # Support both possible key names stored in Connection.extra
         secret = (
-            self.connection.extra_dejson.get('access_key_secret')
-            or self.connection.extra_dejson.get('secret_access_key')
+            self.connection.extra_dejson.get("access_key_secret")
+            or self.connection.extra_dejson.get("secret_access_key")
             or self.connection.password
         )
 
         return MaxComputerClient(
-            endpoint=self.connection.extra_dejson.get('endpoint'),
-            access_id=self.connection.extra_dejson.get('access_id', self.connection.login),
+            endpoint=self.connection.extra_dejson.get("endpoint"),
+            access_id=self.connection.extra_dejson.get(
+                "access_id", self.connection.login
+            ),
             secret_access_key=secret,
-            project=self.connection.extra_dejson.get('project', self.connection.schema)
+            project=self.connection.extra_dejson.get("project", self.connection.schema),
         )
-        
+
     @property
     def client(self) -> MaxComputerClient:
         """Get MaxComputerClient instance (always returns a new instance)
-        
+
         Returns:
             MaxComputerClient instance
         """
         return self.get_client()
-    
 
-    def execute_sql(self, sql: str, *, hints: dict, file: str=None) -> None:
+    def execute_sql(self, sql: str, *, hints: dict, file: str = None) -> None:
         """Execute SQL statement on MaxCompute
-        
+
         If file is provided, save the results to the file.
-        
+
         Args:
             sql: SQL statement to execute
             hints: Optional execution hints
             file: Optional file path to save results
         """
-        
+
         self.client.execute_sql(sql, hints=hints)
         logger.info("SQL execution completed.")
-        
+
         # TODO: Implement file handling if needed
         # if file is not None:
         #     self.client
-        
+
     def execute(self, context):
         """Execute method for Airflow Operator
-        
+
         Args:
             context: Airflow context
         """
-        
-        sql = context['params'].get('sql')
-        hints = context['params'].get('hints', {})
-        file = context['params'].get('file', None)
-        
+
+        sql = context["params"].get("sql")
+        hints = context["params"].get("hints", {})
+        file = context["params"].get("file", None)
+
         if not sql:
             raise ValueError("SQL statement is required.")
-        
+
         if file:
             self.client.execute_to_save(sql, file, hints=hints)
-        else: 
+        else:
             self.client.execute_sql(sql, hints=hints)
         logger.info("MaxCompute SQL execution task completed.")
 
-    
+
 class LarkHook(BaseHook):
     """
     Lark Hook
 
     Provides a Hook to Lark and methods to interact with the API.
     """
+
     _clients = {
         "im": None,
         "sheet": None,
         "multi": None,
-        "apaas": None, # Lark aPaaS client
+        "apaas": None,  # Lark aPaaS client
     }
-    
-    def __init__(self, conn_id: str = 'lark_app'):
+
+    def __init__(self, conn_id: str = "lark_app"):
         """Init MaxCompute Hook
-        
+
         Args:
             conn_id: Airflow connection ID for MaxCompute
         """
@@ -151,15 +156,13 @@ class LarkHook(BaseHook):
         self.conn_id = conn_id
         self.connection = self._get_connection()
 
-
     def _get_connection(self) -> Connection:
         """Get Airflow Connection
-        
+
         Returns:
             Connection object
         """
         return Connection.get_connection_from_secrets(self.conn_id)
-    
 
     @property
     def sheet_client(self) -> LarkSheets:
@@ -171,13 +174,18 @@ class LarkHook(BaseHook):
 
         if self._clients["sheet"] is None:
             self._clients["sheet"] = LarkSheets(
-                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
-                url=None
+                app_id=self.connection.extra_dejson.get(
+                    "app_id", self.connection.login
+                ),
+                app_secret=self.connection.extra_dejson.get(
+                    "app_secret", self.connection.password
+                ),
+                lark_host=self.connection.extra_dejson.get(
+                    "lark_host", "https://open.feishu.cn"
+                ),
+                url=None,
             )
         return self._clients["sheet"]
-
 
     @property
     def im_client(self) -> LarkIM:
@@ -189,13 +197,18 @@ class LarkHook(BaseHook):
         logger.info(f"Getting Lark IM Client {self.connection.extra_dejson}")
         if self._clients["im"] is None:
             self._clients["im"] = LarkIM(
-                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
+                app_id=self.connection.extra_dejson.get(
+                    "app_id", self.connection.login
+                ),
+                app_secret=self.connection.extra_dejson.get(
+                    "app_secret", self.connection.password
+                ),
+                lark_host=self.connection.extra_dejson.get(
+                    "lark_host", "https://open.feishu.cn"
+                ),
             )
         return self._clients["im"]
 
-        
     @property
     def multi_client(self) -> LarkMultiDimTable:
         """Get Lark Multi Dimention Table instance
@@ -205,12 +218,17 @@ class LarkHook(BaseHook):
         """
         if self._clients.get("multi") is None:
             self._clients["multi"] = LarkMultiDimTable(
-                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
+                app_id=self.connection.extra_dejson.get(
+                    "app_id", self.connection.login
+                ),
+                app_secret=self.connection.extra_dejson.get(
+                    "app_secret", self.connection.password
+                ),
+                lark_host=self.connection.extra_dejson.get(
+                    "lark_host", "https://open.feishu.cn"
+                ),
             )
         return self._clients["multi"]
-
 
     @property
     def apaas_client(self) -> LarkAPaaSClient:
@@ -222,11 +240,19 @@ class LarkHook(BaseHook):
         # TODO: Support redirect_uri with hard coded value for now
         if self._clients.get("apaas") is None:
             self._clients["apaas"] = LarkAPaaSClient(
-                app_id=self.connection.extra_dejson.get('app_id', self.connection.login),
-                app_secret=self.connection.extra_dejson.get('app_secret', self.connection.password),
-                lark_host=self.connection.extra_dejson.get('lark_host', 'https://open.feishu.cn'),
-                redirect_uri=self.connection.extra_dejson.get('redirect_uri', 'http://localhost:9990/callback'),
-                user_name=self.connection.extra_dejson.get('user_name', None),
-                db_path=self.connection.extra_dejson.get('db_path', None)
+                app_id=self.connection.extra_dejson.get(
+                    "app_id", self.connection.login
+                ),
+                app_secret=self.connection.extra_dejson.get(
+                    "app_secret", self.connection.password
+                ),
+                lark_host=self.connection.extra_dejson.get(
+                    "lark_host", "https://open.feishu.cn"
+                ),
+                redirect_uri=self.connection.extra_dejson.get(
+                    "redirect_uri", "http://localhost:9990/callback"
+                ),
+                user_name=self.connection.extra_dejson.get("user_name", None),
+                db_path=self.connection.extra_dejson.get("db_path", None),
             )
         return self._clients["apaas"]

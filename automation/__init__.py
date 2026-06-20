@@ -1,20 +1,23 @@
-#coding:utf8
+# coding:utf8
 
 import logging
 
 
 from automation.conf import maxcomputer, lark
 from automation.client import (
-    MaxComputerClient, LarkClient, LarkMultiDimTable
-    ,LarkSheets, LarkIM, LarkAPaaSClient
+    MaxComputerClient,
+    LarkClient,
+    LarkMultiDimTable,
+    LarkSheets,
+    LarkIM,
+    LarkAPaaSClient,
 )
-
 
 logger = logging.getLogger("automation")
 logger.setLevel(logging.DEBUG)
 
 formater = logging.Formatter(
-    fmt="[%(levelname)s]:%(asctime)s %(message)s",datefmt="%Y-%m-%d %H:%M:%S"
+    fmt="[%(levelname)s]:%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
 handler = logging.StreamHandler()
 handler.setFormatter(formater)
@@ -25,7 +28,7 @@ conf = {
     "access_id": maxcomputer.get("dev", "access_id"),
     "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
     "project": maxcomputer.get("dev", "project"),
-    "endpoint":maxcomputer.get("dev", "endpoint")
+    "endpoint": maxcomputer.get("dev", "endpoint"),
 }
 
 hints = {
@@ -36,9 +39,8 @@ hints = {
     "odps.odtimizer.dynamic.filter.dpp.enable": True,
     "odps.odtimizer.enable.dynamic.filter": True,
     "odps.sql.python.version": "cp37",
-    "fallback_policy": "default"
+    "fallback_policy": "default",
 }
-
 
 
 # max_compute_client = MaxComputerClient(**conf)

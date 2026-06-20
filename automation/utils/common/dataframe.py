@@ -1,9 +1,8 @@
-#coding:utf-8
+# coding:utf-8
 """Pandas DataFrame Utility Functions
 * dataframe2record: Convert DataFrame to list of records
 
 """
-
 
 import numpy as np
 import pandas as pd
@@ -29,7 +28,9 @@ def dataframe2record(df, type: str = "raw"):
                 if pd.notna(item.get(col)):
                     if isinstance(item.get(col), (Decimal)):
                         record.append(float(item.get(col)))
-                    elif isinstance(item.get(col), (np.int64, np.int32, np.int16, np.int8)):
+                    elif isinstance(
+                        item.get(col), (np.int64, np.int32, np.int16, np.int8)
+                    ):
                         record.append(int(item.get(col)))
                     else:
                         record.append(item.get(col))

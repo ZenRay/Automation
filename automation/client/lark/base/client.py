@@ -9,19 +9,16 @@ import threading
 from datetime import datetime, timedelta
 
 
-
 from .token import AccessToken
 from ..utils import request
 from ..exceptions import LarkException, RegexException
 
-
 logger = logging.getLogger("automation.lark.base.client")
-
 
 
 class LarkClient(object):
     _instances = {}
-    _instances_lock = threading.Lock() 
+    _instances_lock = threading.Lock()
 
     def __new__(cls, *args, **kwargs):
         app_id = kwargs.get("app_id")
@@ -30,10 +27,9 @@ class LarkClient(object):
 
         if not app_id or not app_secret:
             raise ValueError("app_id and app_secret are required parameters")
-        
+
         # include the subclass in the key so different client subclasses
         key = (cls, app_id, app_secret, lark_host)
-
 
         with cls._instances_lock:
             if key not in cls._instances:
@@ -41,7 +37,6 @@ class LarkClient(object):
                 instance._initialized = False
                 cls._instances[key] = instance
             return cls._instances[key]
-
 
     def __init__(self, *, app_id, app_secret, lark_host="https://open.feishu.cn"):
         """Init Lark Object"""
@@ -52,17 +47,16 @@ class LarkClient(object):
         self.__app_id = app_id
         self.__app_secret = app_secret
         self._access_token = AccessToken()
-        
+
         self._token_lock = threading.Lock()
         self._initialized = True
         logger.info(f"Lark Client Initialized for app_id: {app_id}")
-
 
     @property
     def app_id(self):
         """Get Application ID"""
         return self.__app_id
-    
+
     @property
     def app_secret(self):
         """Get Application Secret"""
@@ -75,25 +69,21 @@ class LarkClient(object):
             self._refresh_access_token()
         return self._access_token.tenant_access_token
 
-
-
     @property
     def app_access_token(self):
         """Get Application Access Token"""
         if not self._access_token.is_valid:
             self._refresh_access_token()
         return self._access_token.app_access_token
-    
-
 
     def _refresh_access_token(self):
         with self._token_lock:
             if self._access_token.is_valid:
                 return
-                
+
             url = f"{self._host}/open-apis/auth/v3/app_access_token/internal/"
-            headers = {'Content-Type': 'application/json'}
-            payload = {'app_id': self.__app_id, 'app_secret': self.__app_secret}
+            headers = {"Content-Type": "application/json"}
+            payload = {"app_id": self.__app_id, "app_secret": self.__app_secret}
             try:
                 for attempt in range(3):
                     try:
@@ -106,19 +96,18 @@ class LarkClient(object):
                         if attempt == 2:
                             raise
                         logger.warning(f"Token refresh attempt {attempt+1} failed: {e}")
-                        time.sleep(2 ** attempt)
+                        time.sleep(2**attempt)
 
                 # adjust expire time before 120 seconds
                 expire_time = datetime.now() + timedelta(seconds=resp["expire"] - 120)
 
                 self._access_token = AccessToken(
-                    app_access_token=resp.get('app_access_token'),
-                    tenant_access_token=resp.get('tenant_access_token'),
-                    expire_time=expire_time
+                    app_access_token=resp.get("app_access_token"),
+                    tenant_access_token=resp.get("tenant_access_token"),
+                    expire_time=expire_time,
                 )
                 logger.info("Token refreshed successfully")
 
             except Exception as e:
                 logger.error(f"Token refresh failed after 3 attempts: {e}")
                 raise LarkException(msg="Failed to refresh access token") from e
-                

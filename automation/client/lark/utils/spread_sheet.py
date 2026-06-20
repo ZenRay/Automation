@@ -1,5 +1,5 @@
-#coding:utf-8
-#coding:utf8
+# coding:utf-8
+# coding:utf8
 import requests
 import logging
 import string
@@ -7,14 +7,11 @@ import re
 
 from ..exceptions import LarkException, LarkSheetException
 
-
 logger = logging.getLogger("automation.lark.utils.spread_sheet")
-
 
 
 # Sheet Cell Regex Pattern
 __CELL_PATTERN = re.compile(r"^(?P<col>[A-Z]{0,})(?P<row>\d{0,})$")
-
 
 
 def data_generator(data, batch_size=100):
@@ -23,11 +20,10 @@ def data_generator(data, batch_size=100):
     Generate batches of data, which can be processed in smaller chunks.
     """
     for i in range(0, len(data), batch_size):
-        yield data[i:i + batch_size]
-        
+        yield data[i : i + batch_size]
 
 
-def parse_sheet_cell(cell: str, parse_type: str="single"):
+def parse_sheet_cell(cell: str, parse_type: str = "single"):
     """Parse a sheet cell reference.
     Parse Cell Address `col` and `row` from a cell reference string. If there
     is only a column or a row, set `row` is 1 and `col` is "A".
@@ -41,17 +37,17 @@ def parse_sheet_cell(cell: str, parse_type: str="single"):
     if parse_type == "single":
         col, row = _parse_single_cell(cell)
         return col, row
-    
+
     # parse cell
     if "!" in cell:
         _, data_range = cell.split("!")
-    
+
     else:
         data_range = cell
-    
+
     if ":" not in data_range:
         return _parse_single_cell(data_range)
-    
+
     elif ":" in data_range:
         start_cell, end_cell = data_range.split(":")
         if parse_type == "start":
@@ -59,13 +55,14 @@ def parse_sheet_cell(cell: str, parse_type: str="single"):
         elif parse_type == "end":
             return _parse_single_cell(end_cell)
         elif parse_type == "all":
-            start_col, start_row =  _parse_single_cell(start_cell)
+            start_col, start_row = _parse_single_cell(start_cell)
             end_col, end_row = _parse_single_cell(end_cell)
             return start_col, start_row, end_col, end_row
 
 
-
-def offset_sheet_cell(current_cell: str, *, offset_row: int = None, offset_col: int = None):
+def offset_sheet_cell(
+    current_cell: str, *, offset_row: int = None, offset_col: int = None
+):
     """Offset a sheet cell reference by a certain number of rows and columns.
 
     Args:
@@ -78,16 +75,18 @@ def offset_sheet_cell(current_cell: str, *, offset_row: int = None, offset_col: 
     """
     if offset_col is None:
         offset_col = 0
-    
+
     if offset_row is None:
         offset_row = 0
-    
+
     # parse col and row
     col, row = parse_sheet_cell(current_cell)
-    
+
     new_row = row + offset_row
     if new_row < 1:
-        raise LarkSheetException(f"Row index must be greater than 0 after offset, got {new_row}")
+        raise LarkSheetException(
+            f"Row index must be greater than 0 after offset, got {new_row}"
+        )
 
     # Use different column offset functions based on the sign of the offset
     if offset_col > 0:
@@ -96,15 +95,12 @@ def offset_sheet_cell(current_cell: str, *, offset_row: int = None, offset_col: 
         new_col = _column_negative_offset(col, abs(offset_col))
     else:
         new_col = col
-        
+
     return f"{new_col}{new_row}"
 
 
-def _parse_single_cell(cell:str):
-    """Parse Single Cell Column And Row
-    
-    
-    """
+def _parse_single_cell(cell: str):
+    """Parse Single Cell Column And Row"""
     match = __CELL_PATTERN.match(cell)
     col = match.group("col")
     row = int(match.group("row")) if match.group("row") else 1
@@ -114,14 +110,14 @@ def _parse_single_cell(cell:str):
     # * Parse Cell Fail
     if not match:
         raise LarkSheetException(f"Invalid cell reference: {cell}")
-    
-    
+
     # Set column with start column, if empty
-    col =  col.upper()
+    col = col.upper()
     if len(col) == 0:
         col = "A"
     return col, row
-    
+
+
 def _column_positive_offset(col, offset):
     """Apply a positive offset to a column letter.
 
@@ -146,16 +142,16 @@ def _column_positive_offset(col, offset):
         else:
             current_offset = offset_col
             offset_col = 0
-        
-        if ord(col[-1])  + current_offset > ord("Z"):
+
+        if ord(col[-1]) + current_offset > ord("Z"):
             offset_col += 1
             new_col = chr(ord(col[-1]) + current_offset - 26) + new_col
         else:
             new_col = chr(ord(col[-1]) + current_offset) + new_col
-        
+
         # update origin col
         col = col[:-1]
-        
+
         if offset_col == 0:
             new_col = col + new_col
             col = ""
@@ -170,7 +166,6 @@ def _column_positive_offset(col, offset):
             col = ""
             to_continue = False
 
-
     return new_col
 
 
@@ -183,75 +178,77 @@ def _column_negative_offset(col, offset):
 
     Returns:
         str: The new column letter after applying the negative offset.
-        
+
     Raises:
         LarkSheetException: If the offset would result in a column before "A".
     """
     if not col or offset < 1:
         return col
-    
+
     # parse column char to value
     col_value = 0
     for char in col:
-        col_value = col_value * 26 + (ord(char) - ord('A') + 1)
+        col_value = col_value * 26 + (ord(char) - ord("A") + 1)
 
     # apply negative offset
     new_col_value = col_value - offset
 
     # check column is before 'A' column
     if new_col_value < 1:
-        raise LarkSheetException(f"Column offset would result in a column before 'A': {col} with offset -{offset}")
+        raise LarkSheetException(
+            f"Column offset would result in a column before 'A': {col} with offset -{offset}"
+        )
 
     # alternative column value to char
     result = ""
     while new_col_value > 0:
         remainder = (new_col_value - 1) % 26
-        result = chr(ord('A') + remainder) + result
+        result = chr(ord("A") + remainder) + result
         new_col_value = (new_col_value - 1) // 26
-    
+
     return result
 
 
 def parse_column2index(col):
     """Convert Excel column letters to numeric index.
-    
+
     Examples: A -> 1, Z -> 26, AA -> 27
-    
+
     Args:
         col (str): Column letters, such as 'A', 'AB', etc.
-    
+
     Returns:
         int: Corresponding numeric index
     """
     num = 0
     for c in col:
-        num = num * 26 + (ord(c) - ord('A') + 1)
+        num = num * 26 + (ord(c) - ord("A") + 1)
     return num
 
 
 def parse_index2column(index):
     """Convert numeric index to Excel column letters.
-    
+
     This is the reverse function of parse_column2index.
-    
+
     Examples: 1 -> A, 26 -> Z, 27 -> AA
-    
+
     Args:
         index (int): Numeric index of the column, must be greater than 0
-    
+
     Returns:
         str: Corresponding column letters
-        
+
     Raises:
         LarkSheetException: If the index is less than 1
     """
     if index < 1:
         raise LarkSheetException(f"Column index must be greater than 0, got {index}")
-    
+
     result = ""
     while index > 0:
         remainder = (index - 1) % 26
-        result = chr(ord('A') + remainder) + result
+        result = chr(ord("A") + remainder) + result
         index = (index - 1) // 26
-    
+
     return result

@@ -1,0 +1,25 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .venv,
+    dispatcher,
+    AirflowService,
+    .git,
+    __pycache__,
+    *.egg-info,
+    .specify,
+    specs,
+    deploy,
+    scripts,
+    # automation/ has pre-existing lint debt tracked separately
+    automation
+# F401: unused imports are common in __init__.py re-exports and legacy code
+# E402: module level import not at top of file (test files use sys.path manipulation)
+# W503: line break before binary operator (conflicts with black)
+# E203: whitespace before ':' (conflicts with black slice notation)
+extend-ignore = F401, E402, W503, E203
+per-file-ignores =
+    # __init__.py files are re-export modules, unused imports are intentional
+    */__init__.py: F401
+    # Test files have many f-string placeholders and trailing whitespace
+    tests/*: F541, W293, W391, W292, F841

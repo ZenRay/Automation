@@ -1,4 +1,4 @@
-#coding:utf8
+# coding:utf8
 import requests
 import logging
 import string
@@ -6,14 +6,22 @@ import string
 
 from ..exceptions import LarkException
 
-
 logger = logging.getLogger("automation.lark.utils.lark_request")
 
 
-
-def request(method, url, headers, payload={}, params=None, refresh_client=None, data=None, proxy={}, timeout=(10, 60)):
+def request(
+    method,
+    url,
+    headers,
+    payload={},
+    params=None,
+    refresh_client=None,
+    data=None,
+    proxy={},
+    timeout=(10, 60),
+):
     """Lark API Request
-    
+
     Args:
         timeout: 请求超时时间，默认 (10, 60) 元组。
                  connect_timeout=10s（连接建立），read_timeout=60s（读取响应）。
@@ -23,19 +31,26 @@ def request(method, url, headers, payload={}, params=None, refresh_client=None, 
     # if refresh_client and hasattr(refresh_client, "_refresh_access_token") and callable(getattr(refresh_client, "_refresh_access_token")):
     #     refresh_client._refresh_access_token()
     response = requests.request(
-        method, url, headers=headers, json=payload, params=params, data=data, proxies=proxy, timeout=timeout
+        method,
+        url,
+        headers=headers,
+        json=payload,
+        params=params,
+        data=data,
+        proxies=proxy,
+        timeout=timeout,
     )
 
     resp = {}
-    if response.text[0] == '{':
+    if response.text[0] == "{":
         resp = response.json()
     else:
-        logger.info("response:\n"+response.text)
+        logger.info("response:\n" + response.text)
     code = resp.get("code", -1)
     if code == -1:
         code = resp.get("StatusCode", -1)
     if code == -1 and response.status_code != 200:
-         response.raise_for_status()
+        response.raise_for_status()
     if code != 0:
         logger.error("Error Response: {0}".format(resp))
     return resp
