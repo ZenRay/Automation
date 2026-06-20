@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# okr_cron.sh -- OKR 数据管道定时更新脚本
+# cron_task.sh -- 数据管道定时任务脚本（串行执行）
 #
-# 功能：执行 OKR 数据管道，支持调度层参数透传（--date / --start / --end）
+# 任务列表：
+#   1. OKR 数据管道 - 支持调度层参数透传（--date / --start / --end）
+#   2. CR Trail 商品配置 ETL - 使用 CURRENT_DATE，无需日期参数
+#
 # 用法：
-#   ./okr_cron.sh                                     # 默认：today, T-7~T
-#   ./okr_cron.sh 2026-06-08                          # 指定基准日期
-#   ./okr_cron.sh 2026-06-08 --start -14 --end 0      # 指定日期+自定义窗口
-#   ./okr_cron.sh --start -14 --end 0                 # 不指定日期，仅自定义窗口
+#   ./cron_task.sh                                     # 默认：today, T-7~T
+#   ./cron_task.sh 2026-06-08                          # 指定基准日期
+#   ./cron_task.sh 2026-06-08 --start -14 --end 0      # 指定日期+自定义窗口
+#   ./cron_task.sh --start -14 --end 0                 # 不指定日期，仅自定义窗口
 #
 # crontab 示例（每天凌晨 2 点执行）：
-#   0 2 * * * /home/ray/Documents/RecentWorks/Automation/okr_cron.sh >> /home/ray/Documents/RecentWorks/Automation/logs/okr_cron.log 2>&1
+#   0 2 * * * /home/ray/Documents/RecentWorks/Automation/workers/cron_task.sh >> /home/ray/Documents/RecentWorks/Automation/logs/cron_task.log 2>&1
 
 set -euo pipefail
 
@@ -22,10 +25,10 @@ export TZ='Asia/Shanghai'
 # 路径配置
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$SCRIPT_DIR"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"  # workers/ -> project root
 VENV_DIR="$PROJECT_DIR/.venv"
 LOG_DIR="$PROJECT_DIR/logs"
-LOCK_FILE="$PROJECT_DIR/.okr_pipeline.lock"
+LOCK_FILE="$PROJECT_DIR/.pipeline.lock"
 
 # ---------------------------------------------------------------------------
 # 构建命令参数（在锁文件/venv 之前，dry-run 需要）
@@ -47,7 +50,8 @@ fi
 # dry-run 模式：DRY_RUN=1 ./okr_cron.sh ... 仅打印命令，不创建锁文件/激活 venv
 # ---------------------------------------------------------------------------
 if [ "${DRY_RUN:-0}" = "1" ]; then
-    echo "[DRY-RUN] python -m workers.okr.main ${ARGS[*]:-}"
+    echo "[DRY-RUN] Task 1: python -m workers.okr.main ${ARGS[*]:-}"
+    echo "[DRY-RUN] Task 2: python -m workers.cr_trail.main"
     exit 0
 fi
 
@@ -85,16 +89,36 @@ cd "$PROJECT_DIR"
 source "$VENV_DIR/bin/activate"
 
 # ---------------------------------------------------------------------------
-# 执行管道（if 块中 set -e 不触发，确保失败日志能正常打印）
+# 执行管道（串行任务）
 # ---------------------------------------------------------------------------
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行 OKR 数据管道 (参数: ${ARGS[*]:-默认})"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 开始执行数据管道 =========="
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 工作目录: $PROJECT_DIR"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python: $(which python)"
 
+# ---------------------------------------------------------------------------
+# Task 1: OKR 数据管道
+# ---------------------------------------------------------------------------
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})"
+
 if python -m workers.okr.main "${ARGS[@]}"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 管道执行成功"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - SUCCESS"
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 管道执行失败 (exit_code=$EXIT_CODE)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - FAILED (exit_code=$EXIT_CODE)"
     exit $EXIT_CODE
 fi
+
+# ---------------------------------------------------------------------------
+# Task 2: CR Trail 商品配置 ETL（使用 CURRENT_DATE，无需日期参数）
+# ---------------------------------------------------------------------------
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - START"
+
+if python -m workers.cr_trail.main; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - SUCCESS"
+else
+    EXIT_CODE=$?
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - FAILED (exit_code=$EXIT_CODE)"
+    exit $EXIT_CODE
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 全部任务执行完成 =========="

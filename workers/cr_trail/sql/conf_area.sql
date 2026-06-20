@@ -197,4 +197,5 @@ LEFT JOIN (
     ON t2.county_name= t1.fix_region_name
 -- 本次试验过程中只需要到市和区县
 WHERE t1.area_type IN ("COUNTY")
+    AND t1.region_name NOT IN ("萍乡市")
 ;
