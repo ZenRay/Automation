@@ -181,7 +181,8 @@ dispatcher/**/*.pyd
 Thumbs.db
 
 # Docker related
-.dockerignore
+# NOTE: .dockerignore is NOT ignored — it must be tracked by git
+# as it prevents secrets from being included in container images.
 
 # Test coverage
 .coverage
@@ -232,7 +233,7 @@ backup/
 
 # Local dev directories (not project source)
 notes/
-scripts/
+/scripts/
 tests/*
 !tests/cr_trail_pricing/
 !tests/cr_trail_pricing/**

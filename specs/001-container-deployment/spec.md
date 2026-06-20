@@ -99,6 +99,8 @@ A DevOps engineer deploys the full application stack — including the data pipe
 - **FR-017**: Container images MUST be built from a base image pinned to a specific version tag; use of `:latest` is FORBIDDEN.
 - **FR-018**: Containerfile MUST use multi-stage builds to minimize final image size.
 - **FR-019**: Container images MUST conform to OCI image specification to ensure interoperability between Docker (build) and Podman (runtime).
+- **FR-020**: The CI build pipeline MUST include an automated secret scanning step that inspects image layers for embedded credentials; the pipeline MUST fail if any secrets are detected.
+- **FR-021**: The CI build pipeline MUST include a post-build file verification step confirming that no `.ini`, `.env`, or other credential files exist inside the image; the pipeline MUST fail if any are found.
 
 ### Key Entities
 

@@ -1,0 +1,48 @@
+# Build context exclusion rules for container image
+# This file MUST be at project root (Docker/Podman build context root)
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Secrets — NEVER include in image
+automation/conf/*.ini
+.env
+.env.*
+!.env.example
+
+# Git & IDE
+.git/
+.gitignore
+.gitmodules
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation (not needed in runtime)
+*.md
+!README.md
+
+# Tests
+tests/
+test_*.py
+
+# Project-specific exclusions
+specs/
+notes/
+PrivateWork/
+dispatcher/
+AirflowService/
+scripts/
+.qoder/
+.specify/
+cr_trail_pricing_*.xlsx
+logs/
+*.log

@@ -1,0 +1,22 @@
+# Production environment override
+# Usage: podman compose -f compose.yml -f compose.production.yml up -d
+
+services:
+  worker:
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONLOGFORMAT=text
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+
+  scheduler:
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONLOGFORMAT=text
+      - LOG_LEVEL=INFO
+      - SCHEDULE_INTERVAL=${SCHEDULE_INTERVAL:-3600}
