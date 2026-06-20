@@ -31,6 +31,7 @@ template = """
 [prod]
 APP_ID: {APP_ID}
 APP_SECRET: {APP_SECRET}
+LARK_HOST: https://open.feishu.cn
 USER_TOKEN_REDIRECT_URL: {USER_TOKEN_REDIRECT_URL}
 
 [sqlite_db]

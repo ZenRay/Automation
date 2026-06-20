@@ -9,14 +9,14 @@ from enum import Enum
 from ....conf import lark
 
 if lark.has_section("prod"):
-    _lark_host = lark.get("prod", "lark_host")
+    _lark_host = lark.get("prod", "lark_host", fallback=None)
 elif lark.has_section("dev"):
-    _lark_host = lark.get("dev", "lark_host")
-
+    _lark_host = lark.get("dev", "lark_host", fallback=None)
 else:
     _lark_host = None
 
-if _lark_host is None:
+# Reject empty / placeholder values from template
+if not _lark_host or _lark_host.startswith("{"):
     _lark_host = "https://open.feishu.cn"
 
 
