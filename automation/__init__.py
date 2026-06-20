@@ -25,10 +25,10 @@ logger.addHandler(handler)
 
 
 conf = {
-    "access_id": maxcomputer.get("dev", "access_id"),
-    "secret_access_key": maxcomputer.get("dev", "secret_access_key"),
-    "project": maxcomputer.get("dev", "project"),
-    "endpoint": maxcomputer.get("dev", "endpoint"),
+    "access_id": maxcomputer.get("dev", "access_id", fallback=""),
+    "secret_access_key": maxcomputer.get("dev", "secret_access_key", fallback=""),
+    "project": maxcomputer.get("dev", "project", fallback=""),
+    "endpoint": maxcomputer.get("dev", "endpoint", fallback=""),
 }
 
 hints = {
