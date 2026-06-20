@@ -1,0 +1,44 @@
+name: CI - Lint & Test
+
+on:
+  push:
+    branches: [main, workers, staging, production]
+  pull_request:
+    branches: [main, workers, staging, production]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint dependencies
+        run: pip install black flake8
+
+      - name: Black format check
+        run: black --check .
+
+      - name: Flake8 lint
+        run: flake8 .
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project and dependencies
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
