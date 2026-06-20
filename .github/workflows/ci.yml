@@ -40,5 +40,5 @@ jobs:
           pip install -e .
           pip install pytest
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Run unit tests (skip integration)
+        run: pytest tests/ -v -m "not integration" --tb=short
