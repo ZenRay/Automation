@@ -44,6 +44,7 @@ def find_source(name: str):
     return None
 
 
+@pytest.mark.integration
 def test_quality_reject_e2e():
     """端到端测试：拉取 quality_reject_tasks 并聚合"""
     # 1. 初始化飞书客户端
