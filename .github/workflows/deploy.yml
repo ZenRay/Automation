@@ -100,7 +100,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=sha-
+            type=sha,prefix=sha-,format=long
             type=semver,pattern={{version}}
             type=raw,value=${{ github.ref_name }}
 
