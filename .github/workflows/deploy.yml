@@ -86,7 +86,7 @@ jobs:
 
   smoke:
     needs: push
-    if: github.event.workflow_run.head_branch == 'production'
+    if: github.event.workflow_run.head_branch == 'production' && needs.push.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Log in to GHCR
@@ -105,7 +105,7 @@ jobs:
 
   deploy:
     needs: smoke
-    if: github.event.workflow_run.head_branch == 'production'
+    if: github.event.workflow_run.head_branch == 'production' && needs.smoke.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to production server via SSH
