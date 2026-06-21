@@ -205,7 +205,9 @@ def _execute_via_temp_table(
     # 构建 CTAS 语句（LIFECYCLE 1 作为安全网：即使 DROP 失败，1 天后自动清理）
     # 先 DROP 残留的临时表（上次异常中断可能遗留）
     drop_first = f"DROP TABLE IF EXISTS {full_table_name};"
-    ctas_sql = f"{drop_first}\nCREATE TABLE {full_table_name} LIFECYCLE 1 AS\n{clean_sql};"
+    ctas_sql = (
+        f"{drop_first}\nCREATE TABLE {full_table_name} LIFECYCLE 1 AS\n{clean_sql};"
+    )
     logger.info(f"Query '{query.name}': using temp table mode -> {full_table_name}")
     logger.debug(f"CTAS SQL:\n{ctas_sql[:500]}...")
 
