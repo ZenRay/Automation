@@ -125,42 +125,48 @@ jobs:
           script: |
             set -euo pipefail
 
-            DEPLOY_DIR="${DEPLOY_DIR:-/opt/automation/deploy}"
             CONFIG_DIR="${CONFIG_DIR:-/opt/automation/config}"
             IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}"
 
             echo "[deploy] Image: $IMAGE"
-            echo "[deploy] Deploy dir: $DEPLOY_DIR"
 
             # 登录 GHCR 拉取镜像
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 2>/dev/null \
-              || echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # 拉取新镜像
-            docker pull "$IMAGE" 2>/dev/null || podman pull "$IMAGE"
+            podman pull "$IMAGE"
 
-            # 更新 .env 中的 IMAGE 变量
-            mkdir -p "$DEPLOY_DIR"
-            if [ -f "$DEPLOY_DIR/.env" ]; then
-              sed -i "s|^IMAGE=.*|IMAGE=$IMAGE|" "$DEPLOY_DIR/.env"
-            else
-              echo "IMAGE=$IMAGE" > "$DEPLOY_DIR/.env"
-              echo "CONFIG_DIR=$CONFIG_DIR" >> "$DEPLOY_DIR/.env"
-              echo "SCHEDULE_INTERVAL=3600" >> "$DEPLOY_DIR/.env"
-            fi
+            # 停止并移除旧容器
+            podman rm -f automation-worker 2>/dev/null || true
+            podman rm -f automation-scheduler 2>/dev/null || true
 
-            # 拷贝 compose 文件（如果不存在）
-            if [ ! -f "$DEPLOY_DIR/compose.yml" ]; then
-              echo "[deploy] ERROR: $DEPLOY_DIR/compose.yml not found. Please set up the deploy directory first."
-              exit 1
-            fi
+            # 启动 worker 容器
+            podman run -d \
+              --name automation-worker \
+              --restart unless-stopped \
+              --cpus 4.0 --memory 8g \
+              -e TZ=Asia/Shanghai \
+              -e PYTHONLOGFORMAT=text \
+              -e LOG_LEVEL=INFO \
+              -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
+              -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
+              "$IMAGE" \
+              bash /app/workers/cron_task.sh
 
-            # 重启容器
-            cd "$DEPLOY_DIR"
-            docker compose -f compose.yml -f compose.production.yml up -d 2>/dev/null \
-              || podman compose -f compose.yml -f compose.production.yml up -d
+            # 启动 scheduler 容器
+            podman run -d \
+              --name automation-scheduler \
+              --restart always \
+              -e TZ=Asia/Shanghai \
+              -e PYTHONLOGFORMAT=text \
+              -e LOG_LEVEL=INFO \
+              -e SCHEDULE_INTERVAL=3600 \
+              -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
+              -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
+              "$IMAGE" \
+              bash /app/deploy/scripts/scheduler.sh
 
             # 清理旧镜像
-            docker image prune -f 2>/dev/null || podman image prune -f 2>/dev/null || true
+            podman image prune -f || true
 
             echo "[deploy] Deployment complete: $IMAGE"
