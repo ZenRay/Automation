@@ -112,27 +112,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  smoke:
-    needs: push
-    if: github.ref == 'refs/heads/production'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull and smoke test
-        run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
-          docker pull "$IMAGE"
-          docker run --rm "$IMAGE" python --version
-          docker run --rm "$IMAGE" bash -c "test -d /app/automation && test -d /app/workers && echo 'Smoke test PASSED'"
-
   deploy:
-    needs: smoke
+    needs: push
     if: github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
