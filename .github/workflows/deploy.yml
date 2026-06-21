@@ -1,7 +1,9 @@
 name: Deploy - Build, Scan & Push
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI - Lint & Test"]
+    types: [completed]
     branches: [staging, production]
 
 env:
@@ -13,47 +15,15 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install lint dependencies
-        run: pip install black flake8
-
-      - name: Black format check
-        run: black --check .
-
-      - name: Flake8 lint
-        run: flake8 .
-
-  test:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install project and dependencies
-        run: |
-          pip install -e .
-          pip install pytest
-
-      - name: Run unit tests (skip integration)
-        run: pytest tests/ -v -m "not integration" --tb=short
-
   build:
-    needs: test
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.head_branch == 'staging' || github.event.workflow_run.head_branch == 'production')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Build image (no push)
         uses: docker/build-push-action@v6
@@ -62,18 +32,18 @@ jobs:
           file: deploy/Dockerfile
           push: false
           load: true
-          tags: automation:${{ github.sha }}
+          tags: automation:${{ github.event.workflow_run.head_sha }}
 
       - name: Trivy secret scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: automation:${{ github.sha }}
+          image-ref: automation:${{ github.event.workflow_run.head_sha }}
           scanners: secret
           exit-code: "1"
 
       - name: Verify no credential files in image
         run: |
-          RESULT=$(docker run --rm automation:${{ github.sha }} find /app -name "*.ini" -o -name ".env")
+          RESULT=$(docker run --rm automation:${{ github.event.workflow_run.head_sha }} find /app -name "*.ini" -o -name ".env")
           if [ -n "$RESULT" ]; then
             echo "FAIL: Credential files found in image:"
             echo "$RESULT"
@@ -86,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -101,8 +73,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=sha-,format=long
-            type=semver,pattern={{version}}
-            type=raw,value=${{ github.ref_name }}
+            type=raw,value=${{ github.event.workflow_run.head_branch }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -115,7 +86,7 @@ jobs:
 
   smoke:
     needs: push
-    if: github.ref == 'refs/heads/production'
+    if: github.event.workflow_run.head_branch == 'production'
     runs-on: ubuntu-latest
     steps:
       - name: Log in to GHCR
@@ -127,14 +98,14 @@ jobs:
 
       - name: Pull and smoke test
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}"
           docker pull "$IMAGE"
           docker run --rm "$IMAGE" python --version
           docker run --rm "$IMAGE" bash -c "test -d /app/automation && test -d /app/workers && echo 'Smoke test PASSED'"
 
   deploy:
     needs: smoke
-    if: github.ref == 'refs/heads/production'
+    if: github.event.workflow_run.head_branch == 'production'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to production server via SSH
@@ -150,7 +121,7 @@ jobs:
 
             DEPLOY_DIR="${DEPLOY_DIR:-/opt/automation/deploy}"
             CONFIG_DIR="${CONFIG_DIR:-/opt/automation/config}"
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}"
 
             echo "[deploy] Image: $IMAGE"
             echo "[deploy] Deploy dir: $DEPLOY_DIR"
