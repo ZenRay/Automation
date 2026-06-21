@@ -129,12 +129,7 @@ jobs:
             set -euo pipefail
 
             CONFIG_DIR="${CONFIG_DIR:-/opt/automation/config}"
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
-
-            echo "[deploy] Image: $IMAGE"
-
-            # 登录 GHCR 拉取镜像
-            echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+            IMAGE="ghcr.nju.edu.cn/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
 
             # 拉取新镜像（重试 3 次）
             for i in 1 2 3; do
