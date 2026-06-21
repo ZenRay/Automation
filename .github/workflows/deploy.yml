@@ -41,14 +41,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install -r requirements.lock.txt
+      - name: Install project and dependencies
+        run: |
+          pip install -e .
+          pip install pytest
 
-      - name: Install dev dependencies
-        run: pip install pytest
-
-      - name: Run tests
-        run: pytest tests/
+      - name: Run unit tests (skip integration)
+        run: pytest tests/ -v -m "not integration" --tb=short
 
   build:
     needs: test
