@@ -133,3 +133,58 @@ jobs:
           docker pull "$IMAGE"
           docker run --rm "$IMAGE" python --version
           docker run --rm "$IMAGE" bash -c "test -d /app/automation && test -d /app/workers && echo 'Smoke test PASSED'"
+
+  deploy:
+    needs: smoke
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${DEPLOY_DIR:-/opt/automation/deploy}"
+            CONFIG_DIR="${CONFIG_DIR:-/opt/automation/config}"
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+
+            echo "[deploy] Image: $IMAGE"
+            echo "[deploy] Deploy dir: $DEPLOY_DIR"
+
+            # 登录 GHCR 拉取镜像
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 2>/dev/null \
+              || echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # 拉取新镜像
+            docker pull "$IMAGE" 2>/dev/null || podman pull "$IMAGE"
+
+            # 更新 .env 中的 IMAGE 变量
+            mkdir -p "$DEPLOY_DIR"
+            if [ -f "$DEPLOY_DIR/.env" ]; then
+              sed -i "s|^IMAGE=.*|IMAGE=$IMAGE|" "$DEPLOY_DIR/.env"
+            else
+              echo "IMAGE=$IMAGE" > "$DEPLOY_DIR/.env"
+              echo "CONFIG_DIR=$CONFIG_DIR" >> "$DEPLOY_DIR/.env"
+              echo "SCHEDULE_INTERVAL=3600" >> "$DEPLOY_DIR/.env"
+            fi
+
+            # 拷贝 compose 文件（如果不存在）
+            if [ ! -f "$DEPLOY_DIR/compose.yml" ]; then
+              echo "[deploy] ERROR: $DEPLOY_DIR/compose.yml not found. Please set up the deploy directory first."
+              exit 1
+            fi
+
+            # 重启容器
+            cd "$DEPLOY_DIR"
+            docker compose -f compose.yml -f compose.production.yml up -d 2>/dev/null \
+              || podman compose -f compose.yml -f compose.production.yml up -d
+
+            # 清理旧镜像
+            docker image prune -f 2>/dev/null || podman image prune -f 2>/dev/null || true
+
+            echo "[deploy] Deployment complete: $IMAGE"
