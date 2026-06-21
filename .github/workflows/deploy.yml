@@ -167,7 +167,8 @@ jobs:
               -e TZ=Asia/Shanghai \
               -e PYTHONLOGFORMAT=text \
               -e LOG_LEVEL=INFO \
-              -e SCHEDULE_INTERVAL=3600 \
+              -e SCHEDULE_HOUR=8 \
+              -e SCHEDULE_MIN=20 \
               -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
               -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
               "$IMAGE" \
