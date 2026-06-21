@@ -136,8 +136,14 @@ jobs:
             # 登录 GHCR 拉取镜像
             echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # 拉取新镜像
-            podman pull "$IMAGE"
+            # 拉取新镜像（重试 3 次）
+            for i in 1 2 3; do
+              if podman pull "$IMAGE"; then
+                break
+              fi
+              echo "[deploy] Pull attempt $i failed, retrying in 10s..."
+              sleep 10
+            done
 
             # 停止并移除旧容器
             podman rm -f automation-worker 2>/dev/null || true
