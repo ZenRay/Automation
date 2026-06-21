@@ -15,10 +15,16 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  gate:
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       (github.event.workflow_run.head_branch == 'staging' || github.event.workflow_run.head_branch == 'production')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Gate passed - CI succeeded on ${{ github.event.workflow_run.head_branch }}"
+
+  build:
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +92,7 @@ jobs:
 
   smoke:
     needs: push
-    if: github.event.workflow_run.head_branch == 'production' && needs.push.result == 'success'
+    if: github.event.workflow_run.head_branch == 'production'
     runs-on: ubuntu-latest
     steps:
       - name: Log in to GHCR
@@ -105,7 +111,7 @@ jobs:
 
   deploy:
     needs: smoke
-    if: github.event.workflow_run.head_branch == 'production' && needs.smoke.result == 'success'
+    if: github.event.workflow_run.head_branch == 'production'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to production server via SSH
