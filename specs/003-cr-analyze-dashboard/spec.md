@@ -13,23 +13,23 @@
 ### Session 2026-06-22
 
 - Q: 功效分析（σ/ρ 计算、功效验证）的交付形式？ → A: 双交付 — CLI 命令负责计算并写入 SQLite，Streamlit 看板设独立页面展示计算结果与分析结论（文字判定）。
-- Q: 核心聚合宽表在哪里计算？ → A: 交易明细数据由已有 SQL（order_fact.sql）提取到 SQLite；stage、stage_week、city_unit 等维度结合飞书配置表在本地完成聚合计算。
+- Q: 核心聚合宽表在哪里计算？ → A: 交易明细数据由已有 SQL（order_fact_whole.sql）提取到 SQLite；stage、stage_week、city_unit 等维度结合飞书配置表在本地完成聚合计算。
 - Q: 试验阶段日期与城市单元如何配置管理？ → A: 双源 — 飞书配置表（conf_试验分组配置 + conf_试验周期抽佣率）管理摸底期和生效期的分组与目标 r₀；config.py 管理归一化预备期参数、历史基线时间范围、端午节日期（2026-06-19 ~ 2026-06-21）等特殊日期标注。
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Daily Data Refresh Pipeline (Priority: P1)
 
-A data analyst runs the cr_analyze pipeline each morning (or on demand) to refresh the analysis database. The pipeline performs two extraction phases: (1) extracts 5 Lark configuration tables (商品信息, 区县信息, 线上商品区域抽佣率调整, 试验分组配置, 试验周期抽佣率) with per-source date filters; (2) executes the order_fact.sql MaxCompute query returning transaction-level fact data. All raw results are written to SQLite — one table per source, fully overwritten on each run. The pipeline then computes a core aggregation wide table by joining fact data with configuration tables (city_unit merging, stage/stage_week assignment, trial_group labeling) and writes the aggregated result as an additional SQLite table. The analyst invokes via CLI with optional `--date` (defaults to today) and `--db-path` (defaults to module-local data/ directory).
+A data analyst runs the cr_analyze pipeline each morning (or on demand) to refresh the analysis database. The pipeline performs two extraction phases: (1) extracts 6 Lark configuration tables (商品信息, 区县信息, 线上商品区域抽佣率调整, 线上商品试验区域价格, 试验分组配置, 试验周期抽佣率) with per-source date filters; (2) executes the order_fact_whole.sql MaxCompute query returning transaction-level fact data. All raw results are written to SQLite — one table per source, fully overwritten on each run. The pipeline then computes a core aggregation wide table by joining fact data with configuration tables (city_unit merging, stage/stage_week assignment, trial_group labeling) and writes the aggregated result as an additional SQLite table. The analyst invokes via CLI with optional `--date` (defaults to today) and `--db-path` (defaults to module-local data/ directory).
 
 **Why this priority**: Without fresh data in SQLite, the Streamlit dashboard has nothing to visualize. This is the foundational data layer all downstream analysis depends on.
 
-**Independent Test**: Run the pipeline with `--date 2026-06-20`, then inspect the SQLite database to confirm all expected tables exist (5 Lark tables + 1 fact table + 1 aggregation wide table), contain rows, and reflect correct date-filtered data.
+**Independent Test**: Run the pipeline with `--date 2026-06-20`, then inspect the SQLite database to confirm all expected tables exist (6 Lark tables + 1 fact table + 1 aggregation wide table), contain rows, and reflect correct date-filtered data.
 
 **Acceptance Scenarios**:
 
 1. **Given** valid Lark credentials and MaxCompute access, **When** the pipeline runs with no arguments, **Then** a SQLite database is created (or overwritten) at the default path containing all configured source tables plus the aggregation wide table, each populated per its date rule.
-2. **Given** the pipeline runs with `--date 2026-06-20`, **When** extraction begins, **Then** Lark sources apply their configured date filters; the MaxCompute SQL template receives date parameters; the aggregation wide table computes stage/stage_week/city_unit based on conf_试验周期抽佣率 date ranges and conf_试验分组配置 mappings.
+2. **Given** the pipeline runs with `--date 2026-06-20`, **When** extraction begins, **Then** Lark sources apply their configured date filters; the MaxCompute SQL query executes with its hardcoded date ranges (covering the exploration phase); the aggregation wide table computes stage/stage_week/city_unit based on conf_试验周期抽佣率 date ranges and conf_试验分组配置 mappings.
 3. **Given** the pipeline completes successfully, **When** the SQLite database is inspected, **Then** the aggregation wide table contains rows at the correct granularity per stage (归一化预备期: stage × city_unit × region_type by day; 摸底期: stage × city_unit × sku_id overall; 生效期: stage_week × city_unit × sku_id).
 4. **Given** the SQLite database already exists from a previous run, **When** the pipeline runs again, **Then** all tables are fully overwritten — no stale rows from the prior run persist.
 5. **Given** a Lark API call fails during extraction, **When** the failure occurs, **Then** the pipeline terminates immediately with an error message identifying which table failed.
@@ -39,7 +39,7 @@ A data analyst runs the cr_analyze pipeline each morning (or on demand) to refre
 
 ### User Story 2 - Tab 1: Trial Overview (Priority: P1)
 
-A trial lead opens the Streamlit dashboard and lands on Tab 1 "试验总览". The tab displays the current trial phase (归一化预备期/摸底期/生效期) with start/end dates, an 8-city grouping configuration table showing city_unit, region_type (自营/代理人), trial_group (G0~G3), current target r₀, and covered SKU list, plus a timeline of key phase milestones including the Dragon Boat Festival period (2026-06-19~21).
+A trial lead opens the Streamlit dashboard and lands on Tab 1 "试验总览". The tab displays the current trial phase (归一化预备期/摸底期/生效期) with start/end dates, an 8-city grouping configuration table showing city_unit, region_type (自营/代理人), trial_group (对照组/试验组一/试验组二/试验组三), current target r₀, and covered SKU list, plus a timeline of key phase milestones including the Dragon Boat Festival period (2026-06-19~21).
 
 **Why this priority**: This is the dashboard landing page and the first thing a trial lead checks. It provides immediate situational awareness of the trial's current state.
 
@@ -89,7 +89,7 @@ An operations analyst opens Tab 3 "归一化进度" during the 归一化预备�
 
 ### User Story 5 - Tab 4: Effect Analysis (Priority: P1)
 
-An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine the trial's impact. The tab contains 4 sub-views switchable via radio buttons or sub-tabs: (B) City Unit Trends — 8 cities × 3 SKUs, showing 摸底期 as a single baseline point and 生效期 by stage_week, with incomplete weeks marked ⚠️; (C) Group Aggregation — G0/G1/G2/G3 group-level mean trends for commission_amount, gmv, and order_count; (D) SKU Comparison — 3 SKUs side-by-side within the same group; (E) Origin Comparison — 云南 (10184690+20519020 combined) vs 广西 (20588413) on commission_amount and commission_rate.
+An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine the trial's impact. The tab contains 4 sub-views switchable via radio buttons or sub-tabs: (B) City Unit Trends — 8 cities × 3 SKUs, showing 摸底期 as a single baseline point and 生效期 by stage_week, with incomplete weeks marked ⚠️; (C) Group Aggregation — 对照组/试验组一/试验组二/试验组三 group-level mean trends for commission_amount, gmv, and order_count; (D) SKU Comparison — 3 SKUs side-by-side within the same group; (E) Origin Comparison — 云南 (10184690+20519020 combined) vs 广西 (20588413) on commission_amount and commission_rate.
 
 **Why this priority**: Effect analysis is the primary analytical deliverable — it answers the core business question of whether the commission rate changes had measurable impact.
 
@@ -99,7 +99,7 @@ An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine
 
 1. **Given** 摸底期 data (aggregated as a single block per city_unit × sku_id), **When** sub-view B renders, **Then** each city shows one baseline data point per SKU with trading_days annotation; stage_week is NULL.
 2. **Given** 生效期 data with stage_week = "生效期_W1" where W1 covers only 4 days (is_complete_week = false), **When** sub-view B renders, **Then** the data point shows ⚠️ with "4/7天" annotation.
-3. **Given** sub-view C (group aggregation), **When** it renders, **Then** 4 lines (G0~G3) are plotted for the selected metric (switchable between commission_amount, gmv, order_count); values are group-level means.
+3. **Given** sub-view C (group aggregation), **When** it renders, **Then** 4 lines (对照组/试验组一/试验组二/试验组三) are plotted for the selected metric (switchable between commission_amount, gmv, order_count); values are group-level means.
 4. **Given** sub-view D (SKU comparison), **When** it renders, **Then** 3 SKUs are shown side-by-side within each trial group as bar charts with numerical annotations.
 5. **Given** sub-view E (origin comparison), **When** it renders, **Then** 云南 origin aggregates SKU 10184690 + 20519020; 广西 origin uses SKU 20588413; commission_amount and commission_rate are compared.
 
@@ -158,16 +158,22 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 **Data Extraction**
 
-- **FR-001**: System MUST extract data from 5 Lark configuration tables within a single wiki-hosted Lark base (wiki URL: https://bggc.feishu.cn/wiki/TcALwGgnciCQQYkPeHYcYf1Cnkd?table=tblevDYqsTdwu8fo&view=vewJatIahv): conf_商品信息, conf_区县信息, conf_线上商品区域抽佣率调整, conf_试验分组配置, conf_试验周期抽佣率.
-- **FR-002**: System MUST apply per-source date filters: conf_区县信息 filtered to 日期=target_date; conf_线上商品区域抽佣率调整 filtered to 日期>=2026-06-19; conf_商品信息, conf_试验分组配置, conf_试验周期抽佣率 extracted without date filtering.
-- **FR-003**: System MUST execute the order_fact.sql MaxCompute query from the module's sql/ directory, with parameterized date substitution.
+- **FR-001**: System MUST extract data from 6 Lark configuration tables within a single wiki-hosted Lark base (wiki URL: https://bggc.feishu.cn/wiki/TcALwGgnciCQQYkPeHYcYf1Cnkd?table=tblevDYqsTdwu8fo&view=vewJatIahv), with the following per-table field specifications:
+  - **conf_商品信息** (no date filter): 日期, 商品id, 商品名称, 产地, 包装类型, 单果大小, 色号, 商品头数, 非试验区域平台销售斤单价, 非试验区域平台销售件单价, 非试验区域商家供货斤单价, 非试验区域商家供货件单价, 是否当日上架
+  - **conf_区县信息** (日期=target_date): 区县id, 区县名称, 市id, 市名称, 省id, 省名称, 运营类型
+  - **conf_线上商品区域抽佣率调整** (日期>=2026-06-19): 日期, 商品id, 区县名称, 区域全称, 调整系数, 固定抽佣率调整, 固定抽佣金额调整, 参与试验类型
+  - **conf_线上商品试验区域价格** (日期>=2026-06-19): 日期, 商品id, 商品名称, 商家名称, 区域全称, 试验区域平台销售斤单价, 试验区域平台销售件单价, 试验区域商家供货斤单价, 试验区域商家供货件单价, 抽佣率
+  - **conf_试验分组配置** (no date filter): 区域id, 区域类型, 试验分组, 试验起始日期, 试验结束日期
+  - **conf_试验周期抽佣率** (no date filter): 试验阶段, 运营类型, 抽佣率, 试验分组, 试验起始日期, 试验结束日期
+- **FR-002**: System MUST apply per-source date filters as specified in FR-001: conf_区县信息 filtered to 日期=target_date; conf_线上商品区域抽佣率调整 and conf_线上商品试验区域价格 filtered to 日期>=2026-06-19; conf_商品信息, conf_试验分组配置, conf_试验周期抽佣率 extracted without date filtering.
+- **FR-003**: System MUST execute MaxCompute SQL queries from the module's sql/ directory. The initial order_fact_whole.sql uses hardcoded date ranges covering the exploration phase; the system MUST support `SQLQueryConfig` template parameterization (`${key}` substitution) for future incremental queries that require date-window control.
 - **FR-004**: All business parameters (table names, field names, SQL file paths, date filter rules, trial phase dates, Dragon Boat Festival dates, historical baseline ranges) MUST be centralized in config.py; no hard-coded values in processing or dashboard logic.
 - **FR-005**: System MUST use existing framework components (LarkExtractor, LarkSourceConfig, SQLQueryConfig, MCExtractor) for data extraction — no direct API calls.
 - **FR-006**: All date columns MUST be converted to datetime.date at the extraction stage per the project constitution.
 
 **Data Storage**
 
-- **FR-007**: System MUST store all extracted data (5 Lark tables + MaxCompute fact data) into a single SQLite database, one SQLite table per source.
+- **FR-007**: System MUST store all extracted data (6 Lark tables + MaxCompute fact data) into a single SQLite database, one SQLite table per source.
 - **FR-008**: System MUST compute a core aggregation wide table by joining fact data with configuration tables and write it as an additional SQLite table.
 - **FR-009**: On each pipeline run, all SQLite tables MUST be fully overwritten (dropped and recreated) — no stale data persists.
 - **FR-010**: The target date MUST be configurable via `--date` CLI parameter, defaulting to today.
@@ -175,14 +181,16 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 **Core Aggregation Wide Table**
 
-- **FR-012**: The wide table MUST contain the following dimension fields: stage (归一化预备期/摸底期/生效期), stage_week (生效期_W{N}, NULL for other stages), is_complete_week (BOOLEAN, 生效期 only), trading_days (INT), city_unit (merged city name), region_type (自营/代理人), trial_group (G0/G1/G2/G3), sku_id, sku_origin (产地), sku_grade, sku_weight_spec.
-- **FR-013**: The wide table MUST contain the following measure fields: order_count (COUNT DISTINCT 明细订单id), active_store_count (COUNT DISTINCT 店铺id, cross-SKU deduplicated), gmv (SUM 送达金额), commission_amount (SUM 送达抽佣金额), stockout_num (SUM of positive 下单数量-送达数量 differences), commission_rate (commission_amount / gmv), supply_price (AVG of 平台销售斤单价 × 净重 × (1 - commission_rate)), target_r0 (from conf_试验周期抽佣率 by group and stage).
-- **FR-014**: Aggregation granularity MUST vary by stage: 归一化预备期 = stage × city_unit × region_type (daily); 摸底期 = stage × city_unit × sku_id (overall, no weekly split); 生效期 = stage_week × city_unit × sku_id (weekly).
+- **FR-012**: The wide table MUST contain the following dimension fields: stage (归一化预备期/摸底期/生效期), stage_week (生效期_W{N}, NULL for other stages), is_complete_week (BOOLEAN, 生效期 only), trading_days (INT), city_unit (merged city name), region_type (自营/代理人), trial_group (对照组/试验组一/试验组二/试验组三), sku_id, sku_origin (产地), sku_grade, sku_weight_spec.
+- **FR-013**: The wide table MUST contain the following measure fields: order_count (COUNT DISTINCT 明细订单id), active_store_count (COUNT DISTINCT 店铺id, cross-SKU deduplicated), gmv (SUM 送达金额), commission_amount (SUM 送达抽佣金额), stockout_num (SUM of positive 下单数量-送达数量 differences), commission_rate (commission_amount / gmv), supply_price (AVG of 商家供货斤单价, directly from order_fact_whole.sql output — no recalculation), target_r0 (from conf_试验周期抽佣率 by group and stage).
+- **FR-014**: Aggregation granularity MUST vary by stage: 归一化预备期 = stage × 日期 × city_unit × region_type (daily, for r₀ monitoring); 摸底期 = stage × city_unit × sku_id (overall, no weekly split); 生效期 = stage_week × city_unit × sku_id (weekly).
 - **FR-015**: City unit merging MUST combine multiple same-city regions into one city_unit (e.g., 萍乡市 sub-regions merge to "萍乡市"); the merge mapping is derived from conf_试验分组配置.
-- **FR-016**: Public filters MUST be applied to all fact-data-derived computations: 是否有效订单=1, 商品id IN (10184690, 20519020, 20588413), 参与试验类型="试验区域".
+- **FR-016**: Public filters MUST be applied to all fact-data-derived computations: 是否有效订单=1, 商品id IN (10184690, 20519020, 20588413), 参与试验类型 contains "试验区域" (the field is a formula type returning bracket-wrapped values like `[试验区域]` or `[非试验区域]`).
+- **FR-016a**: The 参与试验类型 filter originates from conf_线上商品区域抽佣率调整 (a Lark config table, formula field type=20), not from the SQL fact data. It MUST be applied during the aggregation phase by joining fact data with conf_线上商品区域抽佣率调整 on (商品id, 区县名称); the SQL extraction does NOT filter by this condition. Filter logic: value contains "试验区域" AND value does NOT contain "非" prefix.
 - **FR-017**: stage_week numbering MUST start at W1 from the 生效期 start date, rolling in 7-day increments; is_complete_week = true only when the week covers a full 7 days.
 - **FR-018**: 摸底期 MUST be aggregated as a single block (no weekly split); trading_days MUST reflect actual trading days excluding Dragon Boat Festival (2026-06-19~21) holidays.
 - **FR-019**: active_store_count MUST be computed with cross-SKU deduplication at the city_unit × aggregation-period level, output separately to avoid double-counting.
+- **FR-019a**: The mapping between order_fact_whole.sql output columns and wide table fields MUST be explicitly defined in config.py. Key mappings include: SQL `日期` → wide table `日期` (for stage derivation), SQL `商品id` → `sku_id`, SQL `店铺id` → used for `active_store_count`, SQL `明细订单id` → used for `order_count`, SQL `送达金额` → `gmv`, SQL `送达抽佣金额` → `commission_amount`, SQL `平台销售斤单价` → used for price analysis, SQL `商家供货斤单价` → used for `supply_price`, SQL `区县id`/`区县名称` → used for `city_unit` merging, SQL `下单数量`-`送达数量` → `stockout_num`, SQL `是否有效订单` → public filter.
 
 **Streamlit Dashboard — Tab 1: Trial Overview**
 
@@ -206,7 +214,7 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 - **FR-029**: Tab 4 MUST provide 4 switchable sub-views: City Trends (B), Group Aggregation (C), SKU Comparison (D), Origin Comparison (E).
 - **FR-030**: Sub-view B MUST show 摸底期 as a single baseline point per city × SKU, and 生效期 by stage_week; incomplete weeks MUST be marked with ⚠️ and display trading_days as "N/7天".
-- **FR-031**: Sub-view C MUST show G0/G1/G2/G3 group-level mean trends for commission_amount, gmv, and order_count (switchable metric selector).
+- **FR-031**: Sub-view C MUST show 对照组/试验组一/试验组二/试验组三 group-level mean trends for commission_amount, gmv, and order_count (switchable metric selector).
 - **FR-032**: Sub-view D MUST show 3 SKUs side-by-side within each trial group as bar charts with numerical annotations.
 - **FR-033**: Sub-view E MUST aggregate 云南 origin as SKU 10184690 + 20519020 sum; 广西 origin as SKU 20588413; compare commission_amount and commission_rate.
 
@@ -236,11 +244,12 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 ### Key Entities
 
-- **Fact Transaction (事实交易表)**: Individual order-line records from MaxCompute (order_fact.sql). Key attributes: 日期, 订单id, 明细订单id, 商品id, 商品名称, 商家名称, 实际抽佣率, 平台销售件单价, 平台销售斤单价, 商家供货件单价, 商家供货斤单价, 店铺id, 省/市/区县 id+name, 网格id+name, 下单数量/金额/重量, 送达数量/金额/重量/运费/抽佣金额, 是否有效订单.
-- **Product (商品信息)**: SKU dimension from conf_商品信息. Key attributes: 商品id, 商品名称, 产地 (云南/广西), 包装类型, 单果大小, 色号, 商品头数, non-trial prices, 是否当日上架.
+- **Fact Transaction (事实交易表)**: Individual order-line records from MaxCompute (order_fact_whole.sql). Key attributes: 日期, 订单id, 明细订单id, 商品id, 商品名称, 商家名称, 实际抽佣率, 平台销售件单价, 平台销售斤单价, 商家供货件单价, 商家供货斤单价, 店铺id, 省/市/区县 id+name, 网格id+name, 下单数量/金额/重量, 送达数量/金额/重量/运费/抽佣金额, 是否有效订单.
+- **Product (商品信息)**: SKU dimension from conf_商品信息. Attributes: 日期, 商品id, 商品名称, 产地 (云南/广西), 包装类型, 单果大小, 色号, 商品头数, 非试验区域平台销售斤单价, 非试验区域平台销售件单价, 非试验区域商家供货斤单价, 非试验区域商家供货件单价, 是否当日上架.
 - **County Region (区县信息)**: Geographic area from conf_区县信息. Attributes: 区县id, 区县名称, 市id, 市名称, 省id, 省名称, 运营类型.
 - **Commission Adjustment (抽佣率调整)**: Per-product per-region config from conf_线上商品区域抽佣率调整. Attributes: 日期, 商品id, 区县名称, 区域全称, 调整系数, 固定抽佣率调整, 固定抽佣金额调整, 参与试验类型.
-- **Trial Group Config (试验分组配置)**: Trial design from conf_试验分组配置. Attributes: 区域id, 区域类型 (自营/代理人), 试验分组 (G0/G1/G2/G3), 试验起始日期, 试验结束日期. Used for city_unit merging and group labeling.
+- **Trial Region Price (试验区域价格)**: Per-product per-region price in trial regions from conf_线上商品试验区域价格. Attributes: 日期, 商品id, 商品名称, 商家名称, 区域全称, 试验区域平台销售斤单价, 试验区域平台销售件单价, 试验区域商家供货斤单价, 试验区域商家供货件单价, 抽佣率. Used for Tab 2 H-2 price comparison and Tab 4 effect analysis.
+- **Trial Group Config (试验分组配置)**: Trial design from conf_试验分组配置. Attributes: 区域id, 区域名称, 市名称, 区域类型 (CITY/COUNTY), 试验分组 (对照组/试验组一/试验组二/试验组三), 试验起始日期, 试验结束日期. Used for city_unit merging (via 市名称) and group labeling.
 - **Trial Period Commission Rate (试验周期抽佣率)**: Phase-level commission targets from conf_试验周期抽佣率. Attributes: 试验阶段 (运营阶段), 运营类型, 抽佣率, 试验分组, 试验起始日期, 试验结束日期. Used for stage derivation and target_r0.
 - **Aggregation Wide Table (核心聚合宽表)**: Computed table joining fact data with all configuration dimensions. Contains stage, stage_week, is_complete_week, trading_days, city_unit, region_type, trial_group, sku_id, sku_origin, sku_grade, sku_weight_spec, order_count, active_store_count, gmv, commission_amount, stockout_num, commission_rate, supply_price, target_r0.
 - **Power Analysis Result**: Per-SKU statistical power metrics: σ_raw, σ_adjusted, ρ_pre, ρ_post, ρ_main, n_required, n_actual, power conclusion, SKU cross-correlation matrix.
@@ -249,7 +258,7 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 ### Measurable Outcomes
 
-- **SC-001**: A full pipeline run (5 Lark extractions + MaxCompute SQL + aggregation wide table computation + SQLite write) completes within 5 minutes for typical data volumes.
+- **SC-001**: A full pipeline run (6 Lark extractions + MaxCompute SQL + aggregation wide table computation + SQLite write) completes within 5 minutes for typical data volumes.
 - **SC-002**: The SQLite database contains all configured source tables plus the aggregation wide table, with row counts matching source query results.
 - **SC-003**: The dashboard loads and displays Tab 1 within 5 seconds of startup (assuming populated SQLite on local storage).
 - **SC-004**: All 5 dashboard tabs render correctly with representative data — each tab's primary visualization is present and interactive.
@@ -265,12 +274,13 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 ## Assumptions
 
-- All 5 Lark configuration tables reside within a single wiki-hosted Lark base accessible via the provided wiki URL; the existing LarkExtractor framework supports wiki-hosted bases without modification.
-- The order_fact.sql MaxCompute query is already developed and tested; it returns transaction-level data with all fields needed for the aggregation wide table.
+- All 6 Lark configuration tables reside within a single wiki-hosted Lark base accessible via the provided wiki URL; the existing LarkExtractor framework supports wiki-hosted bases without modification.
+- The order_fact_whole.sql MaxCompute query is already developed and tested; it returns transaction-level data with all fields needed for the aggregation wide table. Its output column names use Chinese aliases (e.g., `日期`, `商品id`, `送达金额`) matching the field names used in this spec. The current order_fact_whole.sql uses hardcoded date ranges for the exploration phase (full historical data). The system will evolve to incremental update mode in subsequent iterations; the SQL execution layer must support `SQLQueryConfig` parameterization for this future capability.
 - The 3 trial SKUs (10184690, 20519020, 20588413) are all "水仙芒" products with consistent field structures in both Lark config tables and MaxCompute fact data.
+- conf_线上商品试验区域价格 provides trial-region-specific pricing data (商家供货价, 平台销售价, 抽佣率) that complements the fact table's transaction-level pricing; the two sources serve different analysis purposes (configured prices vs actual transaction prices).
 - City unit merging: conf_试验分组配置 contains sufficient information (区域id → city mapping) to derive city_unit; 萍乡市 sub-regions are explicitly handled.
 - 8 trial cities exist with 2 region_types each (自营 + 代理人), yielding 16 city × region_type combinations for normalization monitoring.
-- Trial groups G0~G3 have 2 city units each; G0 is the control group with no commission rate increase during 生效期.
+- Trial groups are: 对照组 (control), 试验组一, 试验组二, 试验组三. Each has 2 city units; 对照组 has no commission rate increase during 生效期.
 - Dragon Boat Festival dates (2026-06-19 ~ 2026-06-21) are hardcoded in config.py; if holiday dates change in future years, config.py is updated.
 - 摸底期 lasts 10 calendar days; effective trading days exclude Dragon Boat Festival (approximately 7 trading days).
 - Historical baseline data (2026-04-13~04-26 and 2026-05-11~05-24) is available in MaxCompute for all 3 SKUs across all 8 city units. If not available for certain SKUs, the fallback power analysis method (using 预备期+摸底期 data) is used.
@@ -278,13 +288,15 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 - The Streamlit dashboard is used by internal analysts on local machines; no authentication is required.
 - The pipeline is run by a single user at a time; concurrent runs are not supported.
 - The dashboard reads from SQLite in read-only mode and does not modify the database.
+- **Constitution Principle IV deviation**: This module outputs to SQLite + Streamlit rather than writing back to Lark. The standard Extract → Transform → Route → Load pipeline is adapted: the "Load" phase writes to SQLite instead of Lark targets, and the Streamlit dashboard consumes SQLite directly. This deviation is intentional — the module is a monitoring/analysis tool, not a data-producing ETL.
+- The module MUST include end-to-end tests verifying the full pipeline (extraction → aggregation → SQLite write) with mocked or sample data, per the project constitution's ETL testing requirement.
 
 ## Scope Boundaries
 
 ### In Scope
 
-- Extracting 5 Lark configuration tables with per-source date filtering
-- Executing order_fact.sql MaxCompute query with date parameterization
+- Extracting 6 Lark configuration tables with per-source date filtering (including conf_线上商品试验区域价格)
+- Executing order_fact_whole.sql MaxCompute query (hardcoded date ranges for exploration phase; future SQL files will support parameterized date windows)
 - Computing core aggregation wide table (joining fact data with config tables, city_unit merging, stage/stage_week assignment)
 - SQLite storage with full overwrite per run
 - CLI with `--date` and `--db-path` parameters
@@ -294,6 +306,7 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 - Alert logic with stage-specific thresholds
 - Dragon Boat Festival handling (hardcoded 2026-06-19~21)
 - Dashboard launch via `streamlit run`
+- End-to-end tests for the full pipeline
 
 ### Out of Scope
 
@@ -305,5 +318,4 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 - Deployment as a hosted web service (local execution only)
 - Historical trend analysis across multiple pipeline runs
 - DID (Difference-in-Differences) formal statistical analysis — the dashboard provides effect preview data; formal DID is done in separate analysis scripts
-- Developing or modifying the order_fact.sql query (already completed)
-- conf_线上商品试验区域价格表 extraction (not required by DP-003; trial region prices come from fact data)
+- Developing or modifying the order_fact_whole.sql query (already completed for the exploration phase; future incremental-mode SQL files will be added as new files, not modifications to the existing one)

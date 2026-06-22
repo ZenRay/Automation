@@ -31,4 +31,6 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- All 16/16 items pass. Spec updated with DP-003 requirements and 3 clarifications (2026-06-22).
+- Technology names (SQLite, Streamlit, MaxCompute) are architectural constraints per project constitution, not implementation prescriptions.
+- Ready for `/speckit.plan`.
