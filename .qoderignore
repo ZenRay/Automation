@@ -1,0 +1,19 @@
+# Qoder 额外忽略文件（在 .gitignore 基础上的补充层）
+# .gitignore 已排除: .venv, __pycache__, notes/, scripts/, logs/, .qoder/*
+# 本文件排除 git 追踪但不需要作为 Qoder 上下文的内容
+
+# 空占位文件
+*.gitkeep
+
+# 未使用的目录
+AirflowService/
+PrivateWork
+
+# 大文档（非代码上下文）
+LICENSE
+部署.md
+
+# 第三方 IDE 配置
+.cursor/
+
+notes/
