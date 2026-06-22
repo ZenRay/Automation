@@ -119,7 +119,7 @@ def _fetch_all_records(
     client,
     table_id: str,
     view_id: Optional[str] = None,
-    page_size: int = 100,
+    page_size: int = 500,
     field_names: Optional[list[str]] = None,
 ) -> tuple[dict[str, LarkFieldType], list[dict]]:
     """分页拉取指定表格的所有记录，同时返回字段类型映射
