@@ -3,7 +3,7 @@
 
 流程：
   1. 初始化 Lark + MaxCompute 客户端
-  2. 提取 6 张飞书配置表
+    2. 提取 7 张飞书配置表
   3. 执行 MaxCompute SQL 查询
   4. 计算聚合宽表
   5. 写入 SQLite
@@ -30,9 +30,92 @@ from .config import (
     DEFAULT_DB_PATH,
 )
 from .sqlite_store import write_tables
-from .transformer import compute_wide_table
+from .transformer import (
+    compute_wide_table,
+    compute_trial_phase_config_wide,
+    compute_trial_phase_config_pivot,
+    compute_trial_sku_profile,
+)
 
 logger = logging.getLogger("workers.cr_analyze.main")
+
+
+def _normalize_lark_date_columns(lark_data: dict) -> dict:
+    """将 Lark 数据中日期/日期时间字段统一转为 date。"""
+    import pandas as pd
+
+    def _to_local_date(series: pd.Series) -> pd.Series:
+        # Lark 日期列常以 UTC 时间戳落地为字符串（如 16:00:00），统一按上海时区取 date
+        dt = pd.to_datetime(series, errors="coerce", utc=True)
+        return dt.dt.tz_convert("Asia/Shanghai").dt.date
+
+    normalized = {}
+    for table_name, df in lark_data.items():
+        if df is None or df.empty:
+            normalized[table_name] = df
+            continue
+
+        df2 = df.copy()
+        for col in df2.columns:
+            col_name = str(col)
+            is_date_name = col_name == "日期" or col_name.endswith("日期")
+            is_datetime_dtype = pd.api.types.is_datetime64_any_dtype(df2[col])
+            if is_date_name or is_datetime_dtype:
+                df2[col] = _to_local_date(df2[col])
+
+        normalized[table_name] = df2
+
+    return normalized
+
+
+def _normalize_lark_region_full_name_columns(lark_data: dict) -> dict:
+    """标准化 Lark 数据中的区域全称，纠正省市顺序写反。"""
+    import pandas as pd
+
+    province_suffixes = ("省", "自治区", "特别行政区", "市")
+    city_suffixes = ("市", "州", "地区", "盟")
+
+    def _is_province_token(token: str) -> bool:
+        token = str(token).strip()
+        return any(token.endswith(s) for s in province_suffixes)
+
+    def _is_city_token(token: str) -> bool:
+        token = str(token).strip()
+        return any(token.endswith(s) for s in city_suffixes)
+
+    def _normalize_region_full_name(value):
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return value
+        text = str(value).strip()
+        if not text:
+            return text
+
+        # 仅纠正两段写反值：市-省 -> 省-市
+        parts = [p.strip() for p in text.split("-") if p and str(p).strip()]
+        if len(parts) == 2:
+            left, right = parts[0], parts[1]
+            if _is_city_token(left) and _is_province_token(right):
+                return f"{right}-{left}"
+
+        return text
+
+    normalized = {}
+    for table_name, df in lark_data.items():
+        if df is None or df.empty:
+            normalized[table_name] = df
+            continue
+
+        df2 = df.copy()
+        if "区域全称" in df2.columns:
+            before = df2["区域全称"].astype(str)
+            df2["区域全称"] = df2["区域全称"].apply(_normalize_region_full_name)
+            changed = (before != df2["区域全称"].astype(str)).sum()
+            if changed:
+                logger.info(f"  {table_name}: normalized 区域全称 rows={int(changed)}")
+
+        normalized[table_name] = df2
+
+    return normalized
 
 
 def _init_lark_client() -> LarkMultiDimTable:
@@ -108,6 +191,11 @@ def run_cr_analyze_pipeline(
                     else:
                         raise
 
+        # 3.1 应用层统一日期粒度: datetime -> date，避免后续跨源关联失败
+        lark_data = _normalize_lark_date_columns(lark_data)
+        # 3.2 应用层统一区域全称口径: 修正市-省写反
+        lark_data = _normalize_lark_region_full_name_columns(lark_data)
+
         # 4. 执行 MaxCompute SQL（或从已有 SQLite 读取）
         if skip_mc:
             logger.info("Skipping MaxCompute (--skip-mc), reading fact from SQLite...")
@@ -136,11 +224,26 @@ def run_cr_analyze_pipeline(
         wide_df = compute_wide_table(lark_data, mc_data, target_date)
         logger.info(f"  agg_wide_table: {len(wide_df)} rows")
 
+        logger.info("Computing trial phase config wide table...")
+        phase_wide_df = compute_trial_phase_config_wide(lark_data)
+        logger.info(f"  trial_phase_config_wide: {len(phase_wide_df)} rows")
+
+        logger.info("Computing trial phase config pivot table...")
+        phase_pivot_df = compute_trial_phase_config_pivot(phase_wide_df)
+        logger.info(f"  trial_phase_config_pivot: {len(phase_pivot_df)} rows")
+
+        logger.info("Computing trial SKU profile table...")
+        trial_sku_profile_df = compute_trial_sku_profile(lark_data)
+        logger.info(f"  trial_sku_profile: {len(trial_sku_profile_df)} rows")
+
         # 6. 组装所有表并写入 SQLite
         all_tables = {}
         all_tables.update(lark_data)
         all_tables.update(mc_data)
         all_tables["agg_wide_table"] = wide_df
+        all_tables["trial_phase_config_wide"] = phase_wide_df
+        all_tables["trial_phase_config_pivot"] = phase_pivot_df
+        all_tables["trial_sku_profile"] = trial_sku_profile_df
 
         logger.info(f"Writing {len(all_tables)} tables to SQLite: {db_path}")
         count = write_tables(db_path, all_tables)
@@ -179,19 +282,60 @@ def run_power_analysis(db_path: str | None = None) -> int:
         fact_df = read_table(db_path, "fact_order_item")
         logger.info(f"Loaded fact_order_item: {len(fact_df)} rows")
 
-        # P1-6: 从宽表获取 city_unit，合并到 fact_df
-        if table_exists(db_path, "agg_wide_table"):
-            wide_df = read_table(db_path, "agg_wide_table")
-            if not wide_df.empty and "city_unit" in wide_df.columns:
-                # 构建 sku_id → city_unit 映射（取众数）
-                sku_city = (
-                    wide_df[["sku_id", "city_unit"]]
-                    .dropna()
-                    .groupby("sku_id")["city_unit"]
-                    .agg(lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else None)
-                    .reset_index()
+        # P1-6: 使用 county_id -> 市名称 -> city_unit 映射，避免按 sku 聚合导致城市错配
+        if table_exists(db_path, "conf_county_info"):
+            import pandas as pd
+
+            county_info = read_table(db_path, "conf_county_info")
+            trial_group = (
+                read_table(db_path, "conf_trial_group")
+                if table_exists(db_path, "conf_trial_group")
+                else pd.DataFrame()
+            )
+
+            if not county_info.empty and "区县id" in county_info.columns:
+                county_map = county_info[["区县id", "市名称"]].copy()
+                county_map["county_id"] = pd.to_numeric(
+                    county_map["区县id"], errors="coerce"
                 )
-                fact_df = fact_df.merge(sku_city, on="sku_id", how="left")
+                county_map["市名称"] = (
+                    county_map["市名称"].astype(str).replace("nan", pd.NA)
+                )
+                county_map = county_map.dropna(subset=["county_id", "市名称"])
+                county_map["county_id"] = county_map["county_id"].astype(int)
+                county_map = county_map[["county_id", "市名称"]].drop_duplicates(
+                    subset=["county_id"]
+                )
+
+                if not trial_group.empty and "市名称" in trial_group.columns:
+                    tg_city = trial_group[["市名称", "区域名称"]].copy()
+                    tg_city["市名称"] = (
+                        tg_city["市名称"].astype(str).replace("nan", pd.NA)
+                    )
+                    tg_city["city_unit"] = tg_city["市名称"].fillna(tg_city["区域名称"])
+                    tg_city = tg_city.dropna(subset=["市名称", "city_unit"])
+                    tg_city = tg_city[["市名称", "city_unit"]].drop_duplicates(
+                        subset=["市名称"]
+                    )
+                    county_map = county_map.merge(tg_city, on="市名称", how="left")
+                else:
+                    county_map["city_unit"] = county_map["市名称"]
+
+                if "区县id" in fact_df.columns:
+                    fact_df["county_id"] = pd.to_numeric(
+                        fact_df["区县id"], errors="coerce"
+                    )
+                elif "county_id" in fact_df.columns:
+                    fact_df["county_id"] = pd.to_numeric(
+                        fact_df["county_id"], errors="coerce"
+                    )
+
+                fact_df = fact_df.drop(columns=["city_unit"], errors="ignore")
+                fact_df = fact_df.merge(
+                    county_map[["county_id", "city_unit"]],
+                    on="county_id",
+                    how="left",
+                )
 
         # 确保日期列为 date 类型
         import pandas as pd

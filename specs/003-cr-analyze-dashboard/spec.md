@@ -55,19 +55,26 @@ A trial lead opens the Streamlit dashboard and lands on Tab 1 "试验总览". Th
 
 ### User Story 3 - Tab 2: Configuration Audit (Priority: P1)
 
-An operations analyst navigates to Tab 2 "配置核查" to verify that commission rate configurations and supplier pricing are correctly set up before each trial phase transition. The tab has two sections: H-1 checks that each region's configured commission rate matches the target r₀ for its trial group and phase (flagging deviations > 0.5% in red); H-2 checks non-trial-region supplier pricing for anomalies, computing an implied commission rate and flagging daily swings > 5%.
+An operations analyst navigates to Tab 2 "配置核查" to verify that commission rate configurations and supplier pricing are correctly set up before each trial phase transition. The tab has two sections: H-1 checks that each region's configured commission rate matches the target r₀ for its trial group and phase (flagging deviations > 0.5% in red); H-2 provides a product-level price and commission trend view with a SKU selector, including non-trial-region dual-axis trend and trial-region city-level multi-line trends.
 
 **Why this priority**: Configuration errors directly corrupt the trial's validity. A wrong r₀ or mislabeled participation type invalidates the experiment for affected regions. Must be caught before each phase starts.
 
-**Independent Test**: After a pipeline run, open Tab 2 and verify the commission rate deviation table correctly flags a known misconfiguration; verify the pricing anomaly chart shows the 3 SKUs' implied rate trends.
+**Independent Test**: After a pipeline run, open Tab 2 and verify the commission rate deviation table correctly flags a known misconfiguration; then verify H-2 only offers SKUs that are both trial products and sellable on the latest product date (是否当日上架=1), the selector label uses the latest-date 商品名称 for each SKU, chart 1 uses zero-based y-axes, and charts 2/3/4 render grouped city bar charts with date axis in YYYY-MM-DD format.
 
 **Acceptance Scenarios**:
 
 1. **Given** a region where the configured commission rate (from conf_线上商品区域抽佣率调整) differs from the target r₀ (from conf_试验周期抽佣率 by trial_group and current stage) by more than 0.5%, **When** H-1 renders, **Then** that row is highlighted red with the deviation value displayed.
 2. **Given** a trial city whose participation type (参与试验类型) is "非试验区域" instead of "试验区域", **When** H-1 renders, **Then** a red alert is shown for that region.
 3. **Given** a region with region_type = "代理人" whose configured rate is approximately 7.5% (the 自营 target), **When** H-1 renders, **Then** a red alert flags the cross-type misconfiguration.
-4. **Given** conf_商品信息 data for the 3 SKUs, **When** H-2 renders, **Then** a trend chart shows each SKU's non-trial-region implied commission rate (computed as (platform_price - supply_price) / platform_price) over time; days where the rate swings > 5% from the prior day are highlighted yellow.
-5. **Given** a product row where 是否当日上架 = true, **When** H-2 renders, **Then** that date is visually highlighted as a new listing marker.
+4. **Given** H-1 needs county→city→trial_group mapping, **When** mapping is performed, **Then** the system uses the latest available snapshot date in conf_区县信息 for mapping (independent of the H-1 selected date), avoiding empty mappings caused by date misalignment.
+5. **Given** conf_线上商品区域抽佣率调整 provides 调整系数 and 固定抽佣金额调整, **When** H-1 renders, **Then** 隐形物流费加价 is shown in the H-1 main table as `调整系数 × 固定抽佣金额调整`.
+6. **Given** H-1 rows may be trial-region or non-trial-region, **When** price columns are shown after 试验分组, **Then** 商家供货斤单价 and 商城销售斤单价 are populated from region-matched sources: trial rows from conf_线上商品试验区域价格 (by 日期+商品id+区域全称), non-trial rows from conf_商品信息 (by 日期+商品id).
+7. **Given** H-2 SKU selector, **When** candidate SKUs are listed, **Then** only SKUs that are both trial products and sellable on the latest product date (是否当日上架=1) are selectable, and each option label uses the latest-date 商品名称 for that SKU.
+8. **Given** conf_商品信息 has non-trial-region supply price and commission rate fields, **When** an eligible SKU is selected in H-2, **Then** chart 1 shows non-trial-region 商家供货斤单价 (left axis) and 抽佣率 (right axis) in a dual-axis trend chart, and both y-axes start at 0.
+9. **Given** conf_线上商品试验区域价格 has city-level rows for the selected SKU, **When** chart 2 renders, **Then** trial-region 商家供货斤单价 is shown as grouped bar charts by date with one bar per city.
+10. **Given** conf_线上商品试验区域价格 has city-level commission fields for the selected SKU, **When** chart 3 renders, **Then** trial-region 抽佣率 is shown as grouped bar charts by date with one bar per city.
+11. **Given** conf_线上商品试验区域价格 has city-level platform sales price fields for the selected SKU, **When** chart 4 renders, **Then** trial-region 平台销售斤单价 is shown as grouped bar charts by date with one bar per city.
+12. **Given** a product row where 是否当日上架 = true, **When** H-2 renders, **Then** that row is marked as "当日可售卖" (availability marker), not interpreted as a new listing event.
 
 ---
 
@@ -170,6 +177,7 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 - **FR-004**: All business parameters (table names, field names, SQL file paths, date filter rules, trial phase dates, Dragon Boat Festival dates, historical baseline ranges) MUST be centralized in config.py; no hard-coded values in processing or dashboard logic.
 - **FR-005**: System MUST use existing framework components (LarkExtractor, LarkSourceConfig, SQLQueryConfig, MCExtractor) for data extraction — no direct API calls.
 - **FR-006**: All date columns MUST be converted to datetime.date at the extraction stage per the project constitution.
+- **FR-006a**: During ETL preprocessing, `区域全称` values with reversed province-city order in two-token format (e.g., `长沙市-湖南省`) MUST be normalized to `省-市` order (e.g., `湖南省-长沙市`) before downstream joins.
 
 **Data Storage**
 
@@ -200,9 +208,14 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 - **FR-021**: Tab 2 section H-1 MUST display a commission rate deviation table comparing configured rates (from conf_线上商品区域抽佣率调整) against target rates (from conf_试验周期抽佣率 by trial_group and stage), highlighting deviations > 0.5% in red.
 - **FR-022**: Tab 2 H-1 MUST flag three alert conditions: commission rate deviation > 0.5% (RED), trial city with participate_type = "非试验区域" (RED), 代理人 region configured at ~7.5% rate (RED).
-- **FR-023**: Tab 2 H-1 MUST display the target configuration reference table showing target r₀ for each phase × region_type × trial_group combination.
-- **FR-024**: Tab 2 section H-2 MUST display a non-trial-region supplier price trend chart for 3 SKUs, computing implied commission rate ((platform_price - supply_price) / platform_price) and flagging daily swings > 5% in yellow.
-- **FR-025**: Tab 2 H-2 MUST highlight dates where 是否当日上架 = true as new listing markers.
+- **FR-023**: Target configuration reference (phase × region_type × trial_group) MUST be presented in Tab 1 (试验总览). Tab 2 H-1 uses the same reference for deviation checks but does not need to render a duplicate reference table.
+- **FR-023a**: Tab 2 H-1 county-to-trial_group mapping MUST be built from conf_区县信息 latest snapshot date (max 日期) + conf_试验分组配置, and MUST NOT depend on the selected H-1 business date.
+- **FR-023b**: Tab 2 H-1 main table MUST include 隐形物流费加价, computed as `调整系数 × 固定抽佣金额调整`, and this column MUST be rendered in the same main table rather than a separate section.
+- **FR-023c**: Tab 2 H-1 main table MUST include 商家供货斤单价 and 商城销售斤单价 immediately after 试验分组; values MUST be sourced by participation type: 试验区域 from conf_线上商品试验区域价格 using 日期+商品id+城市归一化键 (derived from 区域全称), 非试验区域 from conf_商品信息 (日期+商品id).
+- **FR-024**: Tab 2 section H-2 MUST provide a SKU selector and display four charts: (1) non-trial-region dual-axis trend of 商家供货斤单价 and 抽佣率, (2) trial-region city-level grouped bar chart of 商家供货斤单价 by date, (3) trial-region city-level grouped bar chart of 抽佣率 by date, (4) trial-region city-level grouped bar chart of 平台销售斤单价 by date.
+- **FR-024b**: H-2 SKU selector MUST include only SKUs that are both trial products and sellable on the latest product date (是否当日上架=1).
+- **FR-024a**: All H-2 chart x-axes MUST use full date format (YYYY-MM-DD).
+- **FR-025**: Tab 2 H-2 MUST mark dates where 是否当日上架 = true as 当日可售卖标记 (availability marker), and MUST NOT interpret this field as a new listing indicator.
 
 **Streamlit Dashboard — Tab 3: Normalization Progress**
 

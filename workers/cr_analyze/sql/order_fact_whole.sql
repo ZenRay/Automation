@@ -27,6 +27,7 @@ WITH stores AS(
 ,base AS(
     SELECT
         t1.dt -- `日期`
+        ,t1.mall_id -- `商城id`
         ,t1.order_id -- `订单id`
         ,t1.order_item_id -- `明细订单id`
 
@@ -82,10 +83,10 @@ WITH stores AS(
     LEFT JOIN datawarehouse_max.dwd_order_item_daily_asc t2
         ON (
             (
-                t1.dt BETWEEN "2026-04-01"
+                t2.dt BETWEEN "2026-04-01"
                     AND CURRENT_DATE()
             ) OR (
-                t1.dt BETWEEN "2025-05-01"
+                t2.dt BETWEEN "2025-05-01"
                     AND "2025-07-31"
             )
         )
@@ -122,6 +123,72 @@ SELECT
 	,t1.settlement_type_desc AS `结算类型`
 	,t1.net_weight AS `净重`
 	,t1.gross_weight AS `毛重`
+    ,CASE
+        WHEN 
+            ISNOTNULL(t2.sku_grade)
+        THEN t2.sku_grade
+        WHEN 
+            INSTR(t1.sku_name, "A级")>0
+        THEN "A级"
+        WHEN 
+            INSTR(t1.sku_name, "B级")>0
+        THEN "B级"
+        WHEN 
+            INSTR(t1.sku_name, "C级")>0
+        THEN "C级"
+    END AS `商品等级`
+    ,CASE
+        WHEN 
+            ISNOTNULL(t2.producing_area)
+        THEN t2.producing_area
+        WHEN 
+            INSTR(t1.sku_name, "海南")>0
+        THEN "海南"
+        WHEN 
+            INSTR(t1.sku_name, "云南")>0
+        THEN "云南"
+        WHEN 
+            INSTR(t1.sku_name, "广西")>0
+        THEN "广西"
+    END AS `产地`
+    ,CASE
+        WHEN 
+            ISNOTNULL(t2.packaging_type)
+        THEN t2.packaging_type
+        WHEN 
+            INSTR(t1.sku_name, "纸箱")>0
+        THEN "纸箱"
+        WHEN 
+            INSTR(t1.sku_name, "塑料胶框")>0
+        THEN "塑料胶框"
+        WHEN 
+            INSTR(t1.sku_name, "泡沫箱")>0
+        THEN "泡沫箱"
+    END AS `包装类型`
+    ,CASE
+        WHEN 
+            ISNOTNULL(t2.single_fruit_size)
+        THEN t2.single_fruit_size
+        WHEN 
+            INSTR(t1.sku_name, "特大果")>0
+        THEN "特大果"
+        WHEN 
+            INSTR(t1.sku_name, "大果")>0
+        THEN "大果"
+        WHEN 
+            INSTR(t1.sku_name, "中大果")>0
+        THEN "中大果"
+        WHEN 
+            INSTR(t1.sku_name, "中小果")>0
+        THEN "中小果"
+        WHEN 
+            INSTR(t1.sku_name, "中果")>0
+        THEN "中果"
+        WHEN 
+            INSTR(t1.sku_name, "小果")>0
+        THEN "小果"
+    END AS `单果大小`
+    ,t2.color_code AS `色号`
 	,ROUND(IF(t1.commission_rate<1, t1.commission_rate, t1.commission_rate / 100), 4) AS `实际抽佣率`
 
 
@@ -154,4 +221,17 @@ SELECT
 
 	,t1.is_valid AS `是否有效订单`
 FROM base t1
+LEFT JOIN datawarehouse_max.dim_goods_extra_info_daily_full t2
+    ON (
+            (
+                t2.dt BETWEEN "2026-04-01"
+                    AND CURRENT_DATE()
+            ) OR (
+                t2.dt BETWEEN "2025-05-01"
+                    AND "2025-07-31"
+            )
+        )
+    AND t2.dt = t1.dt
+    AND t2.sku_id = t1.sku_id
+    AND t2.mall_id = t1.mall_id
 ;

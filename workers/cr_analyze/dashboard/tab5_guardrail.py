@@ -18,8 +18,30 @@ def render(data: dict[str, pd.DataFrame]):
         return
 
     effect = wide[wide["stage"] == "生效期"].copy()
+    baseline = wide[wide["stage"] == "摸底期"].copy()
+
+    # 方案B：生效期为空时，展示摸底期实际监控（不做WoW预警）
     if effect.empty:
-        st.info("暂无生效期数据，护栏预警仅适用于生效期")
+        st.subheader("摸底期实际监控（不触发预警）")
+        if baseline.empty:
+            st.info("暂无摸底期数据")
+            return
+
+        monitor_cols = [
+            c
+            for c in [
+                "city_unit",
+                "sku_id",
+                "order_count",
+                "active_store_count",
+                "stockout_num",
+                "gmv",
+                "commission_amount",
+            ]
+            if c in baseline.columns
+        ]
+        st.caption("当前阶段为摸底期，展示实际指标，不计算WoW告警。")
+        st.dataframe(baseline[monitor_cols], use_container_width=True)
         return
 
     st.subheader("城市 × SKU 告警状态表")
@@ -28,7 +50,7 @@ def render(data: dict[str, pd.DataFrame]):
         st.info("生效期数据缺少 stage_week 列")
         return
 
-    # 计算环比
+    # 计算试验周期 WoW（按 stage_week 顺序，不要求完整自然周）
     effect = effect.sort_values(["city_unit", "sku_id", "stage_week"])
 
     alert_rows = []
@@ -50,38 +72,36 @@ def render(data: dict[str, pd.DataFrame]):
             store_wow = np.nan
             alert = "GREEN"
 
-            if i > 0 and is_complete:
+            if i > 0:
                 prev_week = weeks[i - 1]
                 prev = group[group["stage_week"] == prev_week].iloc[0]
-                prev_complete = prev.get("is_complete_week", True)
 
-                if prev_complete:
-                    if "order_count" in group.columns:
-                        prev_val = prev.get("order_count", 0)
-                        curr_val = row_data.get("order_count", 0)
-                        if prev_val > 0:
-                            order_wow = (curr_val - prev_val) / prev_val
+                if "order_count" in group.columns:
+                    prev_val = prev.get("order_count", 0)
+                    curr_val = row_data.get("order_count", 0)
+                    if prev_val > 0:
+                        order_wow = (curr_val - prev_val) / prev_val
 
-                    if "active_store_count" in group.columns:
-                        prev_val = prev.get("active_store_count", 0)
-                        curr_val = row_data.get("active_store_count", 0)
-                        if prev_val > 0:
-                            store_wow = (curr_val - prev_val) / prev_val
+                if "active_store_count" in group.columns:
+                    prev_val = prev.get("active_store_count", 0)
+                    curr_val = row_data.get("active_store_count", 0)
+                    if prev_val > 0:
+                        store_wow = (curr_val - prev_val) / prev_val
 
-                    # 判定告警等级
-                    if not np.isnan(order_wow) and order_wow < order_red:
-                        alert = "RED"
-                    elif not np.isnan(order_wow) and order_wow < order_yellow:
-                        alert = "YELLOW"
+                # 判定告警等级
+                if not np.isnan(order_wow) and order_wow < order_red:
+                    alert = "RED"
+                elif not np.isnan(order_wow) and order_wow < order_yellow:
+                    alert = "YELLOW"
 
-                    if not np.isnan(store_wow) and store_wow < store_red:
-                        alert = "RED"
-                    elif (
-                        alert != "RED"
-                        and not np.isnan(store_wow)
-                        and store_wow < store_yellow
-                    ):
-                        alert = "YELLOW"
+                if not np.isnan(store_wow) and store_wow < store_red:
+                    alert = "RED"
+                elif (
+                    alert != "RED"
+                    and not np.isnan(store_wow)
+                    and store_wow < store_yellow
+                ):
+                    alert = "YELLOW"
 
             alert_rows.append(
                 {
@@ -93,7 +113,7 @@ def render(data: dict[str, pd.DataFrame]):
                     "active_store_count": row_data.get("active_store_count", np.nan),
                     "order_count_wow": order_wow,
                     "store_count_wow": store_wow,
-                    "alert_level": alert if is_complete else "N/A",
+                    "alert_level": alert,
                 }
             )
 
@@ -106,15 +126,11 @@ def render(data: dict[str, pd.DataFrame]):
             lambda x: render_alert_badge(x) if x != "N/A" else "⬜"
         )
 
-        # 残缺周灰显
+        # WoW 按试验周期周序列计算；首周无上周对照显示为 “—”
         for col in ["order_count_wow", "store_count_wow"]:
             if col in display_df.columns:
                 display_df[col] = display_df.apply(
-                    lambda r: (
-                        f"{r[col]:.1%}"
-                        if pd.notna(r[col]) and r["is_complete_week"]
-                        else "—"
-                    ),
+                    lambda r: f"{r[col]:.1%}" if pd.notna(r[col]) else "—",
                     axis=1,
                 )
 

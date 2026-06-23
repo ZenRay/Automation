@@ -124,15 +124,25 @@
   - `render(db_path: str)`: render function
   - **H-1 section**: Commission rate deviation table
     - Join conf_commission_adjustment with conf_trial_period_rate on (trial_group, stage)
+    - Build county→city→trial_group mapping using conf_county_info latest snapshot date (max 日期) + conf_trial_group mapping
     - Compute r_deviation = configured_r - target_r
     - Highlight rows where |r_deviation| > 0.5% in red (FR-021)
     - Flag: participate_type = "非试验区域" in trial cities (FR-022)
     - Flag: region_type = "代理人" with configured_r ≈ 7.5% (FR-022)
-    - Target reference table per phase × region_type × trial_group (FR-023)
+    - Compute and show 隐形物流费加价 = 调整系数 × 固定抽佣金额调整 in the H-1 main table (same table, not separate section)
+    - Add 商家供货斤单价 and 商城销售斤单价 after 试验分组 in H-1 main table
+    - Source H-1 price fields by participation type: 试验区域 from conf_trial_region_price (日期+商品id+城市归一化键 from 区域全称), 非试验区域 from conf_product_info (日期+商品id)
+    - Reuse target reference for H-1 deviation calculation only; do not render duplicate reference table in Tab 2 (FR-023)
   - **H-2 section**: Supplier price trend chart
-    - Compute non_trial_r_implied = (platform_price - supply_price) / platform_price from conf_product_info
-    - Line chart per SKU; flag daily swings > 5% in yellow (FR-024)
-    - Highlight 是否当日上架 = true dates (FR-025)
+    - Add SKU selector for H-2
+    - Restrict H-2 SKU options to trial products that are sellable on the latest product date (是否当日上架=1)
+    - Display each SKU option label using the latest-date 商品名称 for that SKU
+    - Chart 1: non-trial-region dual-axis trend (商家供货斤单价 + 抽佣率) from conf_product_info, with both y-axes starting at 0 (FR-024)
+    - Chart 2: trial-region city-level grouped bar chart of 商家供货斤单价 by date from conf_trial_region_price (FR-024)
+    - Chart 3: trial-region city-level grouped bar chart of 抽佣率 by date from conf_trial_region_price (FR-024)
+    - Chart 4: trial-region city-level grouped bar chart of 平台销售斤单价 by date from conf_trial_region_price (FR-024)
+    - Ensure H-2 date axis displays full YYYY-MM-DD format (FR-024a)
+    - Mark 是否当日上架 = true rows as 当日可售卖标记（非新品上架语义）(FR-025)
 
 ### Tab 3: Normalization Progress (US4)
 

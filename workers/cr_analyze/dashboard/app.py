@@ -11,15 +11,32 @@ import sys
 import streamlit as st
 
 from workers.cr_analyze.config import DEFAULT_DB_PATH
-from .components import load_db, check_db, render_error_missing_db
-from . import (
-    tab1_overview,
-    tab2_config_audit,
-    tab3_normalization,
-    tab4_effect,
-    tab5_guardrail,
-    tab_power,
-)
+
+try:
+    from .components import load_db, check_db, render_error_missing_db
+    from . import (
+        tab1_overview,
+        tab2_config_audit,
+        tab3_normalization,
+        tab4_effect,
+        tab5_guardrail,
+        tab_power,
+    )
+except ImportError:
+    # 支持 `streamlit run workers/cr_analyze/dashboard/app.py` 直接脚本运行
+    from workers.cr_analyze.dashboard.components import (
+        load_db,
+        check_db,
+        render_error_missing_db,
+    )
+    from workers.cr_analyze.dashboard import (
+        tab1_overview,
+        tab2_config_audit,
+        tab3_normalization,
+        tab4_effect,
+        tab5_guardrail,
+        tab_power,
+    )
 
 st.set_page_config(
     page_title="抽佣率试验分析看板",

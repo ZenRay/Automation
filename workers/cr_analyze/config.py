@@ -16,12 +16,12 @@ from workers.lib import LarkSourceConfig, SQLQueryConfig
 SQL_BASE_DIR = Path(__file__).parent / "sql"
 
 # --------------------------------------------------------------------------
-# 飞书 Wiki Base URL（6 张配置表共享）
+# 飞书 Wiki Base URL（7 张配置表共享）
 # --------------------------------------------------------------------------
 _WIKI_BASE = "https://bggc.feishu.cn/wiki/TcALwGgnciCQQYkPeHYcYf1Cnkd"
 
 # --------------------------------------------------------------------------
-# 飞书数据源配置：6 张配置表
+# 飞书数据源配置：7 张配置表
 # --------------------------------------------------------------------------
 LARK_SOURCES: list[LarkSourceConfig] = [
     LarkSourceConfig(
@@ -32,17 +32,27 @@ LARK_SOURCES: list[LarkSourceConfig] = [
             "日期",
             "商品id",
             "商品名称",
+            "商家名称",
             "产地",
             "包装类型",
             "单果大小",
             "色号",
             "商品头数",
+            "非试验区域抽佣率",
             "非试验区域平台销售斤单价",
             "非试验区域平台销售件单价",
             "非试验区域商家供货斤单价",
             "非试验区域商家供货件单价",
             "是否当日上架",
         ],
+        date_filter_field=None,
+        date_fields=["日期"],
+    ),
+    LarkSourceConfig(
+        name="conf_trial_product_info",
+        url=f"{_WIKI_BASE}?table=tblQ7tqbptg9Mdrq&view=vewmkLMh07",
+        table_name="conf_试验商品信息",
+        field_names=["日期", "商品id", "非试验区域抽佣率"],
         date_filter_field=None,
         date_fields=["日期"],
     ),
@@ -175,6 +185,8 @@ TARGET_SKU_IDS: list[int] = [10184690, 20519020, 20588413]
 # --------------------------------------------------------------------------
 TRIAL_PHASE_CONFIG: dict = {
     "dragon_boat_dates": [date(2026, 6, 19), date(2026, 6, 20), date(2026, 6, 21)],
+    "holiday_extension_days": 3,
+    "baseline_min_effective_days": 7,
     "historical_baseline_ranges": [
         (date(2026, 4, 13), date(2026, 4, 26)),
         (date(2026, 5, 11), date(2026, 5, 24)),

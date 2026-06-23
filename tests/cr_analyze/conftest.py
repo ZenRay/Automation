@@ -12,11 +12,13 @@ def sample_product_info() -> pd.DataFrame:
         "日期": [date(2026, 6, 20)] * 3,
         "商品id": [10184690, 20519020, 20588413],
         "商品名称": ["云南水仙芒大果", "云南水仙芒中果", "广西水仙芒大果"],
+        "商家名称": ["得兴果业", "得兴果业", "桂南果业"],
         "产地": ["云南", "云南", "广西"],
         "包装类型": ["泡沫箱", "泡沫箱", "纸箱"],
         "单果大小": ["大果", "中果", "大果"],
         "色号": ["5号色", "5号色", "3号色"],
         "商品头数": ["12", "15", "10"],
+        "非试验区域抽佣率": [0.075, 0.075, 0.046],
         "非试验区域平台销售斤单价": [6.0, 5.5, 5.0],
         "非试验区域平台销售件单价": [140.0, 120.0, 110.0],
         "非试验区域商家供货斤单价": [5.4, 4.9, 4.5],
@@ -101,6 +103,17 @@ def sample_trial_region_price() -> pd.DataFrame:
 
 
 @pytest.fixture
+def sample_trial_product_info() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "日期": [date(2026, 6, 20), date(2026, 6, 21), date(2026, 6, 20)],
+            "商品id": [10184690, 10184690, 20519020],
+            "非试验区域抽佣率": [0.075, 0.08, 0.075],
+        }
+    )
+
+
+@pytest.fixture
 def sample_fact_order_item() -> pd.DataFrame:
     return pd.DataFrame({
         "日期": [date(2026, 6, 20)] * 6,
@@ -128,6 +141,7 @@ def sample_fact_order_item() -> pd.DataFrame:
 @pytest.fixture
 def sample_lark_data(
     sample_product_info,
+    sample_trial_product_info,
     sample_county_info,
     sample_commission_adjustment,
     sample_trial_group,
@@ -136,6 +150,7 @@ def sample_lark_data(
 ) -> dict:
     return {
         "conf_product_info": sample_product_info,
+        "conf_trial_product_info": sample_trial_product_info,
         "conf_county_info": sample_county_info,
         "conf_commission_adjustment": sample_commission_adjustment,
         "conf_trial_group": sample_trial_group,

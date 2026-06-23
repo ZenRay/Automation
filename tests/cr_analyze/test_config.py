@@ -8,14 +8,15 @@ import pytest
 
 
 class TestLarkSources:
-    def test_six_sources_defined(self):
+    def test_seven_sources_defined(self):
         from workers.cr_analyze.config import LARK_SOURCES
-        assert len(LARK_SOURCES) == 6
+        assert len(LARK_SOURCES) == 7
 
     def test_source_names(self):
         from workers.cr_analyze.config import LARK_SOURCES
         names = {s.name for s in LARK_SOURCES}
         expected = {
+            "conf_trial_product_info",
             "conf_product_info", "conf_county_info",
             "conf_commission_adjustment", "conf_trial_region_price",
             "conf_trial_group", "conf_trial_period_rate",
@@ -60,6 +61,11 @@ class TestTrialPhaseConfig:
         ranges = TRIAL_PHASE_CONFIG["historical_baseline_ranges"]
         assert len(ranges) == 2
         assert ranges[0] == (date(2026, 4, 13), date(2026, 4, 26))
+
+    def test_holiday_extension_config(self):
+        from workers.cr_analyze.config import TRIAL_PHASE_CONFIG
+        assert TRIAL_PHASE_CONFIG["holiday_extension_days"] == 3
+        assert TRIAL_PHASE_CONFIG["baseline_min_effective_days"] >= 1
 
 
 class TestTargetSkuIds:

@@ -30,9 +30,200 @@ def preprocess_lark_dates(
         df = df.copy()
         for col in df.columns:
             if col == "日期" or col.endswith("日期"):
-                df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+                df[col] = _to_date_series(df[col])
         result[name] = df
     return result
+
+
+def _to_date_series(series: pd.Series) -> pd.Series:
+    """将任意日期/日期时间列统一按上海时区转为 datetime.date。"""
+    dt = pd.to_datetime(series, errors="coerce", utc=True)
+    return dt.dt.tz_convert("Asia/Shanghai").dt.date
+
+
+def _normalize_city_name(series: pd.Series) -> pd.Series:
+    """统一城市名：去除空白字符，避免 `株洲 市` 之类格式差异导致关联失败。"""
+    return series.astype(str).str.replace(r"\s+", "", regex=True).replace("nan", pd.NA)
+
+
+def compute_trial_phase_config_wide(
+    lark_data: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """构建试验阶段配置宽表。
+
+    规则:
+      - 以 conf_trial_group 与 conf_trial_period_rate 做 FULL JOIN
+      - JOIN 键: 试验分组 + 试验起始日期 + 试验结束日期
+      - 日期统一转 date，供看板阶段/分组配置共用
+    """
+    trial_group_df = lark_data.get("conf_trial_group", pd.DataFrame()).copy()
+    period_rate_df = lark_data.get("conf_trial_period_rate", pd.DataFrame()).copy()
+
+    cols = [
+        "市名称",
+        "区域名称",
+        "区域类型",
+        "试验分组",
+        "试验阶段",
+        "试验起始日期",
+        "试验结束日期",
+        "运营类型",
+        "抽佣率",
+        "city_unit",
+    ]
+
+    if trial_group_df.empty and period_rate_df.empty:
+        return pd.DataFrame(columns=cols)
+
+    tg_keep = [
+        c
+        for c in ["市名称", "区域名称", "区域类型", "试验分组", "试验起始日期", "试验结束日期"]
+        if c in trial_group_df.columns
+    ]
+    pr_keep = [
+        c
+        for c in ["试验阶段", "运营类型", "抽佣率", "试验分组", "试验起始日期", "试验结束日期"]
+        if c in period_rate_df.columns
+    ]
+
+    tg = trial_group_df[tg_keep].copy() if tg_keep else pd.DataFrame()
+    pr = period_rate_df[pr_keep].copy() if pr_keep else pd.DataFrame()
+
+    for df in [tg, pr]:
+        if "试验起始日期" in df.columns:
+            df["试验起始日期"] = _to_date_series(df["试验起始日期"])
+        if "试验结束日期" in df.columns:
+            df["试验结束日期"] = _to_date_series(df["试验结束日期"])
+
+    join_keys = ["试验分组", "试验起始日期", "试验结束日期"]
+    if tg.empty:
+        merged = pr.copy()
+        merged["市名称"] = pd.NA
+        merged["区域名称"] = pd.NA
+        merged["区域类型"] = pd.NA
+    elif pr.empty:
+        merged = tg.copy()
+        merged["试验阶段"] = pd.NA
+        merged["运营类型"] = pd.NA
+        merged["抽佣率"] = pd.NA
+    else:
+        merged = tg.merge(pr, on=join_keys, how="outer")
+
+    if "市名称" in merged.columns or "区域名称" in merged.columns:
+        city_series = (
+            merged["市名称"] if "市名称" in merged.columns else pd.Series(pd.NA, index=merged.index)
+        )
+        area_series = (
+            merged["区域名称"]
+            if "区域名称" in merged.columns
+            else pd.Series(pd.NA, index=merged.index)
+        )
+        merged["city_unit"] = city_series.fillna(area_series)
+    else:
+        merged["city_unit"] = pd.NA
+
+    for col in cols:
+        if col not in merged.columns:
+            merged[col] = pd.NA
+
+    merged = merged[cols].drop_duplicates().reset_index(drop=True)
+    return merged
+
+
+def compute_trial_phase_config_pivot(phase_wide_df: pd.DataFrame) -> pd.DataFrame:
+    """将阶段配置宽表透视为运营类型列，用于城市分组配置展示。"""
+    if phase_wide_df is None or phase_wide_df.empty:
+        return pd.DataFrame()
+
+    required = ["市名称", "试验分组", "试验阶段", "试验起始日期", "试验结束日期", "运营类型", "抽佣率"]
+    missing = [c for c in required if c not in phase_wide_df.columns]
+    if missing:
+        return pd.DataFrame()
+
+    base = phase_wide_df[required].copy()
+    base["试验起始日期"] = _to_date_series(base["试验起始日期"])
+    base["试验结束日期"] = _to_date_series(base["试验结束日期"])
+
+    pivot = base.pivot_table(
+        index=["市名称", "试验分组", "试验阶段", "试验起始日期", "试验结束日期"],
+        columns="运营类型",
+        values="抽佣率",
+        aggfunc="first",
+    ).reset_index()
+
+    pivot.columns.name = None
+    return pivot
+
+
+def compute_trial_sku_profile(
+    lark_data: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """构建试验 SKU 主数据。
+
+    规则:
+      - conf_trial_product_info INNER JOIN conf_product_info
+      - JOIN 键: 日期 + 商品id
+      - 输出参与过试验的商品及其最近参与日期
+    """
+    trial_df = lark_data.get("conf_trial_product_info", pd.DataFrame()).copy()
+    product_df = lark_data.get("conf_product_info", pd.DataFrame()).copy()
+
+    out_cols = ["商品id", "商品名称", "商家名称", "非试验区域抽佣率", "last_trial_date"]
+    if trial_df.empty or product_df.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    for df in [trial_df, product_df]:
+        if "日期" in df.columns:
+            df["日期"] = _to_date_series(df["日期"])
+        if "商品id" in df.columns:
+            df["商品id"] = pd.to_numeric(df["商品id"], errors="coerce")
+
+    trial_keep = [c for c in ["日期", "商品id", "非试验区域抽佣率"] if c in trial_df.columns]
+    product_keep = [
+        c for c in ["日期", "商品id", "商品名称", "商家名称", "非试验区域抽佣率"] if c in product_df.columns
+    ]
+    if "日期" not in trial_keep or "商品id" not in trial_keep:
+        return pd.DataFrame(columns=out_cols)
+    if "日期" not in product_keep or "商品id" not in product_keep:
+        return pd.DataFrame(columns=out_cols)
+
+    trial_base = trial_df[trial_keep].copy().rename(
+        columns={"非试验区域抽佣率": "非试验区域抽佣率_trial"}
+    )
+    product_base = product_df[product_keep].copy().rename(
+        columns={"非试验区域抽佣率": "非试验区域抽佣率_prod"}
+    )
+
+    merged = trial_base.merge(product_base, on=["日期", "商品id"], how="inner")
+    if merged.empty:
+        return pd.DataFrame(columns=out_cols)
+
+    trial_last = (
+        trial_base.groupby("商品id", as_index=False)["日期"].max().rename(columns={"日期": "last_trial_date"})
+    )
+    merged = merged.merge(trial_last, on="商品id", how="left")
+
+    merged = merged.sort_values(["商品id", "日期"], ascending=[True, False])
+    latest = merged.drop_duplicates(subset=["商品id"], keep="first").copy()
+
+    trial_rate = (
+        latest["非试验区域抽佣率_trial"]
+        if "非试验区域抽佣率_trial" in latest.columns
+        else pd.Series(pd.NA, index=latest.index)
+    )
+    prod_rate = (
+        latest["非试验区域抽佣率_prod"]
+        if "非试验区域抽佣率_prod" in latest.columns
+        else pd.Series(pd.NA, index=latest.index)
+    )
+    latest["非试验区域抽佣率"] = trial_rate.combine_first(prod_rate)
+
+    latest["商品id"] = pd.to_numeric(latest["商品id"], errors="coerce").astype("Int64")
+    for col in out_cols:
+        if col not in latest.columns:
+            latest[col] = pd.NA
+
+    return latest[out_cols].reset_index(drop=True)
 
 
 def compute_wide_table(
@@ -108,15 +299,25 @@ def compute_wide_table(
             subset=["join_key"]
         )
 
-        # 确保 fact 的 市名称 是普通 str 类型（避免 ArrowString 合并问题）
-        fact["市名称"] = fact["市名称"].astype(str).replace("nan", np.nan)
+        # 统一城市名用于关联，避免城市名包含空白导致无法匹配
+        fact["city_join_key"] = _normalize_city_name(fact["市名称"])
+        tg_city["join_key"] = _normalize_city_name(tg_city["join_key"])
 
-        fact = fact.merge(tg_city, left_on="市名称", right_on="join_key", how="left")
+        fact = fact.merge(
+            tg_city,
+            left_on="city_join_key",
+            right_on="join_key",
+            how="left",
+        )
         # city_unit 使用试验分组中的市名称（归并后的名称）
         fact["city_unit"] = fact["city_unit_tg"].fillna(fact["市名称"])
         # 重命名中文列名为英文，便于后续聚合引用
         if "试验分组" in fact.columns:
             fact = fact.rename(columns={"试验分组": "trial_group"})
+
+        # 仅保留试验分组命中的城市，避免非试验城市混入宽表
+        if "trial_group" in fact.columns:
+            fact = fact[fact["trial_group"].notna()]
     else:
         fact["city_unit"] = np.nan
         if "trial_group" not in fact.columns:
