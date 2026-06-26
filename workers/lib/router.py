@@ -6,11 +6,12 @@
 
 核心设计：统一数据池
 - 数据池（data_pool）合并 lark_data、mc_data、result_df 为统一引用字典
+- 数据池可选合并 file_data（本地文件源）
 - 多个路由引用同一 source_ref 时，共享同一份 DataFrame 对象（零拷贝）
 - per-route transforms 接收 DataFrame 副本（.copy()），避免路由间互相污染
 
 数据流转：
-  data_pool = {"result": df, "lark:xxx": df, "mc:yyy": df}
+    data_pool = {"result": df, "lark:xxx": df, "mc:yyy": df, "file:zzz": df}
     → Route A: source="mc:yyy" → transforms → validate → write → target_a
     → Route B: source="mc:yyy" → transforms → validate → write → target_b  (共享源数据)
     → Route C: source="result" → transforms → validate → write → target_c
@@ -125,6 +126,7 @@ class DataRouter:
         *,
         lark_data: dict[str, pd.DataFrame],
         mc_data: dict[str, pd.DataFrame],
+        file_data: Optional[dict[str, pd.DataFrame]] = None,
         result_df: Optional[pd.DataFrame] = None,
     ) -> RouteReport:
         """执行所有路由
@@ -133,6 +135,7 @@ class DataRouter:
             routes:    DataRoute 配置列表
             lark_data: {source.name -> DataFrame} 飞书数据源字典
             mc_data:   {query.name -> DataFrame} MaxCompute 查询结果字典
+            file_data: {source.name -> DataFrame} 本地文件源字典（可选）
             result_df: 主管道 merge + transform 后的结果 DataFrame（可选）
 
         Returns:
@@ -143,7 +146,7 @@ class DataRouter:
             return RouteReport()
 
         # 1. 构建统一数据池（零拷贝，只存引用）
-        data_pool = self._build_data_pool(lark_data, mc_data, result_df)
+        data_pool = self._build_data_pool(lark_data, mc_data, file_data, result_df)
         logger.info(
             f"Data pool built with {len(data_pool)} entries: "
             f"{list(data_pool.keys())}"
@@ -174,6 +177,7 @@ class DataRouter:
         self,
         lark_data: dict[str, pd.DataFrame],
         mc_data: dict[str, pd.DataFrame],
+        file_data: Optional[dict[str, pd.DataFrame]],
         result_df: Optional[pd.DataFrame],
     ) -> dict[str, pd.DataFrame]:
         """构建统一数据池
@@ -182,6 +186,7 @@ class DataRouter:
         - "result"      → result_df
         - "lark:<name>" → lark_data[name]
         - "mc:<name>"   → mc_data[name]
+        - "file:<name>" → file_data[name]
         """
         pool: dict[str, pd.DataFrame] = {}
         if result_df is not None:
@@ -190,6 +195,9 @@ class DataRouter:
             pool[f"lark:{name}"] = df
         for name, df in mc_data.items():
             pool[f"mc:{name}"] = df
+        if file_data:
+            for name, df in file_data.items():
+                pool[f"file:{name}"] = df
         return pool
 
     def _execute_single_route(

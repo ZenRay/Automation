@@ -5,11 +5,12 @@
   1. 加载配置（okr.config）
   2. 初始化客户端（LarkMultiDimTable + MaxComputerClient + FieldTypeCoercer）
   3. 拉取所有飞书源 -> lark_data: dict[name, DataFrame]（可选，无配置时跳过）
-  4. 执行所有 SQL 查询 -> mc_data: dict[name, DataFrame]
-  5. 数据融合 -> merged_df（有 merge 配置时执行，否则直接使用 SQL 结果）
-  6. 数据清洗/转换 -> result_df（使用 OKR 注册步骤）
-  7. 循环 LARK_TARGETS：清理旧数据 -> 类型转换 -> 写入
-  8. 结果校验与日志汇总
+    4. 拉取所有本地文件源 -> local_data: dict[name, DataFrame]（可选，无配置时跳过）
+    5. 执行所有 SQL 查询 -> mc_data: dict[name, DataFrame]
+    6. 数据融合 -> merged_df（有 merge 配置时执行，否则直接使用 SQL 结果）
+    7. 数据清洗/转换 -> result_df（使用 OKR 注册步骤）
+    8. 按路由写入目标（支持 result/lark/mc/file）
+    9. 结果校验与日志汇总
 
 每个步骤用 try/except 包裹，失败时记录错误并抛出。
 """
@@ -29,14 +30,16 @@ from automation import hints as MC_HINTS
 
 from workers.lib import (
     extract_all_lark_sources,
+    extract_all_local_sources,
     execute_all_queries,
     FieldTypeCoercer,
     write_to_all_targets,
     DateRangeParams,
     CleanupCondition,
 )
+from workers.lib.local_attachment_preprocessor import preprocess_local_attachment_columns
 from workers.lib.models import LarkSourceConfig, DataRoute
-from .config import LARK_SOURCES, SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR
+from .config import LARK_SOURCES, LOCAL_FILE_SOURCES, SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR
 from .config import DATA_ROUTES
 from .transformer import build_okr_transformer, OKR_MERGE_CONFIG, execute_okr_merge
 
@@ -232,10 +235,37 @@ def run_okr_pipeline(
         logger.info("[Step 2/7] No Lark sources configured, skipping extraction")
 
     # ------------------------------------------------------------------
-    # 步骤 3: 执行 SQL 查询
+    # 步骤 3: 拉取本地文件数据源（可选）
+    # ------------------------------------------------------------------
+    local_data: dict[str, pd.DataFrame] = {}
+    if LOCAL_FILE_SOURCES:
+        try:
+            logger.info(
+                f"[Step 3/8] Extracting {len(LOCAL_FILE_SOURCES)} local source(s)..."
+            )
+            local_data = extract_all_local_sources(LOCAL_FILE_SOURCES)
+
+            # 附件中间预处理：仅在 source 配置了 attachment_columns 时执行
+            source_config_map = {cfg.name: cfg for cfg in LOCAL_FILE_SOURCES}
+            for name, df in list(local_data.items()):
+                cfg = source_config_map.get(name)
+                if cfg is not None and cfg.attachment_columns:
+                    local_data[name] = preprocess_local_attachment_columns(df, cfg)
+                logger.info(
+                    f"  Local source '{name}': {local_data[name].shape[0]} rows, "
+                    f"{local_data[name].shape[1]} columns"
+                )
+        except Exception as e:
+            logger.error(f"[Step 3/8] Local file extraction failed: {e}")
+            return 1
+    else:
+        logger.info("[Step 3/8] No local file sources configured, skipping extraction")
+
+    # ------------------------------------------------------------------
+    # 步骤 4: 执行 SQL 查询
     # ------------------------------------------------------------------
     try:
-        logger.info(f"[Step 3/7] Executing {len(SQL_QUERIES)} SQL query/queries...")
+        logger.info(f"[Step 4/8] Executing {len(SQL_QUERIES)} SQL query/queries...")
         mc_data: dict[str, pd.DataFrame] = execute_all_queries(
             mc_client,
             SQL_QUERIES,
@@ -248,22 +278,20 @@ def run_okr_pipeline(
                 f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns"
             )
     except Exception as e:
-        logger.error(f"[Step 3/7] SQL execution failed: {e}")
+        logger.error(f"[Step 4/8] SQL execution failed: {e}")
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 4: 数据融合
+    # 步骤 5: 数据融合
     # ------------------------------------------------------------------
     try:
         # 优先使用 OKR 专属多步融合逻辑（合并多个飞书源 + MaxCompute 结果）
         # 如需回退到单次 merge，删除以下 if 块，使用 lib.transformer.merge()
         if _is_merge_config_active(OKR_MERGE_CONFIG):
-            logger.info(
-                "[Step 4/7] Using OKR multi-step merge (Lark sources + MaxCompute)..."
-            )
+            logger.info("[Step 5/8] Using OKR multi-step merge (Lark sources + MaxCompute)...")
             merged_df = execute_okr_merge(lark_data, mc_data)
         else:
-            logger.info("[Step 4/7] No active merge config, using SQL data directly")
+            logger.info("[Step 5/8] No active merge config, using SQL data directly")
             if len(mc_data) == 1:
                 merged_df = next(iter(mc_data.values()))
             else:
@@ -276,32 +304,32 @@ def run_okr_pipeline(
             f"  Data after merge/passthrough: {merged_df.shape[0]} rows, {merged_df.shape[1]} columns"
         )
     except Exception as e:
-        logger.error(f"[Step 4/7] Data merge failed: {e}")
+        logger.error(f"[Step 5/8] Data merge failed: {e}")
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 5: 数据清洗/转换
+    # 步骤 6: 数据清洗/转换
     # ------------------------------------------------------------------
     try:
         # execute_okr_merge 内部已执行过一次 transform，跳过重复调用
         if _is_merge_config_active(OKR_MERGE_CONFIG):
             logger.info(
-                "[Step 5/7] Transform already done in execute_okr_merge, skipping..."
+                "[Step 6/8] Transform already done in execute_okr_merge, skipping..."
             )
             result_df = merged_df  # merged_df 已经是 transform 后的结果
         else:
-            logger.info("[Step 5/7] Running transform pipeline...")
+            logger.info("[Step 6/8] Running transform pipeline...")
             transformer = build_okr_transformer()
             result_df = transformer.transform(merged_df)
         logger.info(
             f"  Transform result: {result_df.shape[0]} rows, {result_df.shape[1]} columns"
         )
     except Exception as e:
-        logger.error(f"[Step 5/7] Transform pipeline failed: {e}")
+        logger.error(f"[Step 6/8] Transform pipeline failed: {e}")
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 6: 写入目标表
+    # 步骤 7: 写入目标表
     # ------------------------------------------------------------------
     routes_had_failure = False
     try:
@@ -316,22 +344,24 @@ def run_okr_pipeline(
                 effective_routes,
                 lark_data=lark_data,
                 mc_data=mc_data,
+                file_data=local_data,
                 result_df=result_df,
             )
-            logger.info(f"[Step 6/7] Route completed: {report.summary}")
+            logger.info(f"[Step 7/8] Route completed: {report.summary}")
         else:
             # 旧模式：直接写入 LARK_TARGETS（向后兼容）
-            logger.info(f"[Step 6/7] Writing to {len(LARK_TARGETS)} target table(s)...")
+            logger.info(f"[Step 7/8] Writing to {len(LARK_TARGETS)} target table(s)...")
             write_to_all_targets(lark_client, result_df, LARK_TARGETS, coercer=coercer)
     except Exception as e:
-        logger.error(f"[Step 6/7] Target write had failures: {e}")
+        logger.error(f"[Step 7/8] Target write had failures: {e}")
         routes_had_failure = True
 
     # ------------------------------------------------------------------
-    # 步骤 7: 结果汇总
+    # 步骤 8: 结果汇总
     # ------------------------------------------------------------------
-    logger.info("[Step 7/7] Pipeline summary:")
+    logger.info("[Step 8/8] Pipeline summary:")
     logger.info(f"  Lark sources processed: {len(lark_data)}")
+    logger.info(f"  Local sources processed: {len(local_data)}")
     logger.info(f"  SQL queries executed:   {len(mc_data)}")
     logger.info(f"  Final result rows:      {len(result_df)}")
     logger.info(f"  Final result columns:   {len(result_df.columns)}")

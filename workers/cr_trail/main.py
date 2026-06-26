@@ -4,9 +4,10 @@
 串联 ETL 各步骤：
   1. 加载配置（cr_trail.config）
   2. 初始化客户端（LarkMultiDimTable + MaxComputerClient + FieldTypeCoercer）
-  3. 执行所有 SQL 查询 → mc_data: dict[name, DataFrame]，逐个 transform
-  4. 路由写入：per-route 日期作用域清理 → 类型转换 → 写入飞书多维表格
-  5. 结果校验与日志汇总
+    3. 拉取本地文件源（可选）→ local_data: dict[name, DataFrame]
+    4. 执行所有 SQL 查询 → mc_data: dict[name, DataFrame]，逐个 transform
+    5. 路由写入：per-route 日期作用域清理 → 类型转换 → 写入飞书多维表格
+    6. 结果校验与日志汇总
 
 多 SQL 多路由架构：
   - 每个 SQL 查询独立执行，结果存入 mc_data[query_name]
@@ -35,6 +36,7 @@ from automation.client import LarkMultiDimTable, MaxComputerClient
 from automation import hints as MC_HINTS
 
 from workers.lib import (
+    extract_all_local_sources,
     execute_all_queries,
     FieldTypeCoercer,
     DataRouter,
@@ -42,8 +44,9 @@ from workers.lib import (
     DateRangeParams,
     CleanupCondition,
 )
+from workers.lib.local_attachment_preprocessor import preprocess_local_attachment_columns
 from workers.lib.models import DataRoute
-from .config import SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR, DATA_ROUTES
+from .config import SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR, DATA_ROUTES, LOCAL_FILE_SOURCES
 from .transformer import build_cr_trail_transformer
 
 logger = logging.getLogger("workers.cr_trail.main")
@@ -190,10 +193,35 @@ def run_cr_trail_pipeline() -> int:
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 2: 执行 SQL 查询
+    # 步骤 2: 拉取本地文件数据源（可选）
+    # ------------------------------------------------------------------
+    local_data: dict[str, pd.DataFrame] = {}
+    if LOCAL_FILE_SOURCES:
+        try:
+            logger.info(
+                f"[Step 2/6] Extracting {len(LOCAL_FILE_SOURCES)} local source(s)..."
+            )
+            local_data = extract_all_local_sources(LOCAL_FILE_SOURCES)
+            source_config_map = {cfg.name: cfg for cfg in LOCAL_FILE_SOURCES}
+            for name, df in list(local_data.items()):
+                cfg = source_config_map.get(name)
+                if cfg is not None and cfg.attachment_columns:
+                    local_data[name] = preprocess_local_attachment_columns(df, cfg)
+                logger.info(
+                    f"  Local source '{name}': {local_data[name].shape[0]} rows, "
+                    f"{local_data[name].shape[1]} columns"
+                )
+        except Exception as e:
+            logger.error(f"[Step 2/6] Local file extraction failed: {e}")
+            return 1
+    else:
+        logger.info("[Step 2/6] No local file sources configured, skipping extraction")
+
+    # ------------------------------------------------------------------
+    # 步骤 3: 执行 SQL 查询
     # ------------------------------------------------------------------
     try:
-        logger.info(f"[Step 2/5] Executing {len(SQL_QUERIES)} SQL query/queries...")
+        logger.info(f"[Step 3/6] Executing {len(SQL_QUERIES)} SQL query/queries...")
         # 使用空 DateRangeParams 生成默认 sql_params，SQL 中 MAX_PT 不依赖日期参数
         default_params = DateRangeParams().sql_params()
         mc_data: dict[str, pd.DataFrame] = execute_all_queries(
@@ -208,14 +236,14 @@ def run_cr_trail_pipeline() -> int:
                 f"  SQL query '{name}': {df.shape[0]} rows, {df.shape[1]} columns"
             )
     except Exception as e:
-        logger.error(f"[Step 2/5] SQL execution failed: {e}")
+        logger.error(f"[Step 3/6] SQL execution failed: {e}")
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 3: 数据转换（当前为 pass-through，逐 SQL 结果处理）
+    # 步骤 4: 数据转换（当前为 pass-through，逐 SQL 结果处理）
     # ------------------------------------------------------------------
     try:
-        logger.info("[Step 3/5] Running transform pipeline...")
+        logger.info("[Step 4/6] Running transform pipeline...")
         transformer = build_cr_trail_transformer()
         # 逐个 SQL 结果进行转换，回写 mc_data 供路由引用
         for name in list(mc_data.keys()):
@@ -225,11 +253,11 @@ def run_cr_trail_pipeline() -> int:
                 f"{mc_data[name].shape[1]} columns"
             )
     except Exception as e:
-        logger.error(f"[Step 3/5] Transform pipeline failed: {e}")
+        logger.error(f"[Step 4/6] Transform pipeline failed: {e}")
         return 1
 
     # ------------------------------------------------------------------
-    # 步骤 4: 路由写入目标表
+    # 步骤 5: 路由写入目标表
     # ------------------------------------------------------------------
     routes_had_failure = False
     try:
@@ -253,26 +281,28 @@ def run_cr_trail_pipeline() -> int:
                 effective_routes,
                 lark_data={},  # 无飞书源
                 mc_data=mc_data,
+                file_data=local_data,
                 result_df=None,
             )
-            logger.info(f"[Step 4/5] Route completed: {report.summary}")
+            logger.info(f"[Step 5/6] Route completed: {report.summary}")
         else:
             # 回退模式：直接写入 LARK_TARGETS
             from workers.lib import write_to_all_targets
 
             first_name = SQL_QUERIES[0].name
-            logger.info(f"[Step 4/5] Writing to {len(LARK_TARGETS)} target table(s)...")
+            logger.info(f"[Step 5/6] Writing to {len(LARK_TARGETS)} target table(s)...")
             write_to_all_targets(
                 lark_client, mc_data[first_name], LARK_TARGETS, coercer=coercer
             )
     except Exception as e:
-        logger.error(f"[Step 4/5] Target write had failures: {e}")
+        logger.error(f"[Step 5/6] Target write had failures: {e}")
         routes_had_failure = True
 
     # ------------------------------------------------------------------
-    # 步骤 5: 结果汇总
+    # 步骤 6: 结果汇总
     # ------------------------------------------------------------------
-    logger.info("[Step 5/5] Pipeline summary:")
+    logger.info("[Step 6/6] Pipeline summary:")
+    logger.info(f"  Local sources processed: {len(local_data)}")
     logger.info(f"  SQL queries executed:   {len(mc_data)}")
     for name, df in mc_data.items():
         logger.info(f"    - {name}: {df.shape[0]} rows, {df.shape[1]} columns")

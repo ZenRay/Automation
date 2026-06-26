@@ -472,6 +472,56 @@ class LarkSourceConfig:
 
 
 @dataclass
+class LocalFileSourceConfig:
+    """本地文件数据源配置
+
+    支持平面文件读取：csv/tsv/txt/xlsx（xls 通过 pandas engine 兼容）。
+    为避免越权读取，默认要求配置 allowed_roots 白名单。
+
+    Attributes:
+        name:                   逻辑名，用于在 DataRoute.source_ref 中引用（file:<name>）
+        path:                   本地文件路径（绝对或相对路径）
+        format:                 文件类型：auto/csv/tsv/txt/xlsx/xls
+        sheet_name:             Excel sheet 名称或索引（仅 xlsx/xls 生效）
+        encoding:               文本文件编码（csv/tsv/txt 生效）
+        delimiter:              文本分隔符；None 时按 format 默认（csv=","，tsv/txt="\t"）
+        quotechar:              文本引用符，默认双引号
+        header:                 传给 pandas 的 header 参数
+        skiprows:               传给 pandas 的 skiprows 参数
+        usecols:                传给 pandas 的 usecols 参数
+        parse_dates:            传给 pandas 的 parse_dates 参数
+        dtype:                  传给 pandas 的 dtype 参数
+        read_kwargs:            透传给 pandas read_* 的额外参数
+        allowed_roots:          本地路径白名单规则列表（必填）
+        path_match_mode:        白名单匹配模式：prefix/glob/regex
+        attachment_columns:     需要做附件中间处理的列名
+        url_prefix_map:         URL 补全规则映射（见 local_attachment_preprocessor）
+        multi_value_separator:  多值分隔符（例如 "," 或 "|")
+        json_array_enabled:     是否允许 JSON 数组字符串输入
+    """
+
+    name: str
+    path: str
+    format: str = "auto"
+    sheet_name: Any = 0
+    encoding: Optional[str] = "utf-8"
+    delimiter: Optional[str] = None
+    quotechar: str = '"'
+    header: Any = 0
+    skiprows: Any = None
+    usecols: Any = None
+    parse_dates: Any = None
+    dtype: Any = None
+    read_kwargs: dict[str, Any] = field(default_factory=dict)
+    allowed_roots: list[str] = field(default_factory=list)
+    path_match_mode: str = "prefix"
+    attachment_columns: list[str] = field(default_factory=list)
+    url_prefix_map: dict[str, str] = field(default_factory=dict)
+    multi_value_separator: str = ","
+    json_array_enabled: bool = True
+
+
+@dataclass
 class SQLQueryConfig:
     """MaxCompute SQL 查询配置
 
@@ -551,6 +601,7 @@ class DataRoute:
     - "result"          → 主管道 result_df（merge + transform 后的结果）
     - "lark:<name>"     → 飞书源提取的 DataFrame
     - "mc:<name>"       → SQL 查询结果的 DataFrame
+    - "file:<name>"     → 本地文件源提取的 DataFrame
     - 以上引用在 DataRouter 执行时从统一数据池中查找
 
     向后兼容：
@@ -560,7 +611,8 @@ class DataRoute:
     Attributes:
         name:               路由名称，用于日志标识
         target:             目标表配置（复用 LarkTargetConfig）
-        source_ref:         数据源引用字符串，格式为 "result" | "lark:<name>" | "mc:<name>"
+        source_ref:         数据源引用字符串，格式为
+                            "result" | "lark:<name>" | "mc:<name>" | "file:<name>"
         transforms:         per-route 转换函数列表，签名 (df: DataFrame) -> DataFrame
                             每个路由独立执行自己的转换，互不影响
         validation_level:   校验级别

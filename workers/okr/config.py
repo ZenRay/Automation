@@ -11,6 +11,7 @@ from pathlib import Path
 
 from workers.lib import (
     LarkSourceConfig,
+    LocalFileSourceConfig,
     SQLQueryConfig,
     FieldMapping,
     LarkTargetConfig,
@@ -54,6 +55,30 @@ LARK_SOURCES: list[LarkSourceConfig] = [
         date_fields=["日期"],  # 日期类型：去掉时间部分，只保留日期
     ),
 ]
+
+# --------------------------------------------------------------------------
+# 本地文件源配置：默认关闭，按需在业务侧填充
+# source_ref 引用方式：file:<name>
+# --------------------------------------------------------------------------
+LOCAL_FILE_SOURCES: list[LocalFileSourceConfig] = []
+
+# 示例（按需取消注释）：
+# LOCAL_FILE_SOURCES = [
+#     LocalFileSourceConfig(
+#         name="okr_local_demo",
+#         path="./PrivateWork/okr_local_demo.csv",
+#         format="csv",
+#         delimiter=",",  # 可改为 "\t" / "|"
+#         encoding="utf-8",
+#         allowed_roots=["./PrivateWork", "./workers/okr"],
+#         path_match_mode="prefix",  # prefix | glob | regex
+#         attachment_columns=["素材链接"],
+#         # URL 补全："//cdn.xx" -> "https://cdn.xx"
+#         url_prefix_map={"//": "https://"},
+#         multi_value_separator=",",
+#         json_array_enabled=True,
+#     )
+# ]
 
 # --------------------------------------------------------------------------
 # MaxCompute SQL 查询配置：所有需要执行的 SQL 查询
