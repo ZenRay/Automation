@@ -18,6 +18,8 @@ from typing import Optional
 
 import pandas as pd
 
+from .attachment_persistence import AttachmentPersistence
+
 from .models import (
     LarkTargetConfig,
     FieldMapping,
@@ -85,6 +87,8 @@ def write_to_all_targets(
     result_df: pd.DataFrame,
     targets: list[LarkTargetConfig],
     coercer=None,
+    attachment_resolver=None,
+    persistence_config=None,
     validator=None,
     validation_level: str = "warn",
 ) -> None:
@@ -109,6 +113,8 @@ def write_to_all_targets(
                 target,
                 result_df,
                 coercer,
+                attachment_resolver=attachment_resolver,
+                persistence_config=persistence_config,
                 validator=validator,
                 validation_level=validation_level,
             )
@@ -123,6 +129,8 @@ def _write_single_target(
     target: LarkTargetConfig,
     result_df: pd.DataFrame,
     coercer=None,
+    attachment_resolver=None,
+    persistence_config=None,
     validator=None,
     validation_level: str = "warn",
 ) -> None:
@@ -175,6 +183,18 @@ def _write_single_target(
 
     logger.info(f"Target '{target.name}': app_token={app_token}, table_id={table_id}")
 
+    persistence = None
+    if persistence_config is not None and getattr(persistence_config, "enabled", False):
+        persistence = AttachmentPersistence(
+            artifact_dir=persistence_config.artifact_dir,
+            job_id=persistence_config.job_id,
+        )
+        checkpoint = persistence.load_checkpoint()
+        if checkpoint.get("stage") in {"upload_done", "write_done"} and attachment_resolver is not None:
+            token_map = persistence.load_latest_upload_token_map(target_name=target.name)
+            if token_map:
+                attachment_resolver.seed_token_cache(token_map)
+
     # 2. 清理旧数据
     if target.cleanup_conditions is not None:
         deleted_count = cleanup_target_table(client, target, table_id)
@@ -198,16 +218,52 @@ def _write_single_target(
             )
 
     # 4. 转换 DataFrame 为 records 格式
+    filtered_df = result_df
+    if persistence is not None and getattr(persistence_config, "retry_failed_only", False):
+        failed_rows = set(persistence.load_current_failed_write_rows(target_name=target.name))
+        if not failed_rows:
+            logger.info(
+                "Target '%s': retry_failed_only enabled and no failed rows found, skip write",
+                target.name,
+            )
+            persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": 0})
+            return
+        if "row_key" in result_df.columns:
+            filtered_df = result_df[result_df["row_key"].astype(str).isin(failed_rows)].copy()
+        else:
+            logger.warning(
+                "retry_failed_only enabled but DataFrame has no row_key column; fallback to full write"
+            )
+
     if coercer is not None:
-        records = coercer.apply_to_dataframe(result_df, target.field_mappings)
+        if attachment_resolver is not None and getattr(coercer, "attachment_resolver", None) is None:
+            coercer = type(coercer)(attachment_resolver=attachment_resolver)
+        records = coercer.apply_to_dataframe(filtered_df, target.field_mappings)
     else:
         # 假定 result_df 已经是 records 格式（list of {"fields": {...}}）
         records = (
-            result_df if isinstance(result_df, list) else result_df.to_dict("records")
+            filtered_df if isinstance(filtered_df, list) else filtered_df.to_dict("records")
         )
 
+    if persistence is not None:
+        persistence.save_checkpoint(stage="upload_done", batch_index=0, counters={"records": len(records)})
+
     # 4. 分批写入
-    _write_records_batched(client, table_id, target.name, records)
+    _write_records_batched(
+        client,
+        table_id,
+        target.name,
+        records,
+        persistence=persistence,
+        row_keys=(
+            filtered_df["row_key"].astype(str).tolist()
+            if isinstance(filtered_df, pd.DataFrame) and "row_key" in filtered_df.columns
+            else None
+        ),
+    )
+
+    if persistence is not None:
+        persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": len(records)})
 
 
 def _extract_date_range(cleanup_cond: CleanupCondition):
@@ -379,6 +435,8 @@ def _write_records_batched(
     table_id: str,
     target_name: str,
     records: list[dict],
+    persistence: AttachmentPersistence | None = None,
+    row_keys: list[str] | None = None,
 ) -> None:
     """分批写入记录到飞书多维表格
 
@@ -412,12 +470,32 @@ def _write_records_batched(
         try:
             client.add_batch_records(batch, table_id=table_id)
             success_count += len(batch)
+            if persistence is not None and row_keys is not None:
+                start_idx = i
+                for offset in range(len(batch)):
+                    row_key = row_keys[start_idx + offset]
+                    persistence.append_write_event(
+                        target_name=target_name,
+                        row_key=row_key,
+                        write_status="success",
+                        error_message=None,
+                    )
         except Exception as e:
             logger.error(
                 f"Target '{target_name}': batch {batch_num} failed: {e}. "
                 f"Records {i+1}-{i+len(batch)} not written."
             )
             failed_batches.append((batch_num, len(batch), str(e)))
+            if persistence is not None and row_keys is not None:
+                start_idx = i
+                for offset in range(len(batch)):
+                    row_key = row_keys[start_idx + offset]
+                    persistence.append_write_event(
+                        target_name=target_name,
+                        row_key=row_key,
+                        write_status="failed",
+                        error_message=str(e),
+                    )
 
         # 批次间间隔，避免限流
         if i + WRITE_BATCH_SIZE < total:
