@@ -146,6 +146,14 @@ def dashboard_db(tmp_path) -> str:
                 "n_weeks_available": [4, 4, 4],
             }
         ),
+        "power_cross_correlation": pd.DataFrame(
+            {
+                "sku_a": [10184690, 10184690, 20519020],
+                "sku_b": [20519020, 20588413, 20588413],
+                "rho": [0.61, 0.42, 0.38],
+                "risk_flag": [True, False, False],
+            }
+        ),
     }
 
     with sqlite3.connect(db_path) as conn:

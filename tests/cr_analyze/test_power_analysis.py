@@ -223,3 +223,42 @@ class TestFallbackBehavior:
         # 应有 fallback 标记
         if "fallback" in result.columns:
             assert result.iloc[0]["fallback"] is True or result.iloc[0]["fallback"] == True
+
+    def test_fallback_uses_prep_baseline_ranges(self):
+        """当历史基线周不足时，应合并回退阶段数据并标注数据来源。"""
+        from workers.cr_analyze.transformer import compute_power_analysis
+
+        cfg = {
+            "historical_baseline_ranges": [(date(2026, 4, 13), date(2026, 4, 19))],
+            "fallback_stage_ranges": [(date(2026, 6, 1), date(2026, 6, 30))],
+        }
+
+        # 历史基线仅 1 周；回退区间补足 3 周
+        rows = []
+        cities = [f"city_{i}" for i in range(8)]
+        hist_days = [date(2026, 4, 14)]
+        fb_days = [date(2026, 6, 2), date(2026, 6, 9), date(2026, 6, 16)]
+        for sku in [10184690, 20519020, 20588413]:
+            for d in hist_days + fb_days:
+                for c in cities:
+                    rows.append(
+                        {
+                            "日期": d,
+                            "sku_id": sku,
+                            "city_unit": c,
+                            "gmv": 100.0 + (sku % 10),
+                            "commission_amount": 8.0,
+                            "store_id": f"s_{c}",
+                            "order_item_id": f"oi_{sku}_{c}_{d}",
+                        }
+                    )
+        fact = pd.DataFrame(rows)
+
+        result = compute_power_analysis(fact, cfg)
+        assert not result.empty
+        assert "fallback" in result.columns
+        assert "data_source" in result.columns
+        assert "n_weeks_available" in result.columns
+        assert result["fallback"].astype(bool).all()
+        assert (result["data_source"] == "fallback_prep_plus_baseline").all()
+        assert (result["n_weeks_available"] >= 3).all()

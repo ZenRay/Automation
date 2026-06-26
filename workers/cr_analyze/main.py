@@ -358,7 +358,18 @@ def run_power_analysis(db_path: str | None = None) -> int:
             return 1
 
         # 写入 SQLite
-        write_tables(db_path, {"power_analysis": result})
+        cross_corr = result.attrs.get("cross_correlation", [])
+        cross_df = (
+            pd.DataFrame(cross_corr)
+            if cross_corr
+            else pd.DataFrame(columns=["sku_a", "sku_b", "rho", "risk_flag"])
+        )
+        if not cross_df.empty and "rho" in cross_df.columns:
+            cross_df["risk_flag"] = cross_df["rho"].apply(
+                lambda x: bool(pd.notna(x) and x > 0.5)
+            )
+
+        write_tables(db_path, {"power_analysis": result, "power_cross_correlation": cross_df})
         logger.info(
             f"Power analysis results written to power_analysis table ({len(result)} rows)"
         )

@@ -496,10 +496,16 @@ def _aggregate_by_stage(
         agg_cols["gmv"] = "sum"
     if "commission_amount" in df.columns:
         agg_cols["commission_amount"] = "sum"
+    if "ordered_num" in df.columns:
+        agg_cols["ordered_num"] = "sum"
     if "supply_price_per_jin" in df.columns:
         agg_cols["supply_price_per_jin"] = "mean"
     if "stockout_num" in df.columns:
         agg_cols["stockout_num"] = "sum"
+    if "trading_days" in df.columns:
+        agg_cols["trading_days"] = "max"
+    if "is_complete_week" in df.columns:
+        agg_cols["is_complete_week"] = "max"
 
     results = []
 
@@ -721,6 +727,53 @@ def _compute_cross_correlation(sku_dfs: dict[int, pd.DataFrame]) -> list[dict]:
     return results
 
 
+def _build_week_pairs(week_ids: list[str]) -> list[tuple[str, str]]:
+    """根据可用自然周构建 (pre, post) 周对。"""
+    weeks = [w for w in sorted(week_ids) if pd.notna(w)]
+    if len(weeks) < 2:
+        return []
+    if len(weeks) < 4:
+        return [(weeks[0], weeks[1])]
+    return [(weeks[0], weeks[1]), (weeks[-2], weeks[-1])]
+
+
+def _prepare_weekly_power_data(df: pd.DataFrame) -> pd.DataFrame:
+    """将事实数据整理为 SKU×城市×自然周 GMV。"""
+    if df.empty:
+        return pd.DataFrame(columns=["sku_id", "city_unit", "week_id", "gmv"])
+
+    required = {"sku_id", "city_unit", "gmv", "日期"}
+    if not required.issubset(df.columns):
+        return pd.DataFrame(columns=["sku_id", "city_unit", "week_id", "gmv"])
+
+    out = df.copy()
+    out["日期"] = pd.to_datetime(out["日期"], errors="coerce").dt.date
+    out = out.dropna(subset=["日期", "sku_id", "city_unit", "gmv"])
+    out["week_id"] = out["日期"].apply(
+        lambda d: f"W{d.isocalendar()[1]}" if pd.notna(d) else None
+    )
+    out = (
+        out.groupby(["sku_id", "city_unit", "week_id"], dropna=False)["gmv"]
+        .sum()
+        .reset_index()
+    )
+    return out
+
+
+def _min_nonzero_weeks_per_city(sku_weekly: pd.DataFrame) -> int:
+    """返回该 SKU 在城市维度上“非零GMV周数”的最小值。"""
+    if sku_weekly.empty or not {"city_unit", "week_id", "gmv"}.issubset(sku_weekly.columns):
+        return 0
+
+    nonzero = sku_weekly[sku_weekly["gmv"] > 0]
+    if nonzero.empty:
+        return 0
+    city_weeks = nonzero.groupby("city_unit", dropna=False)["week_id"].nunique()
+    if city_weeks.empty:
+        return 0
+    return int(city_weeks.min())
+
+
 def compute_power_analysis(
     fact_df: pd.DataFrame,
     config: dict,
@@ -736,6 +789,15 @@ def compute_power_analysis(
     """
     from .config import TARGET_SKU_IDS
 
+    required = {"日期", "sku_id", "city_unit", "gmv"}
+    if fact_df.empty or not required.issubset(fact_df.columns):
+        logger.warning("Power analysis missing required columns: 日期/sku_id/city_unit/gmv")
+        return pd.DataFrame()
+
+    fact_df = fact_df.copy()
+    fact_df["日期"] = pd.to_datetime(fact_df["日期"], errors="coerce").dt.date
+    fact_df = fact_df.dropna(subset=["日期"])
+
     # 按历史基线范围筛选
     baseline_ranges = config.get("historical_baseline_ranges", [])
     filtered = pd.DataFrame()
@@ -747,33 +809,43 @@ def compute_power_analysis(
         logger.warning("No historical baseline data for power analysis")
         return pd.DataFrame()
 
-    # 按 SKU × 城市 × 周聚合 GMV
-    filtered = filtered.copy()
-    filtered["日期"] = pd.to_datetime(filtered["日期"], errors="coerce").dt.date
+    weekly_hist = _prepare_weekly_power_data(filtered)
 
-    # 构造 week_id: 按自然周
-    filtered["week_id"] = filtered["日期"].apply(
-        lambda d: f"W{d.isocalendar()[1]}" if d else None
-    )
-
-    weekly = (
-        filtered.groupby(["sku_id", "city_unit", "week_id"])["gmv"].sum().reset_index()
-    )
-
-    # 定义周对 (pre: W1/W2, post: W3/W4)
-    all_weeks = sorted(weekly["week_id"].unique())
-    week_pairs = []
-    if len(all_weeks) >= 4:
-        mid = len(all_weeks) // 2
-        week_pairs.append((all_weeks[0], all_weeks[1]))
-        if mid + 1 < len(all_weeks):
-            week_pairs.append((all_weeks[mid], all_weeks[mid + 1]))
+    # fallback 备用池：归一化预备期 + 摸底期（来自配置阶段区间）
+    fallback_ranges = config.get("fallback_stage_ranges", [])
+    fallback_pool = pd.DataFrame()
+    for start, end in fallback_ranges:
+        mask = (fact_df["日期"] >= start) & (fact_df["日期"] <= end)
+        fallback_pool = pd.concat([fallback_pool, fact_df[mask]])
+    weekly_fallback = _prepare_weekly_power_data(fallback_pool)
 
     results = []
     sku_gmv_dfs = {}
 
     for sku_id in TARGET_SKU_IDS:
-        sku_weekly = weekly[weekly["sku_id"] == sku_id]
+        sku_weekly_hist = weekly_hist[weekly_hist["sku_id"] == sku_id]
+        min_nonzero_weeks = _min_nonzero_weeks_per_city(sku_weekly_hist)
+        fallback = min_nonzero_weeks < 3
+
+        sku_weekly = sku_weekly_hist.copy()
+        data_source = "historical_baseline"
+        confidence_note = ""
+        if fallback:
+            sku_weekly_fb = weekly_fallback[weekly_fallback["sku_id"] == sku_id]
+            if not sku_weekly_fb.empty:
+                sku_weekly = pd.concat([sku_weekly_hist, sku_weekly_fb], ignore_index=True)
+                sku_weekly = (
+                    sku_weekly.groupby(["sku_id", "city_unit", "week_id"], dropna=False)["gmv"]
+                    .sum()
+                    .reset_index()
+                )
+                data_source = "fallback_prep_plus_baseline"
+                confidence_note = "历史基线有效周不足，已回退使用归一化预备期+摸底期数据。"
+            else:
+                data_source = "historical_baseline_insufficient"
+                confidence_note = "历史基线有效周不足，且未找到回退阶段数据。"
+
+        week_pairs = _build_week_pairs(sku_weekly["week_id"].dropna().unique().tolist())
 
         # σ
         sigma_result = _compute_sigma(sku_weekly, sku_id)
@@ -786,10 +858,7 @@ def compute_power_analysis(
             sigma_result["sigma_adjusted"],
             rho_result["rho_main"],
         )
-
-        # 检查数据充分性
-        n_weeks = sku_weekly["week_id"].nunique()
-        fallback = n_weeks < 3
+        n_weeks = int(sku_weekly["week_id"].nunique()) if "week_id" in sku_weekly.columns else 0
 
         row = {
             "sku_id": sku_id,
@@ -808,6 +877,9 @@ def compute_power_analysis(
             **power_result,
             "fallback": fallback,
             "n_weeks_available": n_weeks,
+            "min_nonzero_weeks_per_city": min_nonzero_weeks,
+            "data_source": data_source,
+            "confidence_note": confidence_note,
         }
         results.append(row)
 
