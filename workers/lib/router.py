@@ -100,7 +100,12 @@ class DataRouter:
     """
 
     def __init__(
-        self, lark_client, coercer, validator: Optional[SchemaValidator] = None
+        self,
+        lark_client,
+        coercer,
+        validator: Optional[SchemaValidator] = None,
+        attachment_resolver=None,
+        persistence_config=None,
     ):
         """
         Args:
@@ -111,6 +116,8 @@ class DataRouter:
         self._lark_client = lark_client
         self._coercer = coercer
         self._validator = validator or SchemaValidator()
+        self._attachment_resolver = attachment_resolver
+        self._persistence_config = persistence_config
 
     def route(
         self,
@@ -272,6 +279,8 @@ class DataRouter:
                 route.target,
                 df,
                 coercer=self._coercer,
+                attachment_resolver=self._attachment_resolver,
+                persistence_config=self._persistence_config,
             )
 
             logger.info(f"--- Route '{route.name}' COMPLETED ---")

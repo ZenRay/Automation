@@ -16,8 +16,10 @@ from .models import (
     CleanupCondition,
     DataRoute,
     DateRangeParams,
+    PersistenceConfig,
 )
 from .type_coercer import FieldTypeCoercer
+from .attachment_resolver import AttachmentResolver
 from .lark_extractor import extract_all_lark_sources, extract_single_source
 from .mc_extractor import execute_all_queries
 from .transformer import DataTransformer
@@ -33,6 +35,7 @@ __all__ = [
     "LarkTargetConfig",
     "DataRoute",
     "DateRangeParams",
+    "PersistenceConfig",
     # 飞书字段类型枚举
     "LarkFieldType",
     # 筛选条件
@@ -41,6 +44,7 @@ __all__ = [
     "CleanupCondition",
     # 类型转换
     "FieldTypeCoercer",
+    "AttachmentResolver",
     # 数据拉取
     "extract_all_lark_sources",
     "extract_single_source",

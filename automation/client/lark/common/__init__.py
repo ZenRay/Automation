@@ -28,6 +28,14 @@ class LarkImURL(Enum):
     SEND_MESSAGE = f"{_lark_host}/open-apis/im/v1/messages"
 
 
+class LarkBitableURL(Enum):
+    """Lark Bitable API URL."""
+
+    UPLOAD_ATTACHMENT = (
+        f"{_lark_host}/open-apis/drive/v1/medias/upload_all"
+    )
+
+
 class LarkContactURL(Enum):
     """Lark Contact API URL."""
 
@@ -85,4 +93,4 @@ class MIMEType(Enum):
     MARKDOWN = "text/markdown"
 
 
-__all__ = ["LarkImURL", "MIMEType"]
+__all__ = ["LarkImURL", "LarkBitableURL", "MIMEType"]

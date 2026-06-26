@@ -21,6 +21,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from automation.utils.common.attachment import normalize_attachment_input
+
 from .models import FieldMapping, LarkFieldType
 
 logger = logging.getLogger("workers.lib.type_coercer")
@@ -39,6 +41,9 @@ class FieldTypeCoercer:
     # ------------------------------------------------------------------
     # 单值转换
     # ------------------------------------------------------------------
+
+    def __init__(self, attachment_resolver=None):
+        self.attachment_resolver = attachment_resolver
 
     def coerce_for_write(self, value: Any, lark_type: int, ui_type: str = "") -> Any:
         """将单个单元格值转换为飞书写入格式
@@ -72,6 +77,8 @@ class FieldTypeCoercer:
                 return self._coerce_person(value)
             elif lark_type == LarkFieldType.URL:
                 return self._coerce_url(value)
+            elif lark_type == LarkFieldType.ATTACHMENT:
+                return self._coerce_attachment(value)
             else:
                 # 未知类型原样传递，避免数据丢失
                 logger.debug(
@@ -157,6 +164,28 @@ class FieldTypeCoercer:
             return value
         url = str(value)
         return {"link": url, "text": url}
+
+    def _coerce_attachment(self, value: Any) -> list[dict]:
+        """type=17 附件：归一化为 [{"file_token": "..."}] 格式。
+
+        当前第一版默认只做输入解析；若注入 attachment_resolver，
+        则可由 resolver 将 URL 下载并上传为 file_token。
+        """
+        normalized_urls = normalize_attachment_input(value)
+        if not normalized_urls:
+            return []
+
+        if self.attachment_resolver is None:
+            return [{"url": url} for url in normalized_urls]
+
+        attachments = []
+        for url in normalized_urls:
+            resolved = self.attachment_resolver(url)
+            if isinstance(resolved, dict):
+                attachments.append(resolved)
+            else:
+                attachments.append({"file_token": str(resolved)})
+        return attachments
 
     # ------------------------------------------------------------------
     # 时间戳转换核心

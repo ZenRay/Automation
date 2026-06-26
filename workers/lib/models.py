@@ -574,3 +574,22 @@ class DataRoute:
     source_ref: str = "result"
     transforms: list[Callable] = field(default_factory=list)
     validation_level: str = "warn"
+
+
+@dataclass
+class PersistenceConfig:
+    """Persistence and retry configuration for attachment processing.
+
+    Attributes:
+        enabled:            Whether persistence/retry orchestration is enabled.
+        artifact_dir:       Base artifacts directory.
+        job_id:             Unique job identifier.
+        stage:              Optional current stage hint.
+        retry_failed_only:  Whether to write only rows that are currently failed.
+    """
+
+    enabled: bool = False
+    artifact_dir: str = "artifacts"
+    job_id: str = "default_job"
+    stage: str = "init"
+    retry_failed_only: bool = False
