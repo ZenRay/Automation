@@ -82,6 +82,46 @@ def _build_fields_from_mappings(mappings: list[FieldMapping]) -> list[dict]:
     return fields
 
 
+def _build_single_field_def(mapping: FieldMapping) -> dict:
+    """将单个 FieldMapping 转为 create_field API 所需结构。"""
+    field_def = {
+        "field_name": mapping.target_field,
+        "type": int(mapping.lark_type),
+    }
+    if int(mapping.lark_type) == int(LarkFieldType.DATE):
+        field_def["property"] = {"date_formatter": "yyyy/MM/dd"}
+    return field_def
+
+
+def _ensure_target_fields(client, *, table_id: str, target: LarkTargetConfig) -> None:
+    """确保目标表包含本次写入所需字段（缺失时自动创建）。"""
+    if not hasattr(client, "list_fields") or not hasattr(client, "create_field"):
+        logger.debug("Client does not support list_fields/create_field, skip field ensure")
+        return
+
+    existing_fields = client.list_fields(table_id=table_id)
+    existing_names = {
+        item.get("field_name")
+        for item in existing_fields
+        if isinstance(item, dict) and item.get("field_name")
+    }
+    missing_mappings = [
+        m for m in target.field_mappings if m.target_field not in existing_names
+    ]
+    if not missing_mappings:
+        return
+
+    logger.info(
+        "Target '%s': creating %d missing field(s): %s",
+        target.name,
+        len(missing_mappings),
+        [m.target_field for m in missing_mappings[:5]]
+        + (["..."] if len(missing_mappings) > 5 else []),
+    )
+    for mapping in missing_mappings:
+        client.create_field(_build_single_field_def(mapping), table_id=table_id)
+
+
 def write_to_all_targets(
     client,
     result_df: pd.DataFrame,
@@ -182,6 +222,9 @@ def _write_single_target(
             ) from e
 
     logger.info(f"Target '{target.name}': app_token={app_token}, table_id={table_id}")
+
+    # 1.5 字段对齐：目标表存在但字段未升级时，自动补齐缺失字段
+    _ensure_target_fields(client, table_id=table_id, target=target)
 
     persistence = None
     if persistence_config is not None and getattr(persistence_config, "enabled", False):
