@@ -9,8 +9,14 @@ import re
 import threading
 from datetime import datetime, timedelta
 
+import os
+from pathlib import Path
+
+from requests_toolbelt import MultipartEncoder
+
 from ..utils.lark_request import request
 from ..base import AccessToken, LarkClient
+from ..common import LarkBitableURL, MIMEType
 from ..exceptions import LarkException, RegexException
 
 logger = logging.getLogger("automation.lark.api.multidimention_table")
@@ -46,7 +52,7 @@ class LarkMultiDimTable(LarkClient):
         self.__raw_url = None
 
         self._regex_pattern = re.compile(
-            "http.*/(?P<app_type>base|wiki|docx|sheets)/(?P<app_token>[a-z0-9]*)\?table=(?P<table_id>[a-z0-9]*)",
+            r"http.*/(?P<app_type>base|wiki|docx|sheets)/(?P<app_token>[a-z0-9]*)\?table=(?P<table_id>[a-z0-9]*)",
             re.I,
         )
 
@@ -674,4 +680,73 @@ class LarkMultiDimTable(LarkClient):
                 msg=resp.get("msg", "Batch create records failed"),
             )
 
+        return resp
+
+    def upload_attachment(
+        self,
+        file,
+        *,
+        app_token: str = None,
+        file_name: str = None,
+        mime_type: str = None,
+        need_binary: bool = True,
+        parent_type: str = "bitable_file",
+        parent_node: str = None,
+    ):
+        """Upload attachment material to Bitable and return API response.
+
+        The response is expected to contain attachment metadata including file_token.
+        """
+        _app_token = app_token or self._app_token
+        if _app_token is None:
+            raise LarkException(msg="app_token is required for attachment upload")
+
+        if file is None:
+            raise ValueError("File path or bytes must be provided for attachment upload")
+
+        local_name = file_name
+        if isinstance(file, (str, os.PathLike)):
+            local_path = Path(file)
+            if local_name is None:
+                local_name = local_path.name
+            if need_binary:
+                with open(local_path, "rb") as f:
+                    file = f.read()
+
+        if local_name is None:
+            local_name = "attachment"
+
+        if mime_type is None:
+            suffix = Path(local_name).suffix.lower()
+            suffix_map = {
+                ".jpg": MIMEType.JPG.value,
+                ".jpeg": MIMEType.JPEG.value,
+                ".png": MIMEType.PNG.value,
+                ".gif": MIMEType.GIF.value,
+                ".webp": MIMEType.WEBP.value,
+                ".bmp": MIMEType.BMP.value,
+                ".mp4": MIMEType.MP4.value,
+            }
+            mime_type = suffix_map.get(suffix, MIMEType.STREAM.value)
+
+        upload_parent_node = parent_node or _app_token
+        url = LarkBitableURL.UPLOAD_ATTACHMENT.value
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+        }
+        file_size = len(file) if isinstance(file, (bytes, bytearray)) else 0
+        form = MultipartEncoder(
+            fields={
+                "file_name": local_name,
+                "parent_type": parent_type,
+                "parent_node": upload_parent_node,
+                "size": str(file_size),
+                "file": (local_name, file, mime_type),
+            }
+        )
+        headers["Content-Type"] = form.content_type
+        resp = request("POST", url, headers=headers, data=form)
+        if resp.get("code", -1) != 0:
+            logger.error(f"Failed to upload attachment({local_name}): {resp}")
+            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Upload attachment failed"))
         return resp
