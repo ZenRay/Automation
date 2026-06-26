@@ -151,11 +151,11 @@ WITH mall AS(
         ,t1.category_level1_id -- `一级类目id`
         ,t1.category_level1_name -- `一级类目名称`
         ,SUM(t1.delivered_goods_amt) AS delivered_goods_amt -- `送达金额`
-        ,SUM(t1.is_filtered * t1.delivered_goods_amt) AS delivered_goods_amt_filtered -- `过滤后送达金额`
+        ,SUM(t1.is_filtered * t1.delivered_goods_amt) AS delivered_goods_amt_filtered -- `剔除特定品类送达金额`
         ,SUM(t1.final_refund_amt) AS final_refund_amt -- `赔付金额`
         ,SUM(t1.delivered_goods_num) AS delivered_goods_num -- `送达数量`
         ,SUM(t1.after_sale_num_order_time) AS after_sale_num_order_time -- `售后数量`
-        ,SUM(t1.is_filtered * t1.final_refund_amt) AS final_refund_amt_filtered -- `过滤后赔付金额`
+        ,SUM(t1.is_filtered * t1.final_refund_amt) AS final_refund_amt_filtered -- `剔除特定品类赔付金额`
         ,SUM(t1.sku_num_onsale) AS sku_num_onsale -- `在售sku数`
 
         ,SUM(t1.sku_num_sold) AS sku_num_sold -- `动销sku数`
@@ -324,11 +324,11 @@ SELECT
         NVL(t3.ordered_store_num / t4.ordered_store_num, 0) , 5
     ) AS `日活覆盖率`
     ,NVL(t1.delivered_goods_amt,0) AS `送达金额`
-    ,NVL(t1.delivered_goods_amt_filtered,0) AS `过滤后送达金额`
+    ,NVL(t1.delivered_goods_amt_filtered,0) AS `剔除特定品类送达金额`
     ,NVL(t1.final_refund_amt,0) AS `赔付金额`
     ,NVL(t1.delivered_goods_num,0) AS `送达数量`
     ,NVL(t1.after_sale_num_order_time,0) AS `售后数量`
-    ,NVL(t1.final_refund_amt_filtered,0) AS `过滤后赔付金额`
+    ,NVL(t1.final_refund_amt_filtered,0) AS `剔除特定品类赔付金额`
     ,NVL(t1.sku_num_onsale,0) AS `在售sku数`
 
     ,NVL(t1.sku_num_sold,0) AS `动销sku数`
@@ -386,4 +386,5 @@ LEFT JOIN datawarehouse_max.dws_pub_mall_base_daily_asc t4
     AND t4.mall_id = t1.mall_id
 WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
                     AND DATEADD(${date_param}, ${end_offset}, "dd")
+
 ;

@@ -78,6 +78,11 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         depends_on=[],  # 独立查询，无数据依赖
     ),
     SQLQueryConfig(
+        name="cat4_stat",
+        sql_file="cat4_stat_query.sql",
+        depends_on=[],  # 独立查询，无数据依赖
+    ),
+    SQLQueryConfig(
         name="cat4_as_type",
         sql_file="cat4_as_type_query.sql",
         depends_on=[],  # 独立查询，无数据依赖
@@ -136,8 +141,8 @@ TARGET_OKR_CAT1 = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="过滤后送达金额",
-            target_field="过滤后送达金额",
+            source_col="剔除特定品类送达金额",
+            target_field="剔除特定品类送达金额",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
@@ -156,8 +161,8 @@ TARGET_OKR_CAT1 = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="过滤后赔付金额",
-            target_field="过滤后赔付金额",
+            source_col="剔除特定品类赔付金额",
+            target_field="剔除特定品类赔付金额",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
@@ -415,18 +420,18 @@ TARGET_OKR_MALL = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="过滤后送达金额",
-            target_field="过滤后送达金额",
+            source_col="剔除特定品类送达金额",
+            target_field="剔除特定品类送达金额",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="过滤后赔付金额",
-            target_field="过滤后赔付金额",
+            source_col="剔除特定品类赔付金额",
+            target_field="剔除特定品类赔付金额",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="过滤后售后赔付率",
-            target_field="过滤后售后赔付率",
+            source_col="剔除特定品类售后赔付率",
+            target_field="剔除特定品类售后赔付率",
             lark_type=LarkFieldType.NUMBER,
         ),
         # -- mall_stat: SKU --
@@ -799,9 +804,98 @@ TARGET_OKR_BD = LarkTargetConfig(
     cleanup_conditions=CleanupCondition.runtime_window(),
 )
 
+TARGET_OKR_CAT4 = LarkTargetConfig(
+    name="okr_cat4",
+    url=(
+        "https://bggc.feishu.cn/wiki/GoetwcGk8ilty7kTKRBcCI48nmc"
+        "?table=tbls6KSijm1R6chr&view=vew2WvvDaN"
+    ),
+    table_name="四级类目维度表",
+    field_mappings=[
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="月份", target_field="月份", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="是否月末", target_field="是否月末", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="一级类目名称", target_field="一级类目名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="二级类目名称", target_field="二级类目名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="三级类目名称", target_field="三级类目名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="四级类目id", target_field="四级类目id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="四级类目名称", target_field="四级类目名称", lark_type=LarkFieldType.TEXT
+        ),
+        FieldMapping(
+            source_col="送达金额", target_field="送达金额", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="赔付金额", target_field="赔付金额", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="在售sku数", target_field="在售sku数", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="动销sku数", target_field="动销sku数", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="老客户曝光店铺数",
+            target_field="老客户曝光店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="老客户下单店铺数",
+            target_field="老客户下单店铺数",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率",
+            target_field="一级类目渗透率",
+            lark_type=LarkFieldType.PERCENT,
+        ),
+        FieldMapping(
+            source_col="明细订单数", target_field="明细订单数", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="达标sku数", target_field="达标sku数", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="送达金额排名", target_field="送达金额排名", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="一级类目渗透率排名",
+            target_field="一级类目渗透率排名",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="上架商品数量", target_field="上架商品数量", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="更新商品卡片数量",
+            target_field="更新商品卡片数量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+    ],
+    cleanup_conditions=CleanupCondition.runtime_window(),
+)
+
 LARK_TARGETS: list[LarkTargetConfig] = [
     TARGET_OKR_CAT1,
     TARGET_OKR_MALL,
+    TARGET_OKR_CAT4,
     TARGET_OKR_CAT4_AS_TYPE,
     TARGET_OKR_BD,
 ]
@@ -835,6 +929,13 @@ DATA_ROUTES: list[DataRoute] = [
         name="okr_cat4_as_type",
         target=TARGET_OKR_CAT4_AS_TYPE,
         source_ref="mc:cat4_as_type",  # 独立 SQL 结果，不参与 merge
+        transforms=[],
+        validation_level="warn",
+    ),
+    DataRoute(
+        name="okr_cat4",
+        target=TARGET_OKR_CAT4,
+        source_ref="mc:cat4_stat",  # 独立 SQL 结果，不参与 merge
         transforms=[],
         validation_level="warn",
     ),
