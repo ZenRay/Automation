@@ -114,19 +114,20 @@ An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine
 
 ### User Story 6 - Tab 5: Guardrail Alerts (Priority: P1)
 
-A trial lead checks Tab 5 "护栏预警" weekly during the 生效期 to detect abnormal order volume or store count drops. The tab shows a city × SKU alert status table with three-color coding (🟢 GREEN / 🟡 YELLOW / 🔴 RED) based on week-over-week changes in order_count and active_store_count. Incomplete weeks are grayed out and excluded from alert calculations. A stockout trend line chart tracks supply disruptions. Alert thresholds are displayed at page bottom for reference.
+A trial lead checks Tab 5 "护栏预警" for risk monitoring across phases. During 摸底期, the tab shows actual monitoring metrics (without alert lights). During 生效期, it shows city × SKU alert status with three-color coding (🟢 GREEN / 🟡 YELLOW / 🔴 RED) based on week-over-week changes in order_count and active_store_count, where WoW is computed by trial stage-week sequence (stage_week, not natural week). The tab also provides metric selector, SKU selector, and a 2025 vs 2026 comparison sub-view with city selector (province-city plus overall option) and attribute filters.
 
 **Why this priority**: Guardrail metrics protect against unintended harm — a severe order drop or store exodus could indicate the commission changes are damaging the business. Early detection enables rollback.
 
-**Independent Test**: After 生效期 W2 data is available, verify the wow (week-over-week) calculations are correct and alert levels match the defined thresholds.
+**Independent Test**: During 摸底期, verify actual metric tables/charts are visible without alert lights; after 生效期 W2 data is available, verify WoW calculations (by stage_week sequence) and alert levels; verify 2025 vs 2026 comparison supports city selector and overall mode.
 
 **Acceptance Scenarios**:
 
-1. **Given** 生效期 data for W2 with order_count dropping 12% from W1 for a trial group city, **When** Tab 5 renders, **Then** that row shows 🔴 RED (threshold: order_count wow < -15% for trial group = RED; < -10% = YELLOW).
-2. **Given** a stage_week where is_complete_week = false, **When** Tab 5 renders, **Then** that week's wow values are grayed out and no alert is triggered regardless of the magnitude.
-3. **Given** active_store_count dropping 7% week-over-week, **When** Tab 5 renders, **Then** 🟡 YELLOW is shown (threshold: < -5% = YELLOW, < -10% = RED).
-4. **Given** the stockout trend chart, **When** stockout_num (下单数量 - 送达数量, positive differences only) increases significantly during 摸底期, **Then** the trend line is visible and annotated.
-5. **Given** the page bottom, **When** it renders, **Then** the alert threshold table is displayed showing all stage-specific thresholds from DP-003 (归一化预备期, 摸底期, 生效期 × metrics).
+1. **Given** current phase is 摸底期, **When** Tab 5 renders, **Then** it shows actual monitoring metrics (ordered_num, gmv, commission_amount, commission_rate, active_store_count, stockout_num) without alert lights.
+2. **Given** 生效期 data for W2 with order_count dropping 12% from W1 for a trial group city, **When** Tab 5 renders, **Then** that row shows alert according to configured thresholds.
+3. **Given** WoW calculation in Tab 5, **When** stage_week values are available, **Then** WoW is computed by stage_week sequence and the first week shows no comparison value.
+4. **Given** active_store_count dropping 7% week-over-week, **When** Tab 5 renders, **Then** 🟡 YELLOW is shown (threshold: < -5% = YELLOW, < -10% = RED).
+5. **Given** the stockout trend chart, **When** stockout_num (下单数量 - 送达数量, positive differences only) changes over stage_week, **Then** the trend line is visible and annotated.
+6. **Given** 2025 and 2026 data are present, **When** the comparison sub-view renders, **Then** users can filter by city (省名称-市名称) or select "整体" to aggregate without city split, with optional attribute filters.
 
 ---
 
@@ -233,10 +234,13 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 **Streamlit Dashboard — Tab 5: Guardrail Alerts**
 
-- **FR-034**: Tab 5 MUST display a city × SKU alert status table with three-color coding: 🟢 GREEN / 🟡 YELLOW / 🔴 RED based on week-over-week changes in order_count and active_store_count.
+- **FR-034**: Tab 5 MUST display a city × SKU alert status table with three-color coding: 🟢 GREEN / 🟡 YELLOW / 🔴 RED based on week-over-week changes in order_count and active_store_count during 生效期.
 - **FR-035**: Alert thresholds MUST be stage-specific: 生效期 order_count wow < -10% = YELLOW, < -15% = RED; active_store_count wow < -5% = YELLOW, < -10% = RED (all thresholds per DP-003 视图 F).
-- **FR-036**: Incomplete weeks (is_complete_week = false) MUST be grayed out and excluded from wow calculations and alert triggers.
+- **FR-036**: WoW in Tab 5 MUST be computed by trial stage-week sequence (`stage_week`) rather than natural week; first stage-week has no WoW baseline.
 - **FR-037**: Tab 5 MUST display a stockout_num trend line chart and a fixed alert threshold reference table at page bottom.
+- **FR-037a**: Tab 5 MUST provide metric selector (中文显示) and SKU selector for both baseline monitoring and effect-stage monitoring views.
+- **FR-037b**: During 摸底期, Tab 5 MUST show actual monitoring metrics (ordered_num, gmv, commission_amount, commission_rate, active_store_count, stockout_num) without red/yellow/green alert lights.
+- **FR-037c**: Tab 5 MUST provide a 2025 vs 2026 comparison sub-view with city selector (`省名称-市名称`) and an `整体` option that aggregates without city split.
 
 **Statistical Power Analysis**
 

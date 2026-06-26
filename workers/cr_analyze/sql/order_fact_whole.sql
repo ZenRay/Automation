@@ -15,8 +15,12 @@ WITH stores AS(
             t1.dt BETWEEN "2026-04-01"
                 AND CURRENT_DATE()
         ) OR (
-            t1.dt BETWEEN "2025-05-01"
+            t1.dt BETWEEN "2025-04-01"
                 AND "2025-07-31"
+        )
+        OR (
+            t1.dt BETWEEN "2024-04-01"
+                AND "2024-07-31"
         )
     )
     GROUP BY t1.dt
@@ -86,8 +90,11 @@ WITH stores AS(
                 t2.dt BETWEEN "2026-04-01"
                     AND CURRENT_DATE()
             ) OR (
-                t2.dt BETWEEN "2025-05-01"
+                t2.dt BETWEEN "2025-04-01"
                     AND "2025-07-31"
+            ) OR (
+                t2.dt BETWEEN "2024-04-01"
+                    AND "2024-07-31"
             )
         )
         AND t2.order_item_id = t1.order_item_id
@@ -101,8 +108,11 @@ WITH stores AS(
                 t1.dt BETWEEN "2026-04-01"
                     AND CURRENT_DATE()
             ) OR (
-                t1.dt BETWEEN "2025-05-01"
+                t1.dt BETWEEN "2025-04-01"
                     AND "2025-07-31"
+            )OR (
+                t1.dt BETWEEN "2024-04-01"
+                    AND "2024-07-31"
             )
         )
         AND t1.mall_id = 871
@@ -227,8 +237,11 @@ LEFT JOIN datawarehouse_max.dim_goods_extra_info_daily_full t2
                 t2.dt BETWEEN "2026-04-01"
                     AND CURRENT_DATE()
             ) OR (
-                t2.dt BETWEEN "2025-05-01"
+                t2.dt BETWEEN "2025-04-01"
                     AND "2025-07-31"
+            )OR (
+                t1.dt BETWEEN "2024-04-01"
+                    AND "2024-07-31"
             )
         )
     AND t2.dt = t1.dt

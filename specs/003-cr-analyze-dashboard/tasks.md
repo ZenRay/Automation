@@ -166,15 +166,17 @@
 
 - [x] T021 [US6] Implement `workers/cr_analyze/dashboard/tab5_guardrail.py`:
   - `render(db_path: str)`: render function
-  - Filter agg_wide_table to 生效期 (stage_week granularity)
-  - Compute wow (week-over-week): order_count_wow, store_count_wow per city × SKU
-  - Exclude incomplete weeks (is_complete_week = false) from wow and alerts (FR-036)
+  - Add metric selector (中文) and SKU selector
+  - During 摸底期, show actual monitoring metrics without alert lights
+  - During 生效期, compute wow (week-over-week): order_count_wow, store_count_wow per city × SKU
+  - Compute WoW by trial stage-week sequence (`stage_week`) instead of natural week (FR-036)
   - Assign alert_level per FR-035 thresholds:
     - 生效期: order_count wow < -10% = YELLOW, < -15% = RED
     - active_store_count wow < -5% = YELLOW, < -10% = RED
   - Alert status table with 🟢/🟡/🔴 coloring using streamlit-aggrid cellStyle (FR-034)
   - stockout_num trend line chart (FR-037)
   - Alert threshold reference table at page bottom (FR-037)
+  - Add 2025 vs 2026 comparison sub-view with city selector (`省名称-市名称` + `整体`) and attribute multi-select filters
 
 ### Dashboard Entry Point
 
