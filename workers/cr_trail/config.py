@@ -20,6 +20,7 @@ lib 层不引用本文件，保证 lib 的通用性。
 from pathlib import Path
 
 from workers.lib import (
+    LocalFileSourceConfig,
     SQLQueryConfig,
     FieldMapping,
     LarkTargetConfig,
@@ -37,6 +38,12 @@ SQL_BASE_DIR = Path(__file__).parent / "sql"
 # 飞书数据源配置：CR试验商品配置 不需要从飞书拉取数据
 # --------------------------------------------------------------------------
 LARK_SOURCES: list = []
+
+# --------------------------------------------------------------------------
+# 本地文件源配置：默认关闭，按需在业务侧填充
+# source_ref 引用方式：file:<name>
+# --------------------------------------------------------------------------
+LOCAL_FILE_SOURCES: list[LocalFileSourceConfig] = []
 
 # --------------------------------------------------------------------------
 # MaxCompute SQL 查询配置

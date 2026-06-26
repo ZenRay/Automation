@@ -7,6 +7,7 @@
 
 from .models import (
     LarkSourceConfig,
+    LocalFileSourceConfig,
     SQLQueryConfig,
     FieldMapping,
     LarkTargetConfig,
@@ -21,6 +22,7 @@ from .models import (
 from .type_coercer import FieldTypeCoercer
 from .attachment_resolver import AttachmentResolver
 from .lark_extractor import extract_all_lark_sources, extract_single_source
+from .file_extractor import extract_all_local_sources, extract_single_local_source
 from .mc_extractor import execute_all_queries
 from .transformer import DataTransformer
 from .lark_loader import write_to_all_targets, cleanup_target_table
@@ -30,6 +32,7 @@ from .router import DataRouter
 __all__ = [
     # 配置数据模型
     "LarkSourceConfig",
+    "LocalFileSourceConfig",
     "SQLQueryConfig",
     "FieldMapping",
     "LarkTargetConfig",
@@ -48,6 +51,8 @@ __all__ = [
     # 数据拉取
     "extract_all_lark_sources",
     "extract_single_source",
+    "extract_all_local_sources",
+    "extract_single_local_source",
     # SQL 执行
     "execute_all_queries",
     # 数据融合管道
