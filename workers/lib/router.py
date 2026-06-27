@@ -43,6 +43,7 @@ class RouteResult:
     source_ref: str
     source_shape: tuple
     final_shape: tuple
+    written_count: int = 0
     validation_report: Optional[ValidationReport] = None
     success: bool = True
     error: Optional[str] = None
@@ -282,7 +283,7 @@ class DataRouter:
                         df[col] = float("nan")
 
             # 4. 写入目标表（复用 lark_loader 的 _write_single_target）
-            _write_single_target(
+            written_count = _write_single_target(
                 self._lark_client,
                 route.target,
                 df,
@@ -297,6 +298,7 @@ class DataRouter:
                 source_ref=route.source_ref,
                 source_shape=source_shape,
                 final_shape=df.shape,
+                written_count=written_count,
                 validation_report=validation_report,
                 success=True,
             )

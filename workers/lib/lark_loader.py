@@ -173,7 +173,7 @@ def _write_single_target(
     persistence_config=None,
     validator=None,
     validation_level: str = "warn",
-) -> None:
+) -> int:
     """写入单个目标表
 
     步骤：
@@ -270,7 +270,7 @@ def _write_single_target(
                 target.name,
             )
             persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": 0})
-            return
+            return 0
         if "row_key" in result_df.columns:
             filtered_df = result_df[result_df["row_key"].astype(str).isin(failed_rows)].copy()
         else:
@@ -292,7 +292,7 @@ def _write_single_target(
         persistence.save_checkpoint(stage="upload_done", batch_index=0, counters={"records": len(records)})
 
     # 4. 分批写入
-    _write_records_batched(
+    written_count = _write_records_batched(
         client,
         table_id,
         target.name,
@@ -307,6 +307,8 @@ def _write_single_target(
 
     if persistence is not None:
         persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": len(records)})
+
+    return written_count
 
 
 def _extract_date_range(cleanup_cond: CleanupCondition):
@@ -480,7 +482,7 @@ def _write_records_batched(
     records: list[dict],
     persistence: AttachmentPersistence | None = None,
     row_keys: list[str] | None = None,
-) -> None:
+) -> int:
     """分批写入记录到飞书多维表格
 
     Args:
@@ -494,7 +496,7 @@ def _write_records_batched(
     """
     if not records:
         logger.info(f"Target '{target_name}': no records to write")
-        return
+        return 0
 
     total = len(records)
     success_count = 0
@@ -557,3 +559,4 @@ def _write_records_batched(
     logger.info(
         f"Target '{target_name}': all {success_count} records written successfully"
     )
+    return success_count
