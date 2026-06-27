@@ -630,14 +630,14 @@ class DataRoute:
 
 @dataclass
 class PersistenceConfig:
-    """Persistence and retry configuration for attachment processing.
+    """Persistence and retry configuration for route write processing.
 
     Attributes:
-        enabled:            Whether persistence/retry orchestration is enabled.
-        artifact_dir:       Base artifacts directory.
-        job_id:             Unique job identifier.
+        enabled:            Whether route write persistence is enabled.
+        artifact_dir:       Base artifacts directory for job outputs.
+        job_id:             Unique job identifier under artifact_dir.
         stage:              Optional current stage hint.
-        retry_failed_only:  Whether to write only rows that are currently failed.
+        retry_failed_only:  Whether to write only rows currently marked failed.
     """
 
     enabled: bool = False

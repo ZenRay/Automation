@@ -6,22 +6,25 @@
 # Stage 1: Build dependencies
 FROM python:3.12-slim AS builder
 
+ENV PATH="/opt/venv/bin:$PATH" \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.lock.txt .
-RUN pip install --no-cache-dir -r requirements.lock.txt
+RUN pip install -r requirements.lock.txt
 
 # Stage 2: Runtime
 FROM python:3.12-slim
 
-RUN groupadd -g 10001 appgroup && \
-    useradd -u 10001 -g appgroup -m -s /bin/bash appuser
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    TZ=Asia/Shanghai
+
+RUN groupadd -g 10001 appgroup && useradd -u 10001 -g appgroup -m -s /bin/bash appuser
 
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
-ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 

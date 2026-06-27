@@ -20,7 +20,7 @@ from .models import (
     PersistenceConfig,
 )
 from .type_coercer import FieldTypeCoercer
-from .attachment_resolver import AttachmentResolver
+from .attachment_token_resolver import AttachmentTokenResolver
 from .lark_extractor import extract_all_lark_sources, extract_single_source
 from .file_extractor import extract_all_local_sources, extract_single_local_source
 from .mc_extractor import execute_all_queries
@@ -47,7 +47,7 @@ __all__ = [
     "CleanupCondition",
     # 类型转换
     "FieldTypeCoercer",
-    "AttachmentResolver",
+    "AttachmentTokenResolver",
     # 数据拉取
     "extract_all_lark_sources",
     "extract_single_source",

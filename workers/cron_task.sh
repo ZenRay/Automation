@@ -4,6 +4,7 @@
 # 任务列表：
 #   1. OKR 数据管道 - 支持调度层参数透传（--date / --start / --end）
 #   2. CR Trail 商品配置 ETL - 使用 CURRENT_DATE，无需日期参数
+#   3. Upgrade After Sale - 持久化主跑，失败时重试失败行
 #
 # 用法：
 #   ./cron_task.sh                                     # 默认：today, T-7~T
@@ -28,6 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"  # workers/ -> project root
 VENV_DIR="$PROJECT_DIR/.venv"
 LOG_DIR="$PROJECT_DIR/logs"
+PERSISTENCE_DIR="$PROJECT_DIR/logs/persistence"
 LOCK_FILE="$PROJECT_DIR/.pipeline.lock"
 
 # ---------------------------------------------------------------------------
@@ -52,13 +54,15 @@ fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[DRY-RUN] Task 1: python -m workers.okr.main ${ARGS[*]:-}"
     echo "[DRY-RUN] Task 2: python -m workers.cr_trail.main"
+    echo "[DRY-RUN] Task 3(main): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date>"
+    echo "[DRY-RUN] Task 3(retry-on-fail): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date> --retry-failed-only"
     exit 0
 fi
 
 # ---------------------------------------------------------------------------
 # 日志目录（首次运行自动创建）
 # ---------------------------------------------------------------------------
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$PERSISTENCE_DIR/cron" "$PERSISTENCE_DIR/upgrade_after_sale"
 
 # ---------------------------------------------------------------------------
 # 锁文件：防止上一次未完成时重复启动
@@ -95,30 +99,72 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 开始执行数据管道 =======
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 工作目录: $PROJECT_DIR"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python: $(which python)"
 
+RUN_DATE="$(date '+%Y-%m-%d')"
+for ((i=0; i<${#ARGS[@]}; i++)); do
+    if [[ "${ARGS[$i]}" == "--date" && $((i + 1)) -lt ${#ARGS[@]} ]]; then
+        RUN_DATE="${ARGS[$((i + 1))]}"
+    fi
+done
+
+CRON_LOG_FILE="$PERSISTENCE_DIR/cron/cron_task_${RUN_DATE}.log"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cron log file: $CRON_LOG_FILE"
+
 # ---------------------------------------------------------------------------
 # Task 1: OKR 数据管道
 # ---------------------------------------------------------------------------
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
 
 if python -m workers.okr.main "${ARGS[@]}"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - SUCCESS"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - SUCCESS" | tee -a "$CRON_LOG_FILE"
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/2] OKR 数据管道 - FAILED (exit_code=$EXIT_CODE)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - FAILED (exit_code=$EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
     exit $EXIT_CODE
 fi
 
 # ---------------------------------------------------------------------------
 # Task 2: CR Trail 商品配置 ETL（使用 CURRENT_DATE，无需日期参数）
 # ---------------------------------------------------------------------------
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - START"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] CR Trail ETL - START" | tee -a "$CRON_LOG_FILE"
 
 if python -m workers.cr_trail.main; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - SUCCESS"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] CR Trail ETL - SUCCESS" | tee -a "$CRON_LOG_FILE"
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/2] CR Trail ETL - FAILED (exit_code=$EXIT_CODE)"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] CR Trail ETL - FAILED (exit_code=$EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
     exit $EXIT_CODE
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 全部任务执行完成 =========="
+# ---------------------------------------------------------------------------
+# Task 3: Upgrade After Sale（末位执行）
+# 规则：先主跑，失败时再补跑 retry_failed_only。
+# ---------------------------------------------------------------------------
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - START (main run)" | tee -a "$CRON_LOG_FILE"
+
+UA_BASE_ARGS=(
+    --date "$RUN_DATE"
+    --as-start -7
+    --as-end 0
+    --order-start -1
+    --order-end 0
+    --enable-persistence
+    --persistence-dir "$PERSISTENCE_DIR/upgrade_after_sale"
+    --job-id "$RUN_DATE"
+)
+
+if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}"; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (main run)" | tee -a "$CRON_LOG_FILE"
+else
+    EXIT_CODE=$?
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - FAILED (main run, exit_code=$EXIT_CODE), retry failed rows" | tee -a "$CRON_LOG_FILE"
+
+    if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" --retry-failed-only; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (retry_failed_only)" | tee -a "$CRON_LOG_FILE"
+    else
+        RETRY_EXIT_CODE=$?
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - FAILED (retry_failed_only, exit_code=$RETRY_EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
+        exit $RETRY_EXIT_CODE
+    fi
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 全部任务执行完成 ==========" | tee -a "$CRON_LOG_FILE"

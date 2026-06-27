@@ -2,21 +2,16 @@
 # Usage: podman compose -f compose.yml -f compose.production.yml up -d
 
 services:
-  worker:
+  scheduler:
     restart: always
     environment:
       - TZ=Asia/Shanghai
       - PYTHONLOGFORMAT=text
       - LOG_LEVEL=INFO
+      - SCHEDULE_HOUR=${SCHEDULE_HOUR:-7}
+      - SCHEDULE_MIN=${SCHEDULE_MIN:-30}
     deploy:
       resources:
         limits:
           cpus: "4.0"
           memory: 8G
-
-  scheduler:
-    environment:
-      - TZ=Asia/Shanghai
-      - PYTHONLOGFORMAT=text
-      - LOG_LEVEL=INFO
-      - SCHEDULE_INTERVAL=${SCHEDULE_INTERVAL:-3600}

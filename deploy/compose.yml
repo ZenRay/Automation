@@ -1,27 +1,4 @@
 services:
-  worker:
-    image: ${IMAGE}
-    command: bash /app/workers/cron_task.sh
-    restart: unless-stopped
-    volumes:
-      - ${CONFIG_DIR:-/opt/automation/config}/_lark.ini:/app/automation/conf/_lark.ini:ro
-      - ${CONFIG_DIR:-/opt/automation/config}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro
-    environment:
-      - TZ=Asia/Shanghai
-      - PYTHONLOGFORMAT=text
-      - LOG_LEVEL=INFO
-    healthcheck:
-      test: ["CMD", "python", "--version"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 4G
-
   scheduler:
     image: ${IMAGE}
     command: bash /app/deploy/scripts/scheduler.sh
@@ -33,12 +10,15 @@ services:
       - TZ=Asia/Shanghai
       - PYTHONLOGFORMAT=text
       - LOG_LEVEL=INFO
-      - SCHEDULE_INTERVAL=${SCHEDULE_INTERVAL:-3600}
+      - SCHEDULE_HOUR=${SCHEDULE_HOUR:-7}
+      - SCHEDULE_MIN=${SCHEDULE_MIN:-30}
     healthcheck:
       test: ["CMD", "pgrep", "-f", "scheduler.sh"]
       interval: 60s
       timeout: 10s
       retries: 3
-    depends_on:
-      worker:
-        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G

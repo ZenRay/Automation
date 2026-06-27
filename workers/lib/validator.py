@@ -14,7 +14,7 @@ FieldMapping.lark_type 兼容"。
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Optional
 
 import numpy as np
@@ -237,7 +237,7 @@ class SchemaValidator:
             sample = non_null.head(sample_size)
 
             for val in sample:
-                if isinstance(val, (pd.Timestamp, np.datetime64, datetime)):
+                if isinstance(val, (pd.Timestamp, np.datetime64, datetime, date)):
                     dtype_kinds.add("datetime")
                 elif isinstance(val, (int, float, np.integer, np.floating)):
                     dtype_kinds.add("numeric_timestamp")
@@ -321,7 +321,11 @@ class SchemaValidator:
                     )
 
             # PERCENT 字段值域检查
-            if m.lark_type == LarkFieldType.PERCENT and pd.api.types.is_numeric_dtype(
+            is_percent_field = (
+                m.lark_type == LarkFieldType.PERCENT
+                and (m.lark_ui_type or "").lower() in {"progress", "percent", "percentage"}
+            )
+            if is_percent_field and pd.api.types.is_numeric_dtype(
                 col
             ):
                 non_null = col.dropna()

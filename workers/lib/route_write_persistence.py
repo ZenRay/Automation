@@ -1,5 +1,5 @@
 # coding:utf8
-"""Attachment persistence utilities.
+"""Route write persistence utilities.
 
 This module stores processing artifacts in JSONL/JSON for:
 - parse/upload/write events
@@ -50,12 +50,12 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 @dataclass
-class AttachmentPersistence:
+class RouteWritePersistence:
     artifact_dir: str
     job_id: str
 
     def __post_init__(self):
-        self.base_dir = Path(self.artifact_dir) / "attachments" / self.job_id
+        self.base_dir = Path(self.artifact_dir) / self.job_id
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.input_snapshot_path = self.base_dir / "input_snapshot.jsonl"
         self.parsed_snapshot_path = self.base_dir / "parsed_snapshot.jsonl"

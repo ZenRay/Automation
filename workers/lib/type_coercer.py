@@ -181,6 +181,8 @@ class FieldTypeCoercer:
         attachments = []
         for url in normalized_urls:
             resolved = self.attachment_resolver(url)
+            if resolved is None:
+                continue
             if isinstance(resolved, dict):
                 attachments.append(resolved)
             else:
@@ -311,6 +313,8 @@ class FieldTypeCoercer:
     def _is_null(value: Any) -> bool:
         """判断值是否为空（None / NaN / NaT / 空字符串）"""
         if value is None:
+            return True
+        if isinstance(value, str) and value.strip() == "":
             return True
         # float NaN
         if isinstance(value, float) and np.isnan(value):

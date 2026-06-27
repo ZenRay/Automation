@@ -18,7 +18,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .attachment_persistence import AttachmentPersistence
+from .route_write_persistence import RouteWritePersistence
 
 from .models import (
     LarkTargetConfig,
@@ -173,7 +173,7 @@ def _write_single_target(
     persistence_config=None,
     validator=None,
     validation_level: str = "warn",
-) -> None:
+) -> int:
     """写入单个目标表
 
     步骤：
@@ -228,7 +228,7 @@ def _write_single_target(
 
     persistence = None
     if persistence_config is not None and getattr(persistence_config, "enabled", False):
-        persistence = AttachmentPersistence(
+        persistence = RouteWritePersistence(
             artifact_dir=persistence_config.artifact_dir,
             job_id=persistence_config.job_id,
         )
@@ -270,13 +270,12 @@ def _write_single_target(
                 target.name,
             )
             persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": 0})
-            return
-        if "row_key" in result_df.columns:
-            filtered_df = result_df[result_df["row_key"].astype(str).isin(failed_rows)].copy()
-        else:
-            logger.warning(
-                "retry_failed_only enabled but DataFrame has no row_key column; fallback to full write"
+            return 0
+        if "row_key" not in result_df.columns:
+            raise ValueError(
+                "retry_failed_only enabled but DataFrame has no row_key column"
             )
+        filtered_df = result_df[result_df["row_key"].astype(str).isin(failed_rows)].copy()
 
     if coercer is not None:
         if attachment_resolver is not None and getattr(coercer, "attachment_resolver", None) is None:
@@ -292,7 +291,7 @@ def _write_single_target(
         persistence.save_checkpoint(stage="upload_done", batch_index=0, counters={"records": len(records)})
 
     # 4. 分批写入
-    _write_records_batched(
+    written_count = _write_records_batched(
         client,
         table_id,
         target.name,
@@ -307,6 +306,8 @@ def _write_single_target(
 
     if persistence is not None:
         persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": len(records)})
+
+    return written_count
 
 
 def _extract_date_range(cleanup_cond: CleanupCondition):
@@ -478,9 +479,9 @@ def _write_records_batched(
     table_id: str,
     target_name: str,
     records: list[dict],
-    persistence: AttachmentPersistence | None = None,
+    persistence: RouteWritePersistence | None = None,
     row_keys: list[str] | None = None,
-) -> None:
+) -> int:
     """分批写入记录到飞书多维表格
 
     Args:
@@ -494,7 +495,7 @@ def _write_records_batched(
     """
     if not records:
         logger.info(f"Target '{target_name}': no records to write")
-        return
+        return 0
 
     total = len(records)
     success_count = 0
@@ -557,3 +558,4 @@ def _write_records_batched(
     logger.info(
         f"Target '{target_name}': all {success_count} records written successfully"
     )
+    return success_count

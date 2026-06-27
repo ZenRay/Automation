@@ -2,20 +2,15 @@
 # Usage: podman compose -f compose.yml -f compose.staging.yml up -d
 
 services:
-  worker:
-    environment:
-      - TZ=Asia/Shanghai
-      - PYTHONLOGFORMAT=text
-      - LOG_LEVEL=DEBUG
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 2G
-
   scheduler:
     environment:
       - TZ=Asia/Shanghai
       - PYTHONLOGFORMAT=text
       - LOG_LEVEL=DEBUG
-      - SCHEDULE_INTERVAL=${SCHEDULE_INTERVAL:-1800}
+      - SCHEDULE_HOUR=${SCHEDULE_HOUR:-7}
+      - SCHEDULE_MIN=${SCHEDULE_MIN:-30}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
