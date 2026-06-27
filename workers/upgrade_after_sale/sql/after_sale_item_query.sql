@@ -269,5 +269,4 @@ SELECT
 FROM base t1
 WHERE DATE(t1.apply_time) BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
                         AND DATEADD(${date_param}, ${end_offset}, "dd")
-LIMIT 10
 ;
