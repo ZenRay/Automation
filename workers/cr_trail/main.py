@@ -44,9 +44,17 @@ from workers.lib import (
     DateRangeParams,
     CleanupCondition,
 )
-from workers.lib.local_attachment_preprocessor import preprocess_local_attachment_columns
+from workers.lib.local_attachment_preprocessor import (
+    preprocess_local_attachment_columns,
+)
 from workers.lib.models import DataRoute
-from .config import SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR, DATA_ROUTES, LOCAL_FILE_SOURCES
+from .config import (
+    SQL_QUERIES,
+    LARK_TARGETS,
+    SQL_BASE_DIR,
+    DATA_ROUTES,
+    LOCAL_FILE_SOURCES,
+)
 from .transformer import build_cr_trail_transformer
 
 logger = logging.getLogger("workers.cr_trail.main")

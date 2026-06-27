@@ -27,7 +27,9 @@ BASE_URL = (
 )
 
 
-def _fm(source_col: str, lark_type: LarkFieldType, target_field: str | None = None) -> FieldMapping:
+def _fm(
+    source_col: str, lark_type: LarkFieldType, target_field: str | None = None
+) -> FieldMapping:
     return FieldMapping(
         source_col=source_col,
         target_field=target_field or source_col,

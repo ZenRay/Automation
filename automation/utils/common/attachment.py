@@ -48,9 +48,7 @@ def normalize_attachment_input(value: Any) -> list[str]:
         if text.startswith("[") and text.endswith("]"):
             candidates = _parse_stringified_list(text)
             if not candidates:
-                logger.warning(
-                    "Malformed bracket attachment input ignored: %s", text
-                )
+                logger.warning("Malformed bracket attachment input ignored: %s", text)
         else:
             candidates = [text]
     else:
@@ -100,7 +98,17 @@ def guess_media_type(url: str, content_type: str | None = None) -> str:
         if lowered.startswith("video/"):
             return "video"
     suffix = Path(urlparse(url).path).suffix.lower()
-    if suffix in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".heic"}:
+    if suffix in {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".ico",
+        ".tiff",
+        ".heic",
+    }:
         return "image"
     if suffix in {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}:
         return "video"
@@ -123,7 +131,9 @@ def normalize_filename(url: str, content_type: str | None = None) -> str:
     return f"attachment_{digest}{suffix}"
 
 
-def download_url_to_tempfile(url: str, *, timeout=DEFAULT_TIMEOUT, max_size_mb: int | None = None) -> tuple[str, str | None]:
+def download_url_to_tempfile(
+    url: str, *, timeout=DEFAULT_TIMEOUT, max_size_mb: int | None = None
+) -> tuple[str, str | None]:
     """Download a remote URL to a temp file and return (path, content_type)."""
     if not _is_valid_http_url(url):
         raise ValueError(f"Unsupported attachment URL scheme: {url}")

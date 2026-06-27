@@ -60,14 +60,16 @@ def _apply_url_prefix(value: str, prefix_map: dict[str, str]) -> str:
         if not key:
             continue
         if text.startswith(key):
-            suffix = text[len(key):]
+            suffix = text[len(key) :]
             return prefix + suffix
     if text.startswith("//"):
         return "https:" + text
     return text
 
 
-def _parse_multi_values(value: Any, separator: str, json_array_enabled: bool) -> list[str]:
+def _parse_multi_values(
+    value: Any, separator: str, json_array_enabled: bool
+) -> list[str]:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return []
 

@@ -37,9 +37,17 @@ from workers.lib import (
     DateRangeParams,
     CleanupCondition,
 )
-from workers.lib.local_attachment_preprocessor import preprocess_local_attachment_columns
+from workers.lib.local_attachment_preprocessor import (
+    preprocess_local_attachment_columns,
+)
 from workers.lib.models import LarkSourceConfig, DataRoute
-from .config import LARK_SOURCES, LOCAL_FILE_SOURCES, SQL_QUERIES, LARK_TARGETS, SQL_BASE_DIR
+from .config import (
+    LARK_SOURCES,
+    LOCAL_FILE_SOURCES,
+    SQL_QUERIES,
+    LARK_TARGETS,
+    SQL_BASE_DIR,
+)
 from .config import DATA_ROUTES
 from .transformer import build_okr_transformer, OKR_MERGE_CONFIG, execute_okr_merge
 
@@ -288,7 +296,9 @@ def run_okr_pipeline(
         # 优先使用 OKR 专属多步融合逻辑（合并多个飞书源 + MaxCompute 结果）
         # 如需回退到单次 merge，删除以下 if 块，使用 lib.transformer.merge()
         if _is_merge_config_active(OKR_MERGE_CONFIG):
-            logger.info("[Step 5/8] Using OKR multi-step merge (Lark sources + MaxCompute)...")
+            logger.info(
+                "[Step 5/8] Using OKR multi-step merge (Lark sources + MaxCompute)..."
+            )
             merged_df = execute_okr_merge(lark_data, mc_data)
         else:
             logger.info("[Step 5/8] No active merge config, using SQL data directly")

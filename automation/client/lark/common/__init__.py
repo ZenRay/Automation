@@ -31,9 +31,7 @@ class LarkImURL(Enum):
 class LarkBitableURL(Enum):
     """Lark Bitable API URL."""
 
-    UPLOAD_ATTACHMENT = (
-        f"{_lark_host}/open-apis/drive/v1/medias/upload_all"
-    )
+    UPLOAD_ATTACHMENT = f"{_lark_host}/open-apis/drive/v1/medias/upload_all"
 
 
 class LarkContactURL(Enum):

@@ -112,7 +112,10 @@ def _replace_cleanup_windows(
     replaced = []
     for route in routes:
         target = route.target
-        if target.cleanup_conditions is None or not target.cleanup_conditions.is_runtime:
+        if (
+            target.cleanup_conditions is None
+            or not target.cleanup_conditions.is_runtime
+        ):
             replaced.append(route)
             continue
 
@@ -124,7 +127,9 @@ def _replace_cleanup_windows(
     return replaced
 
 
-def _build_attachment_resolver(lark_client: LarkMultiDimTable) -> AttachmentTokenResolver:
+def _build_attachment_resolver(
+    lark_client: LarkMultiDimTable,
+) -> AttachmentTokenResolver:
     """附件解析器：由 lark_loader 在写入阶段注入到 coercer。"""
     return AttachmentTokenResolver(
         client=lark_client,
@@ -164,7 +169,9 @@ def _inject_row_key(mc_data: dict[str, pd.DataFrame]) -> None:
         mc_data[source_name] = df.assign(row_key=_build_row_key(df, route_name))
 
 
-def _cleanup_old_persistence_dirs(base_dir: Path, retention_days: int = PERSISTENCE_RETENTION_DAYS) -> None:
+def _cleanup_old_persistence_dirs(
+    base_dir: Path, retention_days: int = PERSISTENCE_RETENTION_DAYS
+) -> None:
     if not base_dir.exists():
         return
 
@@ -255,15 +262,23 @@ def _route_with_retry(
                 result_df=None,
             )
             if attempt == 1:
-                logger.info("[Step 4/5] Route completed on first attempt: %s", report.summary)
+                logger.info(
+                    "[Step 4/5] Route completed on first attempt: %s", report.summary
+                )
             else:
-                logger.info("[Step 4/5] Route completed after retry (attempt=%s): %s", attempt, report.summary)
+                logger.info(
+                    "[Step 4/5] Route completed after retry (attempt=%s): %s",
+                    attempt,
+                    report.summary,
+                )
             return report
         except Exception as exc:
             retryable = _is_retryable_error(exc)
             if not retryable or attempt >= ROUTE_RETRY_MAX_ATTEMPTS:
                 raise
-            wait_seconds = ROUTE_RETRY_BACKOFF_SECONDS * (ROUTE_RETRY_BACKOFF_MULTIPLIER ** (attempt - 1))
+            wait_seconds = ROUTE_RETRY_BACKOFF_SECONDS * (
+                ROUTE_RETRY_BACKOFF_MULTIPLIER ** (attempt - 1)
+            )
             logger.warning(
                 "[Step 4/5] Route attempt %s/%s failed (retryable=%s): %s; retry in %.2fs",
                 attempt,
@@ -297,15 +312,27 @@ def run_upgrade_after_sale_pipeline(
         lark_client = _init_lark_client()
         mc_client = _init_mc_client()
         attachment_resolver = _build_attachment_resolver(lark_client)
-        coercer = FieldTypeCoercer(attachment_resolver=attachment_resolver.resolve_single)
+        coercer = FieldTypeCoercer(
+            attachment_resolver=attachment_resolver.resolve_single
+        )
     except Exception as e:
         logger.error("[Step 1/5] Client initialization failed: %s", e)
         return 1
 
     # 两条 SQL 独立窗口
-    as_start = after_sale_start if after_sale_start is not None else QUERY_WINDOWS["after_sale_item"]["start"]
-    as_end = after_sale_end if after_sale_end is not None else QUERY_WINDOWS["after_sale_item"]["end"]
-    od_start = order_start if order_start is not None else QUERY_WINDOWS["order_item"]["start"]
+    as_start = (
+        after_sale_start
+        if after_sale_start is not None
+        else QUERY_WINDOWS["after_sale_item"]["start"]
+    )
+    as_end = (
+        after_sale_end
+        if after_sale_end is not None
+        else QUERY_WINDOWS["after_sale_item"]["end"]
+    )
+    od_start = (
+        order_start if order_start is not None else QUERY_WINDOWS["order_item"]["start"]
+    )
     od_end = order_end if order_end is not None else QUERY_WINDOWS["order_item"]["end"]
 
     try:
@@ -370,8 +397,12 @@ def run_upgrade_after_sale_pipeline(
     try:
         logger.info("[Step 3/5] Running lightweight normalization...")
         if "after_sale_item" in mc_data:
-            mc_data["after_sale_item"] = normalize_after_sale_df(mc_data["after_sale_item"])
-            mc_data["after_sale_item"] = _apply_attachment_bak_columns(mc_data["after_sale_item"])
+            mc_data["after_sale_item"] = normalize_after_sale_df(
+                mc_data["after_sale_item"]
+            )
+            mc_data["after_sale_item"] = _apply_attachment_bak_columns(
+                mc_data["after_sale_item"]
+            )
         if "order_item" in mc_data:
             mc_data["order_item"] = normalize_order_item_df(mc_data["order_item"])
         _inject_row_key(mc_data)
@@ -418,7 +449,11 @@ def run_upgrade_after_sale_pipeline(
         total_uploaded_rows = 0
         for result in report.results:
             source_name = route_to_source.get(result.route_name, "")
-            sql_rows = len(mc_data.get(source_name, pd.DataFrame())) if source_name else result.source_shape[0]
+            sql_rows = (
+                len(mc_data.get(source_name, pd.DataFrame()))
+                if source_name
+                else result.source_shape[0]
+            )
             uploaded_rows = result.written_count
             delta = sql_rows - uploaded_rows
             total_sql_rows += sql_rows
@@ -452,14 +487,26 @@ def run_upgrade_after_sale_pipeline(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Upgrade After Sale pipeline")
     parser.add_argument("--date", type=str, default=None, help="基准日期 YYYY-MM-DD")
-    parser.add_argument("--as-start", type=int, default=None, help="售后 SQL start offset")
+    parser.add_argument(
+        "--as-start", type=int, default=None, help="售后 SQL start offset"
+    )
     parser.add_argument("--as-end", type=int, default=None, help="售后 SQL end offset")
-    parser.add_argument("--order-start", type=int, default=None, help="订单 SQL start offset")
-    parser.add_argument("--order-end", type=int, default=None, help="订单 SQL end offset")
-    parser.add_argument("--enable-persistence", action="store_true", help="启用 route 写入持久化")
-    parser.add_argument("--persistence-dir", type=str, default=None, help="持久化根目录")
+    parser.add_argument(
+        "--order-start", type=int, default=None, help="订单 SQL start offset"
+    )
+    parser.add_argument(
+        "--order-end", type=int, default=None, help="订单 SQL end offset"
+    )
+    parser.add_argument(
+        "--enable-persistence", action="store_true", help="启用 route 写入持久化"
+    )
+    parser.add_argument(
+        "--persistence-dir", type=str, default=None, help="持久化根目录"
+    )
     parser.add_argument("--job-id", type=str, default=None, help="持久化 job_id")
-    parser.add_argument("--retry-failed-only", action="store_true", help="仅重试当前失败 row_key")
+    parser.add_argument(
+        "--retry-failed-only", action="store_true", help="仅重试当前失败 row_key"
+    )
     args = parser.parse_args()
 
     code = run_upgrade_after_sale_pipeline(
