@@ -23,9 +23,9 @@ from automation.utils.common.attachment import (
     normalize_filename,
     safe_remove_file,
 )
-from .attachment_persistence import AttachmentPersistence
+from .route_write_persistence import RouteWritePersistence
 
-logger = logging.getLogger("workers.lib.attachment_resolver")
+logger = logging.getLogger("workers.lib.attachment_token_resolver")
 
 
 RETRYABLE_EXCEPTIONS = (TimeoutError, ConnectionError)
@@ -54,7 +54,7 @@ def _extract_file_token(payload: Any) -> str | None:
 
 
 @dataclass
-class AttachmentResolver:
+class AttachmentTokenResolver:
     client: Any
     app_token: str | None = None
     timeout: tuple[int, int] = DEFAULT_TIMEOUT
@@ -64,7 +64,7 @@ class AttachmentResolver:
     target_name: str = ""
     field_name: str = ""
     row_key_getter: Any = None
-    persistence: AttachmentPersistence | None = None
+    persistence: RouteWritePersistence | None = None
     _token_cache: dict[str, str] = field(default_factory=dict, init=False)
 
     def resolve(self, value: Any) -> list[dict]:

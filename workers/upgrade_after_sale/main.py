@@ -6,6 +6,7 @@
 2. 两张目标表自动创建（不存在时）
 3. 每条路由按自身日期窗口清理后写入
 4. 售后附件字段走统一附件上传链路
+5. route 级 row_key 持久化与失败重试
 """
 
 from __future__ import annotations
@@ -13,9 +14,11 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
+import shutil
 import sys
 import time
 from datetime import date as _date, timedelta as _timedelta
+from pathlib import Path
 
 import pandas as pd
 
@@ -24,10 +27,11 @@ from automation.client import LarkMultiDimTable, MaxComputerClient
 from automation.conf import lark as lark_conf, maxcomputer as mc_conf
 
 from workers.lib import (
-    AttachmentResolver,
+    AttachmentTokenResolver,
     DataRouter,
     DateRangeParams,
     FieldTypeCoercer,
+    PersistenceConfig,
     SchemaValidator,
     execute_all_queries,
 )
@@ -50,6 +54,9 @@ from .config import (
 from .transformer import normalize_after_sale_df, normalize_order_item_df
 
 logger = logging.getLogger("workers.upgrade_after_sale.main")
+
+DEFAULT_PERSISTENCE_ROOT = Path("logs") / "persistence" / "upgrade_after_sale"
+PERSISTENCE_RETENTION_DAYS = 4
 
 
 def _init_lark_client() -> LarkMultiDimTable:
@@ -117,15 +124,94 @@ def _replace_cleanup_windows(
     return replaced
 
 
-def _build_attachment_resolver(lark_client: LarkMultiDimTable) -> AttachmentResolver:
+def _build_attachment_resolver(lark_client: LarkMultiDimTable) -> AttachmentTokenResolver:
     """附件解析器：由 lark_loader 在写入阶段注入到 coercer。"""
-    return AttachmentResolver(
+    return AttachmentTokenResolver(
         client=lark_client,
         app_token=None,
         max_size_mb=ATTACHMENT_MAX_SIZE_MB,
         max_retries=2,
         backoff_seconds=0.4,
     )
+
+
+def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
+    if route_name == "after_sale_detail":
+        key_col = "售后单id"
+    elif route_name == "order_detail":
+        key_col = "明细订单id"
+    else:
+        raise ValueError(f"Unsupported route_name for row_key: {route_name}")
+
+    if key_col not in df.columns:
+        raise ValueError(f"Missing row key column '{key_col}' for route '{route_name}'")
+
+    row_key = df[key_col].astype(str)
+    if row_key.eq("").any():
+        raise ValueError(f"Empty row_key detected for route '{route_name}'")
+    return row_key
+
+
+def _inject_row_key(mc_data: dict[str, pd.DataFrame]) -> None:
+    route_to_source = {
+        "after_sale_detail": "after_sale_item",
+        "order_detail": "order_item",
+    }
+    for route_name, source_name in route_to_source.items():
+        if source_name not in mc_data:
+            continue
+        df = mc_data[source_name]
+        mc_data[source_name] = df.assign(row_key=_build_row_key(df, route_name))
+
+
+def _cleanup_old_persistence_dirs(base_dir: Path, retention_days: int = PERSISTENCE_RETENTION_DAYS) -> None:
+    if not base_dir.exists():
+        return
+
+    now_ts = time.time()
+    retention_seconds = retention_days * 24 * 60 * 60
+    for child in base_dir.iterdir():
+        if not child.is_dir():
+            continue
+        try:
+            age_seconds = now_ts - child.stat().st_mtime
+            if age_seconds > retention_seconds:
+                shutil.rmtree(child)
+                logger.info("Removed old persistence directory: %s", child)
+        except Exception as exc:
+            logger.warning("Failed to cleanup persistence directory %s: %s", child, exc)
+
+
+def _build_persistence_config(
+    *,
+    enabled: bool,
+    persistence_dir: str | None,
+    job_id: str | None,
+    retry_failed_only: bool,
+) -> PersistenceConfig:
+    base_dir = Path(persistence_dir) if persistence_dir else DEFAULT_PERSISTENCE_ROOT
+    base_dir.mkdir(parents=True, exist_ok=True)
+    _cleanup_old_persistence_dirs(base_dir)
+
+    if job_id:
+        effective_job_id = job_id
+    else:
+        effective_job_id = _date.today().isoformat()
+
+    config = PersistenceConfig(
+        enabled=enabled,
+        artifact_dir=str(base_dir),
+        job_id=effective_job_id,
+        retry_failed_only=retry_failed_only,
+    )
+    if enabled:
+        logger.info(
+            "Persistence enabled: dir=%s, job_id=%s, retry_failed_only=%s",
+            config.artifact_dir,
+            config.job_id,
+            config.retry_failed_only,
+        )
+    return config
 
 
 def _is_retryable_error(exc: Exception) -> bool:
@@ -197,6 +283,10 @@ def run_upgrade_after_sale_pipeline(
     after_sale_end: int | None = None,
     order_start: int | None = None,
     order_end: int | None = None,
+    enable_persistence: bool = False,
+    persistence_dir: str | None = None,
+    job_id: str | None = None,
+    retry_failed_only: bool = False,
 ) -> int:
     logger.info("=" * 60)
     logger.info("Upgrade After Sale Pipeline - START")
@@ -284,6 +374,7 @@ def run_upgrade_after_sale_pipeline(
             mc_data["after_sale_item"] = _apply_attachment_bak_columns(mc_data["after_sale_item"])
         if "order_item" in mc_data:
             mc_data["order_item"] = normalize_order_item_df(mc_data["order_item"])
+        _inject_row_key(mc_data)
     except Exception as e:
         logger.error("[Step 3/5] Normalization failed: %s", e)
         return 1
@@ -302,6 +393,12 @@ def run_upgrade_after_sale_pipeline(
             coercer,
             validator=SchemaValidator(),
             attachment_resolver=attachment_resolver,
+            persistence_config=_build_persistence_config(
+                enabled=enable_persistence,
+                persistence_dir=persistence_dir,
+                job_id=job_id,
+                retry_failed_only=retry_failed_only,
+            ),
         )
         logger.info(router.describe_routes(effective_routes))
         report = _route_with_retry(
@@ -359,6 +456,10 @@ def main() -> None:
     parser.add_argument("--as-end", type=int, default=None, help="售后 SQL end offset")
     parser.add_argument("--order-start", type=int, default=None, help="订单 SQL start offset")
     parser.add_argument("--order-end", type=int, default=None, help="订单 SQL end offset")
+    parser.add_argument("--enable-persistence", action="store_true", help="启用 route 写入持久化")
+    parser.add_argument("--persistence-dir", type=str, default=None, help="持久化根目录")
+    parser.add_argument("--job-id", type=str, default=None, help="持久化 job_id")
+    parser.add_argument("--retry-failed-only", action="store_true", help="仅重试当前失败 row_key")
     args = parser.parse_args()
 
     code = run_upgrade_after_sale_pipeline(
@@ -367,6 +468,10 @@ def main() -> None:
         after_sale_end=args.as_end,
         order_start=args.order_start,
         order_end=args.order_end,
+        enable_persistence=args.enable_persistence,
+        persistence_dir=args.persistence_dir,
+        job_id=args.job_id,
+        retry_failed_only=args.retry_failed_only,
     )
     sys.exit(code)
 
