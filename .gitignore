@@ -1,22 +1,18 @@
-# Ignore all files inside these two directories but keep the .gitkeep files
-/dispatcher/dags/*
-!/dispatcher/dags/.gitkeep
-
-/dispatcher/etl_sentence/*
-!/dispatcher/etl_sentence/.gitkeep
-# Byte-compiled / optimized / DLL files
+# -----------------------------------------------------------------------------
+# Python cache / binaries
+# -----------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
 
-# Distribution / packaging
+# -----------------------------------------------------------------------------
+# Packaging / build artifacts
+# -----------------------------------------------------------------------------
 .Python
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -34,79 +30,27 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+# -----------------------------------------------------------------------------
+# Tooling artifacts
+# -----------------------------------------------------------------------------
 *.manifest
 *.spec
-
-# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# Coverage / testing caches
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
 .cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
 .hypothesis/
 .pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
+*.cover
+*.py,cover
 
 # Environments
 .venv
@@ -116,114 +60,116 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
+# Type check / lint caches
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
 
-*/conf/*.ini
-*/temp*
-*.xlsx
-*.csv
+# Notebook / interactive
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
 *.ipynb
 
-*/conf/\_*.ini
-*/conf/\_*.yml
-*/conf/\_*.yaml
+# -----------------------------------------------------------------------------
+# Framework / app local state
+# -----------------------------------------------------------------------------
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+instance/
+.webassets-cache
+.scrapy
+docs/_build/
+target/
+celerybeat-schedule
+celerybeat.pid
+*.sage.py
 
-*DS_Store
+# -----------------------------------------------------------------------------
+# OS / editor
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.sublime-*
+.vscode/
+.idea/
+.spyderproject
+.spyproject
+.ropeproject
+/site
 
-
-*/test/bitable_calendar/*
-*/test/bitable_calendar/Dockerfile
-test/*
-test*.py
-time_utils.py
-
-# Airflow logs and symlinks
-dispatcher/logs/
+# -----------------------------------------------------------------------------
+# Runtime logs / symlinks
+# -----------------------------------------------------------------------------
 logs/
 *.log
 **/latest
 **/symlinks/
 
-# Dispatcher specific ignores
+# -----------------------------------------------------------------------------
+# Secrets / local config
+# -----------------------------------------------------------------------------
+*/conf/*.ini
+*/conf/\_*.ini
+*/conf/\_*.yml
+*/conf/\_*.yaml
 dispatcher/.env.local
 dispatcher/.env.production
 dispatcher/.env.conf
 
-# Python cache in dispatcher
-dispatcher/**/__pycache__/
-dispatcher/**/*.pyc
-dispatcher/**/*.pyo
-dispatcher/**/*.pyd
+# -----------------------------------------------------------------------------
+# Data / temp files
+# -----------------------------------------------------------------------------
+*/temp*
+*.xlsx
+*.csv
+*DS_Store
 
-# IDE files
-.vscode/
-.idea/
-*.sublime-*
+# -----------------------------------------------------------------------------
+# Dispatcher generated directories (keep .gitkeep only)
+# -----------------------------------------------------------------------------
+/dispatcher/dags/*
+!/dispatcher/dags/.gitkeep
+/dispatcher/etl_sentence/*
+!/dispatcher/etl_sentence/.gitkeep
 
-# System files
-.DS_Store
-Thumbs.db
-
-# Docker related
-# NOTE: .dockerignore is NOT ignored — it must be tracked by git
-# as it prevents secrets from being included in container images.
-
-# Test coverage
-.coverage
-htmlcov/
-
-# Build artifacts
-dist/
-build/
-*.egg-info/
+# Dispatcher explicit local/derived files
 dispatcher/scripts/check_config.sh
 dispatcher/docs/start-docker-wsl.sh
 dispatcher/docs/fix-docker-network.sh
 dispatcher/docs/docker-compose-official.yaml
-.cursor/rules/README.md
-.cursor/rules/data-engineer.md
 dispatcher/plugins/example_plugin.py
 dispatcher/mysql_backup.tar.gz
 
-# Keep AirflowService directories but ignore their contents
+# -----------------------------------------------------------------------------
+# AirflowService generated directories (keep .gitkeep only)
+# -----------------------------------------------------------------------------
 /AirflowService/dags/*
 !/AirflowService/dags/.gitkeep
-
 /AirflowService/etl_sentence/*
 !/AirflowService/etl_sentence/.gitkeep
-dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/dimension/*.py
-dispatcher/dags/etl_dags/etl_sentence/maxcompute_sql/fact/*.py
 
+# -----------------------------------------------------------------------------
+# Tests and local development
+# -----------------------------------------------------------------------------
+test/*
+test*.py
+*/test/bitable_calendar/*
+tests/*
+!tests/cr_trail_pricing/
+!tests/cr_trail_pricing/**
+tests/cr_trail_pricing/**/__pycache__/
+time_utils.py
+
+# -----------------------------------------------------------------------------
+# Project-local excludes
+# -----------------------------------------------------------------------------
 trash/
-dispatcher/etl_sentence/comon_maxcompute_sql/dimension/goods.py
-.gitignore
-.gitignore
-.gitignore
-dispatcher/etl_sentence/comon_maxcompute_sql/fact/trade.py
-dispatcher/etl_sentence/comon_maxcompute_sql/fact/flow.py
-.gitignore
-dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores_goods.py
-dispatcher/etl_sentence/comon_maxcompute_sql/dimension/stores.py
-dispatcher/etl_sentence/report_sql/merchant.py
-
-
 backup/
+notes/
+/scripts/
 项目启动规划.md
 .okr_pipeline.lock
 uv.lock
@@ -232,10 +178,6 @@ uv.lock
 .qoder/*
 !.qoder/commands/
 
-# Local dev directories (not project source)
-notes/
-/scripts/
-tests/*
-!tests/cr_trail_pricing/
-!tests/cr_trail_pricing/**
-tests/cr_trail_pricing/**/__pycache__/
+# Cursor prompt assets
+.cursor/rules/README.md
+.cursor/rules/data-engineer.md
