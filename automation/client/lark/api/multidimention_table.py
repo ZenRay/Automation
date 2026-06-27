@@ -702,7 +702,9 @@ class LarkMultiDimTable(LarkClient):
             raise LarkException(msg="app_token is required for attachment upload")
 
         if file is None:
-            raise ValueError("File path or bytes must be provided for attachment upload")
+            raise ValueError(
+                "File path or bytes must be provided for attachment upload"
+            )
 
         local_name = file_name
         if isinstance(file, (str, os.PathLike)):
@@ -748,5 +750,7 @@ class LarkMultiDimTable(LarkClient):
         resp = request("POST", url, headers=headers, data=form)
         if resp.get("code", -1) != 0:
             logger.error(f"Failed to upload attachment({local_name}): {resp}")
-            raise LarkException(code=resp.get("code"), msg=resp.get("msg", "Upload attachment failed"))
+            raise LarkException(
+                code=resp.get("code"), msg=resp.get("msg", "Upload attachment failed")
+            )
         return resp

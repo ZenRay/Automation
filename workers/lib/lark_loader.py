@@ -96,7 +96,9 @@ def _build_single_field_def(mapping: FieldMapping) -> dict:
 def _ensure_target_fields(client, *, table_id: str, target: LarkTargetConfig) -> None:
     """确保目标表包含本次写入所需字段（缺失时自动创建）。"""
     if not hasattr(client, "list_fields") or not hasattr(client, "create_field"):
-        logger.debug("Client does not support list_fields/create_field, skip field ensure")
+        logger.debug(
+            "Client does not support list_fields/create_field, skip field ensure"
+        )
         return
 
     existing_fields = client.list_fields(table_id=table_id)
@@ -233,8 +235,13 @@ def _write_single_target(
             job_id=persistence_config.job_id,
         )
         checkpoint = persistence.load_checkpoint()
-        if checkpoint.get("stage") in {"upload_done", "write_done"} and attachment_resolver is not None:
-            token_map = persistence.load_latest_upload_token_map(target_name=target.name)
+        if (
+            checkpoint.get("stage") in {"upload_done", "write_done"}
+            and attachment_resolver is not None
+        ):
+            token_map = persistence.load_latest_upload_token_map(
+                target_name=target.name
+            )
             if token_map:
                 attachment_resolver.seed_token_cache(token_map)
 
@@ -262,33 +269,48 @@ def _write_single_target(
 
     # 4. 转换 DataFrame 为 records 格式
     filtered_df = result_df
-    if persistence is not None and getattr(persistence_config, "retry_failed_only", False):
-        failed_rows = set(persistence.load_current_failed_write_rows(target_name=target.name))
+    if persistence is not None and getattr(
+        persistence_config, "retry_failed_only", False
+    ):
+        failed_rows = set(
+            persistence.load_current_failed_write_rows(target_name=target.name)
+        )
         if not failed_rows:
             logger.info(
                 "Target '%s': retry_failed_only enabled and no failed rows found, skip write",
                 target.name,
             )
-            persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": 0})
+            persistence.save_checkpoint(
+                stage="write_done", batch_index=0, counters={"records": 0}
+            )
             return 0
         if "row_key" not in result_df.columns:
             raise ValueError(
                 "retry_failed_only enabled but DataFrame has no row_key column"
             )
-        filtered_df = result_df[result_df["row_key"].astype(str).isin(failed_rows)].copy()
+        filtered_df = result_df[
+            result_df["row_key"].astype(str).isin(failed_rows)
+        ].copy()
 
     if coercer is not None:
-        if attachment_resolver is not None and getattr(coercer, "attachment_resolver", None) is None:
+        if (
+            attachment_resolver is not None
+            and getattr(coercer, "attachment_resolver", None) is None
+        ):
             coercer = type(coercer)(attachment_resolver=attachment_resolver)
         records = coercer.apply_to_dataframe(filtered_df, target.field_mappings)
     else:
         # 假定 result_df 已经是 records 格式（list of {"fields": {...}}）
         records = (
-            filtered_df if isinstance(filtered_df, list) else filtered_df.to_dict("records")
+            filtered_df
+            if isinstance(filtered_df, list)
+            else filtered_df.to_dict("records")
         )
 
     if persistence is not None:
-        persistence.save_checkpoint(stage="upload_done", batch_index=0, counters={"records": len(records)})
+        persistence.save_checkpoint(
+            stage="upload_done", batch_index=0, counters={"records": len(records)}
+        )
 
     # 4. 分批写入
     written_count = _write_records_batched(
@@ -299,13 +321,16 @@ def _write_single_target(
         persistence=persistence,
         row_keys=(
             filtered_df["row_key"].astype(str).tolist()
-            if isinstance(filtered_df, pd.DataFrame) and "row_key" in filtered_df.columns
+            if isinstance(filtered_df, pd.DataFrame)
+            and "row_key" in filtered_df.columns
             else None
         ),
     )
 
     if persistence is not None:
-        persistence.save_checkpoint(stage="write_done", batch_index=0, counters={"records": len(records)})
+        persistence.save_checkpoint(
+            stage="write_done", batch_index=0, counters={"records": len(records)}
+        )
 
     return written_count
 

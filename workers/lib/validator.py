@@ -321,13 +321,10 @@ class SchemaValidator:
                     )
 
             # PERCENT 字段值域检查
-            is_percent_field = (
-                m.lark_type == LarkFieldType.PERCENT
-                and (m.lark_ui_type or "").lower() in {"progress", "percent", "percentage"}
-            )
-            if is_percent_field and pd.api.types.is_numeric_dtype(
-                col
-            ):
+            is_percent_field = m.lark_type == LarkFieldType.PERCENT and (
+                m.lark_ui_type or ""
+            ).lower() in {"progress", "percent", "percentage"}
+            if is_percent_field and pd.api.types.is_numeric_dtype(col):
                 non_null = col.dropna()
                 if not non_null.empty:
                     out_of_range = non_null[(non_null < 0) | (non_null > 1)]

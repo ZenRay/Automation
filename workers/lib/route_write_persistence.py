@@ -63,7 +63,9 @@ class RouteWritePersistence:
         self.write_events_path = self.base_dir / "write_events.jsonl"
         self.checkpoint_path = self.base_dir / "checkpoint.json"
 
-    def append_input_snapshot(self, *, target_name: str, row_key: str, field_name: str, raw_value: Any) -> None:
+    def append_input_snapshot(
+        self, *, target_name: str, row_key: str, field_name: str, raw_value: Any
+    ) -> None:
         _append_jsonl(
             self.input_snapshot_path,
             {
@@ -148,7 +150,13 @@ class RouteWritePersistence:
             },
         )
 
-    def save_checkpoint(self, *, stage: str, batch_index: int = 0, counters: dict[str, int] | None = None) -> None:
+    def save_checkpoint(
+        self,
+        *,
+        stage: str,
+        batch_index: int = 0,
+        counters: dict[str, int] | None = None,
+    ) -> None:
         payload = {
             "ts": _utc_now_iso(),
             "stage": stage,
@@ -163,7 +171,9 @@ class RouteWritePersistence:
         with self.checkpoint_path.open("r", encoding="utf-8") as reader:
             return json.load(reader)
 
-    def load_latest_upload_token_map(self, *, target_name: str | None = None) -> dict[str, str]:
+    def load_latest_upload_token_map(
+        self, *, target_name: str | None = None
+    ) -> dict[str, str]:
         events = _read_jsonl(self.upload_events_path)
         latest: dict[str, str] = {}
         for item in events:
@@ -177,7 +187,9 @@ class RouteWritePersistence:
                 latest[url] = token
         return latest
 
-    def load_current_failed_upload_urls(self, *, target_name: str | None = None) -> list[dict[str, Any]]:
+    def load_current_failed_upload_urls(
+        self, *, target_name: str | None = None
+    ) -> list[dict[str, Any]]:
         events = _read_jsonl(self.upload_events_path)
         latest_by_key: dict[tuple[str, str, str, str], dict[str, Any]] = {}
         for item in events:
@@ -196,7 +208,9 @@ class RouteWritePersistence:
             if item.get("upload_status") == "failed" and item.get("retryable") is True
         ]
 
-    def load_current_failed_write_rows(self, *, target_name: str | None = None) -> list[str]:
+    def load_current_failed_write_rows(
+        self, *, target_name: str | None = None
+    ) -> list[str]:
         events = _read_jsonl(self.write_events_path)
         latest_status: dict[tuple[str, str], str] = {}
         for item in events:

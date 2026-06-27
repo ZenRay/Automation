@@ -83,9 +83,7 @@ def extract_single_local_source(config: LocalFileSourceConfig) -> pd.DataFrame:
     """抽取单个本地文件源并返回 DataFrame。"""
     path = _resolve_path(config.path)
     if not path.exists() or not path.is_file():
-        raise FileNotFoundError(
-            f"Local source '{config.name}': file not found: {path}"
-        )
+        raise FileNotFoundError(f"Local source '{config.name}': file not found: {path}")
 
     _validate_allowed_path(path, config)
     fmt = _detect_format(path, config.format)

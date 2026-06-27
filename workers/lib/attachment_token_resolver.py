@@ -133,7 +133,9 @@ class AttachmentTokenResolver:
                 if media_type == "unknown":
                     logger.warning("Unknown attachment media type for url=%s", url)
 
-                parent_type = "bitable_image" if media_type == "image" else "bitable_file"
+                parent_type = (
+                    "bitable_image" if media_type == "image" else "bitable_file"
+                )
 
                 try:
                     response = self.client.upload_attachment(
@@ -223,4 +225,7 @@ class AttachmentTokenResolver:
         if isinstance(exc, RETRYABLE_EXCEPTIONS):
             return True
         text = str(exc).lower()
-        return any(keyword in text for keyword in ("timeout", "temporar", "429", "503", "502", "504"))
+        return any(
+            keyword in text
+            for keyword in ("timeout", "temporar", "429", "503", "502", "504")
+        )

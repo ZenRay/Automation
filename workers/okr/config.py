@@ -844,37 +844,57 @@ TARGET_OKR_CAT4 = LarkTargetConfig(
             source_col="月份", target_field="月份", lark_type=LarkFieldType.TEXT
         ),
         FieldMapping(
-            source_col="是否月末", target_field="是否月末", lark_type=LarkFieldType.NUMBER
+            source_col="是否月末",
+            target_field="是否月末",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
             source_col="商城", target_field="商城", lark_type=LarkFieldType.TEXT
         ),
         FieldMapping(
-            source_col="一级类目名称", target_field="一级类目名称", lark_type=LarkFieldType.TEXT
+            source_col="一级类目名称",
+            target_field="一级类目名称",
+            lark_type=LarkFieldType.TEXT,
         ),
         FieldMapping(
-            source_col="二级类目名称", target_field="二级类目名称", lark_type=LarkFieldType.TEXT
+            source_col="二级类目名称",
+            target_field="二级类目名称",
+            lark_type=LarkFieldType.TEXT,
         ),
         FieldMapping(
-            source_col="三级类目名称", target_field="三级类目名称", lark_type=LarkFieldType.TEXT
+            source_col="三级类目名称",
+            target_field="三级类目名称",
+            lark_type=LarkFieldType.TEXT,
         ),
         FieldMapping(
-            source_col="四级类目id", target_field="四级类目id", lark_type=LarkFieldType.NUMBER
+            source_col="四级类目id",
+            target_field="四级类目id",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="四级类目名称", target_field="四级类目名称", lark_type=LarkFieldType.TEXT
+            source_col="四级类目名称",
+            target_field="四级类目名称",
+            lark_type=LarkFieldType.TEXT,
         ),
         FieldMapping(
-            source_col="送达金额", target_field="送达金额", lark_type=LarkFieldType.NUMBER
+            source_col="送达金额",
+            target_field="送达金额",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="赔付金额", target_field="赔付金额", lark_type=LarkFieldType.NUMBER
+            source_col="赔付金额",
+            target_field="赔付金额",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="在售sku数", target_field="在售sku数", lark_type=LarkFieldType.NUMBER
+            source_col="在售sku数",
+            target_field="在售sku数",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="动销sku数", target_field="动销sku数", lark_type=LarkFieldType.NUMBER
+            source_col="动销sku数",
+            target_field="动销sku数",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
             source_col="老客户曝光店铺数",
@@ -892,13 +912,19 @@ TARGET_OKR_CAT4 = LarkTargetConfig(
             lark_type=LarkFieldType.PERCENT,
         ),
         FieldMapping(
-            source_col="明细订单数", target_field="明细订单数", lark_type=LarkFieldType.NUMBER
+            source_col="明细订单数",
+            target_field="明细订单数",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="达标sku数", target_field="达标sku数", lark_type=LarkFieldType.NUMBER
+            source_col="达标sku数",
+            target_field="达标sku数",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="送达金额排名", target_field="送达金额排名", lark_type=LarkFieldType.NUMBER
+            source_col="送达金额排名",
+            target_field="送达金额排名",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
             source_col="一级类目渗透率排名",
@@ -906,7 +932,9 @@ TARGET_OKR_CAT4 = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="上架商品数量", target_field="上架商品数量", lark_type=LarkFieldType.NUMBER
+            source_col="上架商品数量",
+            target_field="上架商品数量",
+            lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
             source_col="更新商品卡片数量",
