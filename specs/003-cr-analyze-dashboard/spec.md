@@ -96,7 +96,7 @@ An operations analyst opens Tab 3 "归一化进度" during the 归一化预备�
 
 ### User Story 5 - Tab 4: Effect Analysis (Priority: P1)
 
-An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine the trial's impact. The tab contains 4 sub-views switchable via radio buttons or sub-tabs: (B) City Unit Trends — 8 cities × 3 SKUs, showing 摸底期 as a single baseline point and 生效期 by stage_week, with incomplete weeks marked ⚠️; (C) Group Aggregation — 对照组/试验组一/试验组二/试验组三 group-level mean trends for commission_amount, gmv, and order_count; (D) SKU Comparison — 3 SKUs side-by-side within the same group; (E) Origin Comparison — 云南 (10184690+20519020 combined) vs 广西 (20588413) on commission_amount and commission_rate.
+An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine the trial's impact. The tab contains 4 sub-views switchable via radio buttons or sub-tabs: (B) City Unit Trends — 8 cities × 3 SKUs, showing 摸底期 as a single baseline point and 生效期 by stage_week, with incomplete weeks marked ⚠️; (C) Group Aggregation — 对照组/试验组一/试验组二/试验组三 trends for commission_amount, gmv, and order_count, with aggregation mode selector (总量/均值); (D) SKU Comparison — 3 SKUs side-by-side within the same group with metric selector (commission_amount, gmv, order_count, active_store_count, commission_rate); (E) Origin Comparison — 云南 (10184690+20519020 combined) vs 广西 (20588413) on commission_amount, commission_rate, gmv, order_count, and active_store_count.
 
 **Why this priority**: Effect analysis is the primary analytical deliverable — it answers the core business question of whether the commission rate changes had measurable impact.
 
@@ -106,9 +106,9 @@ An analyst navigates to Tab 4 "效应分析" after the 摸底期 ends to examine
 
 1. **Given** 摸底期 data (aggregated as a single block per city_unit × sku_id), **When** sub-view B renders, **Then** each city shows one baseline data point per SKU with trading_days annotation; stage_week is NULL.
 2. **Given** 生效期 data with stage_week = "生效期_W1" where W1 covers only 4 days (is_complete_week = false), **When** sub-view B renders, **Then** the data point shows ⚠️ with "4/7天" annotation.
-3. **Given** sub-view C (group aggregation), **When** it renders, **Then** 4 lines (对照组/试验组一/试验组二/试验组三) are plotted for the selected metric (switchable between commission_amount, gmv, order_count); values are group-level means.
+3. **Given** sub-view C (group aggregation), **When** it renders, **Then** 4 lines (对照组/试验组一/试验组二/试验组三) are plotted for the selected metric (switchable between commission_amount, gmv, order_count), and users can switch aggregation mode between 总量 and 均值.
 4. **Given** sub-view D (SKU comparison), **When** it renders, **Then** 3 SKUs are shown side-by-side within each trial group as bar charts with numerical annotations.
-5. **Given** sub-view E (origin comparison), **When** it renders, **Then** 云南 origin aggregates SKU 10184690 + 20519020; 广西 origin uses SKU 20588413; commission_amount and commission_rate are compared.
+5. **Given** sub-view E (origin comparison), **When** it renders, **Then** 云南 origin aggregates SKU 10184690 + 20519020; 广西 origin uses SKU 20588413; commission_amount, commission_rate, gmv, order_count, and active_store_count are compared.
 
 ---
 
@@ -228,9 +228,9 @@ A data scientist runs the power analysis CLI command to compute σ (GMV coeffici
 
 - **FR-029**: Tab 4 MUST provide 4 switchable sub-views: City Trends (B), Group Aggregation (C), SKU Comparison (D), Origin Comparison (E).
 - **FR-030**: Sub-view B MUST show 摸底期 as a single baseline point per city × SKU, and 生效期 by stage_week; incomplete weeks MUST be marked with ⚠️ and display trading_days as "N/7天".
-- **FR-031**: Sub-view C MUST show 对照组/试验组一/试验组二/试验组三 group-level mean trends for commission_amount, gmv, and order_count (switchable metric selector).
+- **FR-031**: Sub-view C MUST show 对照组/试验组一/试验组二/试验组三 trends for commission_amount, gmv, and order_count (switchable metric selector), and MUST provide aggregation mode selector (总量/均值).
 - **FR-032**: Sub-view D MUST show 3 SKUs side-by-side within each trial group as bar charts with numerical annotations.
-- **FR-033**: Sub-view E MUST aggregate 云南 origin as SKU 10184690 + 20519020 sum; 广西 origin as SKU 20588413; compare commission_amount and commission_rate.
+- **FR-033**: Sub-view E MUST aggregate 云南 origin as SKU 10184690 + 20519020 sum; 广西 origin as SKU 20588413; compare commission_amount, commission_rate, gmv, order_count, and active_store_count. For commission_rate, aggregation MUST use weighted formula sum(commission_amount) / sum(gmv).
 
 **Streamlit Dashboard — Tab 5: Guardrail Alerts**
 

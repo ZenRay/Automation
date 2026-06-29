@@ -158,9 +158,9 @@
 - [x] T020 [US5] Implement `workers/cr_analyze/dashboard/tab4_effect.py`:
   - `render(db_path: str)`: render function with 4 switchable sub-views (st.radio or st.tabs)
   - **Sub-view B (City Trends)**: Filter agg_wide_table; plot 摸底期 as baseline points + 生效期 by stage_week; mark incomplete weeks with ⚠️ and "N/7天" (FR-030)
-  - **Sub-view C (Group Aggregation)**: 对照组/试验组一/试验组二/试验组三 group-level means; switchable metric (commission_amount/gmv/order_count) via st.selectbox (FR-031)
-  - **Sub-view D (SKU Comparison)**: 3 SKUs side-by-side within each trial_group as grouped bar chart with numerical annotations (FR-032)
-  - **Sub-view E (Origin Comparison)**: 云南 = SKU 10184690 + 20519020 sum; 广西 = SKU 20588413; compare commission_amount and commission_rate (FR-033)
+  - **Sub-view C (Group Aggregation)**: 对照组/试验组一/试验组二/试验组三 trends; switchable metric (commission_amount/gmv/order_count) and aggregation mode selector (总量/均值) via st.selectbox (FR-031)
+  - **Sub-view D (SKU Comparison)**: 3 SKUs side-by-side within each trial_group as grouped bar chart with numerical annotations; metric selector supports commission_amount/gmv/order_count/active_store_count/commission_rate (FR-032)
+  - **Sub-view E (Origin Comparison)**: 云南 = SKU 10184690 + 20519020 sum; 广西 = SKU 20588413; compare commission_amount/commission_rate/gmv/order_count/active_store_count, with weighted commission_rate aggregation (FR-033)
 
 ### Tab 5: Guardrail Alerts (US6)
 

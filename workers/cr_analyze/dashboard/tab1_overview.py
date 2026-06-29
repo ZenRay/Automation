@@ -157,7 +157,17 @@ def render(data: dict[str, pd.DataFrame]):
         st.info("暂无试验 SKU 主数据，请先运行数据管道。")
     else:
         sku_df = sku_profile.copy()
-        sku_df = _to_date_col(sku_df, "last_trial_date")
-        show_cols = ["商品id", "商品名称", "商家名称", "非试验区域抽佣率", "last_trial_date"]
+        date_col = "last_trial_date" if "last_trial_date" in sku_df.columns else "last_trail_date"
+        sku_df = _to_date_col(sku_df, date_col)
+        show_cols = ["商品id", "商品名称", "商家名称", "非试验区域抽佣率", date_col]
         show_cols = [c for c in show_cols if c in sku_df.columns]
-        st.dataframe(sku_df[show_cols].drop_duplicates(), use_container_width=True)
+        rename_map = {
+            "商品id": "商品ID",
+            "非试验区域抽佣率": "非试验区域抽佣率",
+            "last_trial_date": "最近试验日期",
+            "last_trail_date": "最近试验日期",
+        }
+        st.dataframe(
+            sku_df[show_cols].drop_duplicates().rename(columns=rename_map),
+            use_container_width=True,
+        )

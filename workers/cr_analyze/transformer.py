@@ -160,16 +160,16 @@ def compute_trial_sku_profile(
 ) -> pd.DataFrame:
     """构建试验 SKU 主数据。
 
-    规则:
-      - conf_trial_product_info INNER JOIN conf_product_info
-      - JOIN 键: 日期 + 商品id
-      - 输出参与过试验的商品及其最近参与日期
+        规则:
+            - 试验日期与非试验区域抽佣率以 conf_trial_product_info 为准
+            - 商品名称/商家名称从 conf_product_info 最近日期补齐
+            - 输出参与过试验的商品及其最近参与日期
     """
     trial_df = lark_data.get("conf_trial_product_info", pd.DataFrame()).copy()
     product_df = lark_data.get("conf_product_info", pd.DataFrame()).copy()
 
     out_cols = ["商品id", "商品名称", "商家名称", "非试验区域抽佣率", "last_trial_date"]
-    if trial_df.empty or product_df.empty:
+    if trial_df.empty:
         return pd.DataFrame(columns=out_cols)
 
     for df in [trial_df, product_df]:
@@ -179,43 +179,34 @@ def compute_trial_sku_profile(
             df["商品id"] = pd.to_numeric(df["商品id"], errors="coerce")
 
     trial_keep = [c for c in ["日期", "商品id", "非试验区域抽佣率"] if c in trial_df.columns]
-    product_keep = [
-        c for c in ["日期", "商品id", "商品名称", "商家名称", "非试验区域抽佣率"] if c in product_df.columns
-    ]
     if "日期" not in trial_keep or "商品id" not in trial_keep:
         return pd.DataFrame(columns=out_cols)
-    if "日期" not in product_keep or "商品id" not in product_keep:
-        return pd.DataFrame(columns=out_cols)
+    trial_base = trial_df[trial_keep].copy().rename(columns={"非试验区域抽佣率": "非试验区域抽佣率_trial"})
+    trial_base = trial_base.sort_values(["商品id", "日期"], ascending=[True, False])
+    trial_latest = trial_base.drop_duplicates(subset=["商品id"], keep="first").copy()
+    trial_latest = trial_latest.rename(columns={"日期": "last_trial_date"})
 
-    trial_base = trial_df[trial_keep].copy().rename(
-        columns={"非试验区域抽佣率": "非试验区域抽佣率_trial"}
-    )
-    product_base = product_df[product_keep].copy().rename(
-        columns={"非试验区域抽佣率": "非试验区域抽佣率_prod"}
-    )
+    latest = trial_latest.copy()
 
-    merged = trial_base.merge(product_base, on=["日期", "商品id"], how="inner")
-    if merged.empty:
-        return pd.DataFrame(columns=out_cols)
+    # conf_product_info 仅用于补齐商品名称/商家名称（以及 trial 抽佣率缺失时兜底）。
+    if not product_df.empty:
+        product_keep = [
+            c
+            for c in ["日期", "商品id", "商品名称", "商家名称", "非试验区域抽佣率"]
+            if c in product_df.columns
+        ]
+        if "商品id" in product_keep:
+            product_base = product_df[product_keep].copy().rename(columns={"非试验区域抽佣率": "非试验区域抽佣率_prod"})
+            if "日期" in product_base.columns:
+                product_base = product_base.sort_values(["商品id", "日期"], ascending=[True, False])
+            else:
+                product_base = product_base.sort_values(["商品id"], ascending=[True])
+            product_latest = product_base.drop_duplicates(subset=["商品id"], keep="first")
+            keep_cols = [c for c in ["商品id", "商品名称", "商家名称", "非试验区域抽佣率_prod"] if c in product_latest.columns]
+            latest = latest.merge(product_latest[keep_cols], on="商品id", how="left")
 
-    trial_last = (
-        trial_base.groupby("商品id", as_index=False)["日期"].max().rename(columns={"日期": "last_trial_date"})
-    )
-    merged = merged.merge(trial_last, on="商品id", how="left")
-
-    merged = merged.sort_values(["商品id", "日期"], ascending=[True, False])
-    latest = merged.drop_duplicates(subset=["商品id"], keep="first").copy()
-
-    trial_rate = (
-        latest["非试验区域抽佣率_trial"]
-        if "非试验区域抽佣率_trial" in latest.columns
-        else pd.Series(pd.NA, index=latest.index)
-    )
-    prod_rate = (
-        latest["非试验区域抽佣率_prod"]
-        if "非试验区域抽佣率_prod" in latest.columns
-        else pd.Series(pd.NA, index=latest.index)
-    )
+    trial_rate = latest.get("非试验区域抽佣率_trial", pd.Series(pd.NA, index=latest.index))
+    prod_rate = latest.get("非试验区域抽佣率_prod", pd.Series(pd.NA, index=latest.index))
     latest["非试验区域抽佣率"] = trial_rate.combine_first(prod_rate)
 
     latest["商品id"] = pd.to_numeric(latest["商品id"], errors="coerce").astype("Int64")
@@ -334,11 +325,80 @@ def compute_wide_table(
     # 关联 conf_commission_adjustment → 参与试验类型过滤
     adj_df = lark_data.get("conf_commission_adjustment", pd.DataFrame())
     if not adj_df.empty and "county_name" in fact.columns:
-        adj = adj_df[["商品id", "区县名称", "参与试验类型"]].copy()
-        adj = adj.rename(columns={"商品id": "sku_id", "区县名称": "county_name"})
-        adj = adj.drop_duplicates(subset=["sku_id", "county_name"])
+        has_adj_date = "日期" in adj_df.columns and "日期" in fact.columns
+        pick_cols = ["商品id", "区县名称", "参与试验类型"]
+        if has_adj_date:
+            pick_cols.append("日期")
 
-        fact = fact.merge(adj, on=["sku_id", "county_name"], how="left")
+        adj = adj_df[pick_cols].copy()
+        adj = adj.rename(columns={"商品id": "sku_id", "区县名称": "county_name"})
+
+        # 统一关联键类型，避免 int/float 字段类型差异导致错配。
+        fact["sku_id"] = pd.to_numeric(fact["sku_id"], errors="coerce")
+        adj["sku_id"] = pd.to_numeric(adj["sku_id"], errors="coerce")
+
+        if has_adj_date:
+            fact["日期"] = pd.to_datetime(fact["日期"], errors="coerce").dt.date
+            adj["日期"] = pd.to_datetime(adj["日期"], errors="coerce").dt.date
+            # 同一天同商品同区县若有重复，按最新记录保留一条，避免随机行顺序影响结果。
+            adj = adj.sort_values(["日期"], ascending=True)
+            adj = adj.drop_duplicates(subset=["sku_id", "county_name", "日期"], keep="last")
+
+            # 参与试验类型配置并非每天都有快照：
+            # 1) 优先匹配 <= 交易日 最近配置（backward）
+            # 2) 若仍缺失，使用 >= 交易日 最近配置（forward）
+            # 这样可避免因快照缺日导致整天交易被误过滤。
+            fact = fact.reset_index(drop=True).copy()
+            fact["_fact_row_id"] = np.arange(len(fact))
+            fact["_adj_join_date"] = pd.to_datetime(fact["日期"], errors="coerce")
+
+            # merge_asof 要求 by 键 dtype 完全一致，统一为字符串键规避 int/float 混型。
+            fact["_sku_join_key"] = pd.to_numeric(fact["sku_id"], errors="coerce").astype("Int64").astype(str)
+            fact["_county_join_key"] = fact["county_name"].astype(str)
+
+            adj_for_asof = adj[["sku_id", "county_name", "日期", "参与试验类型"]].copy()
+            adj_for_asof["_adj_join_date"] = pd.to_datetime(adj_for_asof["日期"], errors="coerce")
+            adj_for_asof["_sku_join_key"] = pd.to_numeric(adj_for_asof["sku_id"], errors="coerce").astype("Int64").astype(str)
+            adj_for_asof["_county_join_key"] = adj_for_asof["county_name"].astype(str)
+            adj_for_asof = adj_for_asof[["_sku_join_key", "_county_join_key", "_adj_join_date", "参与试验类型"]]
+
+            # merge_asof 需要 on 键全局有序，且不接受 NaT 参与匹配。
+            fact_valid = fact[fact["_adj_join_date"].notna()].copy()
+            fact_nat = fact[fact["_adj_join_date"].isna()].copy()
+            adj_sort = adj_for_asof[adj_for_asof["_adj_join_date"].notna()].copy()
+
+            fact_sort = fact_valid.sort_values(["_adj_join_date", "_sku_join_key", "_county_join_key", "_fact_row_id"])
+            adj_sort = adj_sort.sort_values(["_adj_join_date", "_sku_join_key", "_county_join_key"])
+
+            if not fact_sort.empty and not adj_sort.empty:
+                matched_back = pd.merge_asof(
+                    fact_sort,
+                    adj_sort,
+                    on="_adj_join_date",
+                    by=["_sku_join_key", "_county_join_key"],
+                    direction="backward",
+                )
+                matched_fwd = pd.merge_asof(
+                    fact_sort,
+                    adj_sort,
+                    on="_adj_join_date",
+                    by=["_sku_join_key", "_county_join_key"],
+                    direction="forward",
+                )
+
+                matched_back["参与试验类型"] = matched_back["参与试验类型"].combine_first(
+                    matched_fwd["参与试验类型"]
+                )
+                fact = pd.concat([matched_back, fact_nat], ignore_index=True, sort=False)
+            else:
+                fact = pd.concat([fact_sort, fact_nat], ignore_index=True, sort=False)
+
+            fact = fact.sort_values("_fact_row_id").drop(
+                columns=["_fact_row_id", "_adj_join_date", "_sku_join_key", "_county_join_key"], errors="ignore"
+            )
+        else:
+            adj = adj.drop_duplicates(subset=["sku_id", "county_name"], keep="last")
+            fact = fact.merge(adj, on=["sku_id", "county_name"], how="left")
 
         # 过滤: 参与试验类型 contains "试验区域" AND not "非试验区域"
         if "参与试验类型" in fact.columns:
@@ -434,40 +494,30 @@ def _compute_stage_week(
     df["is_complete_week"] = np.nan
     df["trading_days"] = np.nan
 
-    if period_rate_df.empty:
-        return df
-
-    # 找到生效期的起止日期
-    effect_rows = period_rate_df[period_rate_df["试验阶段"] == "生效期"]
-    if effect_rows.empty:
-        return df
-
-    effect_start = effect_rows["试验起始日期"].min()
-    if pd.isna(effect_start):
-        return df
-    if isinstance(effect_start, pd.Timestamp):
-        effect_start = effect_start.date()
-
+    # 生效期周序列计算：仅在生效期配置可用时执行；无生效期配置不应影响摸底期/预备期。
     effect_mask = df["stage"] == "生效期"
-    if not effect_mask.any():
-        return df
+    if not period_rate_df.empty and effect_mask.any():
+        effect_rows = period_rate_df[period_rate_df["试验阶段"] == "生效期"]
+        if not effect_rows.empty:
+            effect_start = effect_rows["试验起始日期"].min()
+            if pd.notna(effect_start):
+                if isinstance(effect_start, pd.Timestamp):
+                    effect_start = effect_start.date()
 
-    effect_dates = df.loc[effect_mask, "日期"]
-    for idx, d in effect_dates.items():
-        if pd.isna(d):
-            continue
-        days_since_start = (d - effect_start).days
-        week_num = days_since_start // 7 + 1
-        df.at[idx, "stage_week"] = f"生效期_W{week_num}"
+                effect_dates = df.loc[effect_mask, "日期"]
+                for idx, d in effect_dates.items():
+                    if pd.isna(d):
+                        continue
+                    days_since_start = (d - effect_start).days
+                    week_num = days_since_start // 7 + 1
+                    df.at[idx, "stage_week"] = f"生效期_W{week_num}"
 
-    # 计算每个 stage_week 的实际天数和是否完整
-    if effect_mask.any():
-        week_groups = df.loc[effect_mask].groupby("stage_week")["日期"].apply(set)
-        for week_name, date_set in week_groups.items():
-            is_complete = len(date_set) >= 7
-            week_mask = effect_mask & (df["stage_week"] == week_name)
-            df.loc[week_mask, "is_complete_week"] = is_complete
-            df.loc[week_mask, "trading_days"] = len(date_set)
+                week_groups = df.loc[effect_mask].groupby("stage_week")["日期"].apply(set)
+                for week_name, date_set in week_groups.items():
+                    is_complete = len(date_set) >= 7
+                    week_mask = effect_mask & (df["stage_week"] == week_name)
+                    df.loc[week_mask, "is_complete_week"] = is_complete
+                    df.loc[week_mask, "trading_days"] = len(date_set)
 
     # 摸底期 trading_days
     baseline_mask = df["stage"] == "摸底期"

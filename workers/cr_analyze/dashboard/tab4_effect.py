@@ -15,6 +15,8 @@ METRIC_LABEL_TO_COL = {
     "下单门店数": "active_store_count",
 }
 
+TRIAL_GROUP_ORDER = ["对照组", "试验组一", "试验组二", "试验组三"]
+
 
 def _available_metric_labels(df: pd.DataFrame, labels: list[str]) -> list[str]:
     return [l for l in labels if METRIC_LABEL_TO_COL.get(l) in df.columns]
@@ -22,6 +24,43 @@ def _available_metric_labels(df: pd.DataFrame, labels: list[str]) -> list[str]:
 
 def _safe_cols(df: pd.DataFrame, cols: list[str]) -> list[str]:
     return [c for c in cols if c in df.columns]
+
+
+def _aggregate_metric(df: pd.DataFrame, group_cols: list[str], metric: str) -> pd.DataFrame:
+    """统一指标聚合口径：量能指标求和，抽佣率按加权口径。"""
+    if df.empty:
+        return pd.DataFrame(columns=group_cols + [metric])
+
+    if metric == "commission_rate":
+        if {"commission_amount", "gmv"}.issubset(df.columns):
+            out = (
+                df.groupby(group_cols, dropna=False)[["commission_amount", "gmv"]]
+                .sum()
+                .reset_index()
+            )
+            out[metric] = np.where(out["gmv"] > 0, out["commission_amount"] / out["gmv"], np.nan)
+            return out[group_cols + [metric]]
+        out = (
+            df.groupby(group_cols, dropna=False)[metric]
+            .mean()
+            .reset_index()
+        )
+        return out
+
+    if metric in {"commission_amount", "gmv", "order_count", "active_store_count"}:
+        out = (
+            df.groupby(group_cols, dropna=False)[metric]
+            .sum()
+            .reset_index()
+        )
+        return out
+
+    out = (
+        df.groupby(group_cols, dropna=False)[metric]
+        .mean()
+        .reset_index()
+    )
+    return out
 
 
 def _aggregate_baseline_city_sku(baseline: pd.DataFrame, metric: str) -> pd.DataFrame:
@@ -201,13 +240,18 @@ def _render_group_agg(wide: pd.DataFrame):
         st.warning(f"指标 {metric_label} 不可用")
         return
 
-    # 摸底期均值
+    agg_mode = st.selectbox("聚合口径", ["总量", "均值"], index=0, key="tab4_group_agg_mode")
+
+    # 摸底期 + 生效期
     baseline = wide[wide["stage"] == "摸底期"].copy()
     effect = wide[wide["stage"] == "生效期"].copy()
 
     frames = []
     if not baseline.empty and "trial_group" in baseline.columns:
-        b = baseline.groupby("trial_group")[metric].mean().reset_index()
+        if agg_mode == "总量":
+            b = _aggregate_metric(baseline, ["trial_group"], metric)
+        else:
+            b = baseline.groupby("trial_group", dropna=False)[metric].mean().reset_index()
         b["period"] = "摸底期"
         frames.append(b)
 
@@ -216,12 +260,22 @@ def _render_group_agg(wide: pd.DataFrame):
         and "trial_group" in effect.columns
         and "stage_week" in effect.columns
     ):
-        e = effect.groupby(["trial_group", "stage_week"])[metric].mean().reset_index()
+        if agg_mode == "总量":
+            e = _aggregate_metric(effect, ["trial_group", "stage_week"], metric)
+        else:
+            e = effect.groupby(["trial_group", "stage_week"], dropna=False)[metric].mean().reset_index()
         e["period"] = e["stage_week"]
         frames.append(e)
 
     if frames:
         combined = pd.concat(frames, ignore_index=True)
+        if "trial_group" in combined.columns:
+            combined["trial_group"] = pd.Categorical(
+                combined["trial_group"],
+                categories=TRIAL_GROUP_ORDER,
+                ordered=True,
+            )
+            combined = combined.sort_values(["trial_group", "period"], na_position="last")
         period_count = combined["period"].nunique(dropna=True)
         if period_count <= 1:
             # 只有摸底期单点时，线图不可读，退化为分组柱图确保可见。
@@ -230,12 +284,19 @@ def _render_group_agg(wide: pd.DataFrame):
                 .mean()
                 .reset_index()
             )
+            one_period["trial_group"] = pd.Categorical(
+                one_period["trial_group"],
+                categories=TRIAL_GROUP_ORDER,
+                ordered=True,
+            )
+            one_period = one_period.sort_values("trial_group", na_position="last")
             fig = px.bar(
                 one_period,
                 x="trial_group",
                 y=metric,
-                title=f"各试验组{metric_label}（摸底期）",
+                title=f"各试验组{metric_label}（摸底期，{agg_mode}）",
                 labels={"trial_group": "试验组", metric: metric_label},
+                category_orders={"trial_group": TRIAL_GROUP_ORDER},
             )
             fig.update_traces(text=one_period[metric].round(2), textposition="outside", cliponaxis=False)
             fig.update_yaxes(title_text=metric_label)
@@ -247,9 +308,10 @@ def _render_group_agg(wide: pd.DataFrame):
                 x="period",
                 y=metric,
                 color="trial_group",
-                title=f"各试验组{metric_label}均值趋势",
+                title=f"各试验组{metric_label}{agg_mode}趋势",
                 markers=True,
                 labels={"period": "阶段/周", metric: metric_label, "trial_group": "试验组"},
+                category_orders={"trial_group": TRIAL_GROUP_ORDER},
             )
             fig.update_xaxes(type="category")
             fig.update_yaxes(title_text=metric_label)
@@ -270,13 +332,14 @@ def _render_sku_comparison(wide: pd.DataFrame):
         st.info("暂无 SKU 对比数据")
         return
 
-    labels = _available_metric_labels(target, ["抽佣金额", "货值", "实际抽佣率"])
+    labels = _available_metric_labels(target, ["抽佣金额", "货值", "订单数", "下单门店数", "实际抽佣率"])
     if not labels:
         st.info("暂无可用指标")
         return
 
     metric_label = st.selectbox("指标", labels, key="tab4_sku_metric")
     metric = METRIC_LABEL_TO_COL[metric_label]
+    agg_mode = st.selectbox("聚合口径", ["总量", "均值"], index=0, key="tab4_sku_agg_mode")
     if metric not in target.columns:
         return
 
@@ -288,32 +351,51 @@ def _render_sku_comparison(wide: pd.DataFrame):
         return
 
     if "trial_group" in target.columns:
-        bar_df = target.groupby(["trial_group", "sku_id"])[metric].mean().reset_index()
+        if agg_mode == "总量":
+            bar_df = _aggregate_metric(target, ["trial_group", "sku_id"], metric)
+        else:
+            bar_df = target.groupby(["trial_group", "sku_id"], dropna=False)[metric].mean().reset_index()
+        bar_df["trial_group"] = pd.Categorical(
+            bar_df["trial_group"],
+            categories=TRIAL_GROUP_ORDER,
+            ordered=True,
+        )
+        bar_df = bar_df.sort_values(["trial_group", "sku_id"], na_position="last")
         bar_df["sku_id"] = bar_df["sku_id"].astype(str)
+        decimals = 4 if metric == "commission_rate" else 2
+        bar_df["_text"] = bar_df[metric].round(decimals)
         fig = px.bar(
             bar_df,
             x="trial_group",
             y=metric,
             color="sku_id",
+            text="_text",
             barmode="group",
-            title=f"各试验组SKU{metric_label}对比",
+            title=f"各试验组SKU{metric_label}对比（{agg_mode}）",
             labels={"trial_group": "试验组", "sku_id": "商品ID"},
+            category_orders={"trial_group": TRIAL_GROUP_ORDER},
         )
-        fig.update_traces(text=bar_df[metric].round(2), textposition="outside", cliponaxis=False)
+        fig.update_traces(textposition="outside", cliponaxis=False)
         fig.update_xaxes(type="category")
         fig.update_yaxes(title_text=metric_label)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        bar_df = target.groupby(["sku_id"])[metric].mean().reset_index()
+        if agg_mode == "总量":
+            bar_df = _aggregate_metric(target, ["sku_id"], metric)
+        else:
+            bar_df = target.groupby(["sku_id"], dropna=False)[metric].mean().reset_index()
         bar_df["sku_id"] = bar_df["sku_id"].astype(str)
+        decimals = 4 if metric == "commission_rate" else 2
+        bar_df["_text"] = bar_df[metric].round(decimals)
         fig = px.bar(
             bar_df,
             x="sku_id",
             y=metric,
-            title=f"SKU {metric_label} 对比",
+            text="_text",
+            title=f"SKU {metric_label} 对比（{agg_mode}）",
             labels={"sku_id": "商品ID", metric: metric_label},
         )
-        fig.update_traces(text=bar_df[metric].round(2), textposition="outside", cliponaxis=False)
+        fig.update_traces(textposition="outside", cliponaxis=False)
         fig.update_yaxes(title_text=metric_label)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -335,40 +417,48 @@ def _render_origin_comparison(wide: pd.DataFrame):
     yunnan = df[df["sku_id"].isin(yunnan_skus)]
     guangxi = df[df["sku_id"].isin(guangxi_skus)]
 
-    metric_labels = ["抽佣金额", "实际抽佣率"]
+    metric_labels = ["抽佣金额", "实际抽佣率", "货值", "订单数", "下单门店数"]
     available_labels = _available_metric_labels(df, metric_labels)
 
     if available_labels:
         rows = []
         for label in available_labels:
             m = METRIC_LABEL_TO_COL[label]
+            if m == "commission_rate" and {"commission_amount", "gmv"}.issubset(df.columns):
+                y_gmv = yunnan["gmv"].sum()
+                g_gmv = guangxi["gmv"].sum()
+                y_val = yunnan["commission_amount"].sum() / y_gmv if y_gmv > 0 else np.nan
+                g_val = guangxi["commission_amount"].sum() / g_gmv if g_gmv > 0 else np.nan
+            elif m in {"commission_amount", "gmv", "order_count", "active_store_count"}:
+                y_val = yunnan[m].sum()
+                g_val = guangxi[m].sum()
+            else:
+                y_val = yunnan[m].mean()
+                g_val = guangxi[m].mean()
             rows.append(
                 {
                     "指标": label,
-                    "云南 (10184690+20519020)": (
-                        yunnan[m].sum()
-                        if m == "commission_amount" or m == "gmv"
-                        else yunnan[m].mean()
-                    ),
-                    "广西 (20588413)": (
-                        guangxi[m].sum()
-                        if m == "commission_amount" or m == "gmv"
-                        else guangxi[m].mean()
-                    ),
+                    "云南 (10184690+20519020)": y_val,
+                    "广西 (20588413)": g_val,
                 }
             )
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-        # 柱状图对比（按 spec: 抽佣金额、实际抽佣率）
-        for label in ["抽佣金额", "实际抽佣率"]:
+        # 柱状图对比
+        for label in available_labels:
             m = METRIC_LABEL_TO_COL[label]
             if m in df.columns:
-                if m == "commission_rate":
-                    y_val = yunnan[m].mean()
-                    g_val = guangxi[m].mean()
-                else:
+                if m == "commission_rate" and {"commission_amount", "gmv"}.issubset(df.columns):
+                    y_gmv = yunnan["gmv"].sum()
+                    g_gmv = guangxi["gmv"].sum()
+                    y_val = yunnan["commission_amount"].sum() / y_gmv if y_gmv > 0 else np.nan
+                    g_val = guangxi["commission_amount"].sum() / g_gmv if g_gmv > 0 else np.nan
+                elif m in {"commission_amount", "gmv", "order_count", "active_store_count"}:
                     y_val = yunnan[m].sum()
                     g_val = guangxi[m].sum()
+                else:
+                    y_val = yunnan[m].mean()
+                    g_val = guangxi[m].mean()
                 compare_df = pd.DataFrame(
                     {
                         "产地": ["云南", "广西"],
