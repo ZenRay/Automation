@@ -7,14 +7,14 @@
 lib 层不引用本文件，保证 lib 的通用性。
 
 数据流：
-  飞书多维表格 (6 张配置表)
+    飞书多维表格 (5 张配置表)
     → 7 阶段数据处理流水线
     → Excel 调价方案文件
 
 设计决策：
   - 仅从飞书读取数据，不涉及 MaxCompute
   - 输出为 Excel 文件，不写回飞书（无 LarkTargetConfig / DataRoute）
-  - 2 张表需日期范围过滤（today 在试验起止日期内），在 pandas 中完成
+    - 1 张表需日期范围过滤（today 在试验起止日期内），在 pandas 中完成
   - 3 张表使用 API 级别日期过滤（日期 = target_date）
   - 1 张表使用 API 级别日期偏移过滤（conf_商品信息: 日期 = target_date - 1）
 """
@@ -30,12 +30,12 @@ APP_TOKEN = "GmWEbfgCmatLAnsSyaocBisJnoe"
 _WIKI_BASE = "https://bggc.feishu.cn/wiki/TcALwGgnciCQQYkPeHYcYf1Cnkd"
 
 # --------------------------------------------------------------------------
-# 飞书数据源配置：6 张配置表
+# 飞书数据源配置：5 张配置表
 #
 # 日期过滤策略（参见 research.md R-001）：
 #   - conf_county / conf_trial_goods / conf_hidden_logistics: API 级别精确日期过滤 (日期 = target_date)
 #   - conf_goods: API 级别精确日期过滤 (日期 = target_date - 1, 即昨日数据)
-#   - conf_trial_group / conf_trial_commission:
+#   - conf_trial_item_region_commission:
 #     全量拉取后在 pandas 中按日期范围过滤（需要 "today 在 [start, end] 内" 语义）
 # --------------------------------------------------------------------------
 LARK_SOURCES: list[LarkSourceConfig] = [
@@ -89,36 +89,6 @@ LARK_SOURCES: list[LarkSourceConfig] = [
         lark_extra_start_days=0,
     ),
     LarkSourceConfig(
-        name="conf_trial_group",
-        url=f"{_WIKI_BASE}?table=tbl2hCVkpjtMt16J&view=default",
-        table_name="conf_试验分组配置",
-        field_names=[
-            "区域id",
-            "区域名称",
-            "区域类型",
-            "试验分组",
-            "试验起始日期",
-            "试验结束日期",
-        ],
-        date_filter_field=None,
-        date_fields=["试验起始日期", "试验结束日期"],
-    ),
-    LarkSourceConfig(
-        name="conf_trial_commission",
-        url=f"{_WIKI_BASE}?table=tblXeBNiHArKWmXm&view=default",
-        table_name="conf_试验周期抽佣率",
-        field_names=[
-            "试验阶段",
-            "运营类型",
-            "试验分组",
-            "抽佣率",
-            "试验起始日期",
-            "试验结束日期",
-        ],
-        date_filter_field=None,
-        date_fields=["试验起始日期", "试验结束日期"],
-    ),
-    LarkSourceConfig(
         name="conf_trial_goods",
         url=f"{_WIKI_BASE}?table=tblQ7tqbptg9Mdrq&view=default",
         table_name="conf_试验商品信息",
@@ -130,6 +100,25 @@ LARK_SOURCES: list[LarkSourceConfig] = [
         date_filter_field="日期",
         date_fields=["日期"],
         lark_extra_start_days=0,
+    ),
+    LarkSourceConfig(
+        name="conf_trial_item_region_commission",
+        url=f"{_WIKI_BASE}?table=tblzQApGUi2SCjXt&view=vewRpmyZtT",
+        table_name="conf_试验商品和区域抽佣率配置",
+        field_names=[
+            "商品id",
+            "区域id",
+            "区域名称",
+            "市名称",
+            "试验分组",
+            "试验阶段",
+            "自营区域抽佣率",
+            "代理人区域抽佣率",
+            "试验起始日期",
+            "试验结束日期",
+        ],
+        date_filter_field=None,
+        date_fields=["试验起始日期", "试验结束日期"],
     ),
     LarkSourceConfig(
         name="conf_hidden_logistics",
@@ -174,10 +163,9 @@ REGION_OUTPUT_FIELDS: list[str] = [
     "市id",
     "省id",
     "区县id",
+    "运营类型",
     "是否试验区域",
     "试验分组",
-    "运营类型",
-    "抽佣率",
 ]
 
 # --------------------------------------------------------------------------

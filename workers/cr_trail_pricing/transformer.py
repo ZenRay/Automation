@@ -203,39 +203,14 @@ def filter_trial_products(conf_goods, conf_trial_goods, target_date):
 # ---------------------------------------------------------------------------
 
 
-def mark_trial_regions(conf_county, conf_trial_group, target_date):
-    """LEFT JOIN on 市id=区域id, 标记是否试验区域"""
-    city_groups = conf_trial_group[
-        (conf_trial_group["区域类型"] == "CITY")
-        & _in_date_range(
-            conf_trial_group["试验起始日期"],
-            conf_trial_group["试验结束日期"],
-            target_date,
-        )
-    ]
-    join_cols = ["区域id", "区域类型", "试验分组", "试验起始日期", "试验结束日期"]
-    city_groups = city_groups[[c for c in join_cols if c in city_groups.columns]]
-
-    overlap = set(city_groups.columns) & set(conf_county.columns)
-    county_clean = conf_county.drop(
-        columns=[c for c in overlap if c in conf_county.columns], errors="ignore"
-    )
-
-    result = county_clean.merge(
-        city_groups,
-        left_on="市id",
-        right_on="区域id",
-        how="left",
-    )
-    result["是否试验区域"] = result["试验分组"].notna().astype(int)
-
-    for col in ["试验分组"]:
-        if col in result.columns:
-            result[col] = result[col].fillna("")
-
+def mark_trial_regions(conf_county):
+    """区域基础标记：先默认非试验，试验命中在商品区域抽佣关联阶段再确定。"""
+    result = conf_county.copy()
+    result["是否试验区域"] = 0
+    result["试验分组"] = ""
     keep = [
         c
-        for c in list(county_clean.columns) + ["是否试验区域", "试验分组"]
+        for c in list(conf_county.columns) + ["是否试验区域", "试验分组"]
         if c in result.columns
     ]
     return result[keep].copy()
@@ -246,27 +221,73 @@ def mark_trial_regions(conf_county, conf_trial_group, target_date):
 # ---------------------------------------------------------------------------
 
 
-def associate_commission(regions_df, conf_trial_commission, target_date):
-    """LEFT JOIN on 试验分组 + 运营类型, 关联抽佣率
+def associate_trial_item_region_commission(
+    products_df, regions_df, conf_trial_item_region_commission, target_date
+):
+    """按 商品id+城市id+运营类型 关联试验抽佣率。
 
-    每个试验分组有 2 条记录（自营区域/代理人区域），
-    必须将运营类型纳入 JOIN 条件以避免行数翻倍。
+        说明：
+        - 抽佣率来源切到 conf_试验商品和区域抽佣率配置。
+        - 先按日期范围过滤生效记录，再按 商品id+区域id(城市id) 匹配。
+        - 本阶段仅缓存“商品->(自营费率, 代理费率, 试验分组)”映射；
+            在 Stage 6 按区域运营类型二选一路由取值。
     """
-    active = conf_trial_commission[
+    if regions_df.empty:
+        return regions_df.copy()
+
+    result = regions_df.copy()
+    active = conf_trial_item_region_commission[
         _in_date_range(
-            conf_trial_commission["试验起始日期"],
-            conf_trial_commission["试验结束日期"],
+            conf_trial_item_region_commission["试验起始日期"],
+            conf_trial_item_region_commission["试验结束日期"],
             target_date,
         )
-    ]
-    join_cols = ["试验分组", "运营类型"]
-    result = regions_df.merge(
-        active[[c for c in join_cols + ["抽佣率"] if c in active.columns]],
-        on=join_cols,
-        how="left",
+    ].copy()
+
+    if active.empty:
+        result["_trial_rate_map"] = [{} for _ in range(len(result))]
+        result["_trial_group_map"] = [{} for _ in range(len(result))]
+        return result[
+            [c for c in REGION_OUTPUT_FIELDS if c in result.columns]
+            + ["_trial_rate_map", "_trial_group_map"]
+        ]
+
+    active["商品id"] = pd.to_numeric(active["商品id"], errors="coerce").astype("Int64")
+    active["区域id"] = pd.to_numeric(active["区域id"], errors="coerce").astype("Int64")
+
+    # 防御性去重：同 商品id+区域id 仅保留最后一条
+    active = active.dropna(subset=["商品id", "区域id"]).drop_duplicates(
+        subset=["商品id", "区域id"], keep="last"
     )
-    # 不填充 0，保留 NaN 以便未匹配行在下游计算中自然传播
-    return result[[c for c in REGION_OUTPUT_FIELDS if c in result.columns]].copy()
+
+    active["试验分组"] = active["试验分组"].fillna("")
+
+    city_rate_map = {}
+    city_group_map = {}
+    for city_id, sub in active.groupby("区域id"):
+        city_rate_map[int(city_id)] = {
+            int(pid): {
+                "self": self_rate,
+                "agent": agent_rate,
+            }
+            for pid, self_rate, agent_rate in zip(
+                sub["商品id"], sub["自营区域抽佣率"], sub["代理人区域抽佣率"]
+            )
+        }
+        city_group_map[int(city_id)] = {
+            int(pid): grp for pid, grp in zip(sub["商品id"], sub["试验分组"])
+        }
+
+    result["_trial_rate_map"] = result["市id"].apply(
+        lambda x: city_rate_map.get(int(x), {}) if pd.notna(x) else {}
+    )
+    result["_trial_group_map"] = result["市id"].apply(
+        lambda x: city_group_map.get(int(x), {}) if pd.notna(x) else {}
+    )
+    return result[
+        [c for c in REGION_OUTPUT_FIELDS if c in result.columns]
+        + ["_trial_rate_map", "_trial_group_map"]
+    ].copy()
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +370,35 @@ def compute_pricing(products_df, regions_df):
     regions_df = regions_df.assign(_key=1)
     result = products_df.merge(regions_df, on="_key").drop(columns=["_key"])
 
+    # 商品+城市匹配试验抽佣映射；未命中则视为非试验
+    def _lookup_trial_rate(row):
+        rate_map = row.get("_trial_rate_map", {})
+        pid = row.get("商品id")
+        if not isinstance(rate_map, dict) or pd.isna(pid):
+            return np.nan
+        rate_entry = rate_map.get(int(pid))
+        if not isinstance(rate_entry, dict):
+            return np.nan
+        op_type = "" if pd.isna(row.get("运营类型")) else str(row.get("运营类型"))
+        if "自营" in op_type:
+            return rate_entry.get("self", np.nan)
+        if "代理" in op_type:
+            return rate_entry.get("agent", np.nan)
+        return np.nan
+
+    def _lookup_trial_group(row):
+        group_map = row.get("_trial_group_map", {})
+        pid = row.get("商品id")
+        if not isinstance(group_map, dict) or pd.isna(pid):
+            return ""
+        return group_map.get(int(pid), "")
+
+    result["抽佣率"] = result.apply(_lookup_trial_rate, axis=1)
+    result["试验分组"] = result.apply(_lookup_trial_group, axis=1)
+    result["是否试验区域"] = result["抽佣率"].notna().astype(int)
+    # 非试验行清空试验分组，避免核对时将“城市匹配未命中”误判为试验命中。
+    result.loc[result["是否试验区域"] == 0, "试验分组"] = ""
+
     is_trial = result["是否试验区域"] == 1
 
     # 固定抽佣比例 = 抽佣率 - 非试验区域抽佣率（无 abs）
@@ -379,6 +429,8 @@ def compute_pricing(products_df, regions_df):
     # 过滤：只保留 固定抽佣比例 / 固定抽佣货值 至少一个非空的行
     has_value = result["固定抽佣比例"].notna() | result["固定抽佣货值"].notna()
     result = result[has_value].reset_index(drop=True)
+
+    result = result.drop(columns=["_trial_rate_map", "_trial_group_map"], errors="ignore")
 
     result["调价幅度"] = np.nan
     result["设置状态"] = "启用"

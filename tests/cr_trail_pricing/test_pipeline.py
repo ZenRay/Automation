@@ -11,7 +11,7 @@ import pytest
 from workers.cr_trail_pricing.transformer import (
     filter_trial_products,
     mark_trial_regions,
-    associate_commission,
+    associate_trial_item_region_commission,
     associate_logistics_fee,
     compute_pricing,
     export_excel,
@@ -81,35 +81,22 @@ def mock_conf_county():
             "是否有效": [1] * 5,
             "区域等级": [1] * 5,
             "试验区域类型": ["T"] * 5,
-            "运营类型": ["类型A", "类型B", "类型A", "类型A", "类型A"],
+            "运营类型": ["自营区域", "代理人区域", "自营区域", "自营区域", "自营区域"],
         }
     )
 
 
 @pytest.fixture
-def mock_conf_trial_group():
+def mock_conf_trial_item_region_commission():
     return pd.DataFrame(
         {
-            "区域id": [10, 20],
-            "区域名称": ["试验区域A", "试验区域B"],
-            "区域类型": ["CITY", "CITY"],
-            "试验分组": ["分组1", "分组2"],
-            "试验起始日期": [date(2026, 6, 1), date(2026, 6, 1)],
-            "试验结束日期": [date(2026, 6, 30), date(2026, 6, 30)],
-        }
-    )
-
-
-@pytest.fixture
-def mock_conf_trial_commission():
-    return pd.DataFrame(
-        {
-            "试验阶段": ["阶段A", "阶段B"],
-            "运营类型": ["类型A", "类型B"],
-            "试验分组": ["分组1", "分组2"],
-            "抽佣率": [0.03, 0.06],
-            "试验起始日期": [date(2026, 6, 1), date(2026, 6, 1)],
-            "试验结束日期": [date(2026, 6, 30), date(2026, 6, 30)],
+            "商品id": [101, 101, 102],
+            "区域id": [10, 20, 20],
+            "试验分组": ["分组1", "分组2", "分组2"],
+            "自营区域抽佣率": [0.03, 0.07, 0.08],
+            "代理人区域抽佣率": [0.02, 0.06, 0.09],
+            "试验起始日期": [date(2026, 6, 1), date(2026, 6, 1), date(2026, 6, 1)],
+            "试验结束日期": [date(2026, 6, 30), date(2026, 6, 30), date(2026, 6, 30)],
         }
     )
 
@@ -183,53 +170,47 @@ class TestStage2FilterProducts:
 
 
 class TestStage3MarkRegions:
-    def test_marks_trial_and_non_trial(self, mock_conf_county, mock_conf_trial_group):
-        result = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
-        )
+    def test_default_marks_all_non_trial(self, mock_conf_county):
+        result = mark_trial_regions(mock_conf_county)
         assert len(result) == 5
-        trial = result[result["是否试验区域"] == 1]
-        assert len(trial) == 2
-        assert set(trial["市id"]) == {10, 20}
+        assert (result["是否试验区域"] == 0).all()
 
-    def test_non_trial_has_empty_trial_fields(
-        self, mock_conf_county, mock_conf_trial_group
+    def test_trial_group_default_empty(self, mock_conf_county):
+        result = mark_trial_regions(mock_conf_county)
+        assert (result["试验分组"] == "").all()
+
+
+class TestStage4AssociateTrialItemRegionCommission:
+    def test_routes_self_operated_rate(
+        self,
+        mock_conf_goods,
+        mock_conf_trial_goods,
+        mock_conf_county,
+        mock_conf_trial_item_region_commission,
     ):
-        result = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
+        products = filter_trial_products(mock_conf_goods, mock_conf_trial_goods, TARGET_DATE)
+        regions = mark_trial_regions(mock_conf_county)
+        result = associate_trial_item_region_commission(
+            products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
         )
-        non_trial = result[result["是否试验区域"] == 0]
-        assert (non_trial["试验分组"] == "").all()
+        row = result[result["市id"] == 10].iloc[0]
+        assert isinstance(row["_trial_rate_map"], dict)
+        assert row["_trial_rate_map"][101]["self"] == pytest.approx(0.03)
 
-    def test_trial_region_id_from_county(self, mock_conf_county, mock_conf_trial_group):
-        result = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
-        )
-        trial = result[result["是否试验区域"] == 1]
-        assert set(trial["试验区域id"]) == {1001, 1002}
-
-
-class TestStage4AssociateCommission:
-    def test_trial_gets_commission(
-        self, mock_conf_county, mock_conf_trial_group, mock_conf_trial_commission
+    def test_routes_agent_rate(
+        self,
+        mock_conf_goods,
+        mock_conf_trial_goods,
+        mock_conf_county,
+        mock_conf_trial_item_region_commission,
     ):
-        regions = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
+        products = filter_trial_products(mock_conf_goods, mock_conf_trial_goods, TARGET_DATE)
+        regions = mark_trial_regions(mock_conf_county)
+        result = associate_trial_item_region_commission(
+            products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
         )
-        result = associate_commission(regions, mock_conf_trial_commission, TARGET_DATE)
-        trial = result[result["是否试验区域"] == 1]
-        assert (trial["抽佣率"] > 0).all()
-
-    def test_non_trial_has_nan_commission(
-        self, mock_conf_county, mock_conf_trial_group, mock_conf_trial_commission
-    ):
-        """非试验区域未匹配抽佣表，抽佣率应为 NaN"""
-        regions = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
-        )
-        result = associate_commission(regions, mock_conf_trial_commission, TARGET_DATE)
-        non_trial = result[result["是否试验区域"] == 0]
-        assert non_trial["抽佣率"].isna().all()
+        row = result[result["市id"] == 20].iloc[0]
+        assert row["_trial_rate_map"][101]["agent"] == pytest.approx(0.06)
 
 
 class TestStage5LogisticsFee:
@@ -357,8 +338,11 @@ class TestStage6Pricing:
                 "市id": [10, 30],
                 "省id": [1, 3],
                 "区县id": [100, 300],
-                "是否试验区域": [1, 0],
-                "抽佣率": [0.03, 0],
+                "运营类型": ["自营区域", "代理人区域"],
+                "是否试验区域": [0, 0],
+                "试验分组": ["", ""],
+                "_trial_rate_map": [{101: {"self": 0.03, "agent": 0.02}}, {}],
+                "_trial_group_map": [{101: "分组1"}, {}],
                 "隐形物流费率": [0.01, 0.02],
             }
         )
@@ -424,8 +408,11 @@ class TestStage6Pricing:
                 "市id": [10],
                 "省id": [1],
                 "区县id": [100],
-                "是否试验区域": [1],
-                "抽佣率": [0.05],
+                "运营类型": ["自营区域"],
+                "是否试验区域": [0],
+                "试验分组": [""],
+                "_trial_rate_map": [{101: {"self": 0.05, "agent": 0.03}}],
+                "_trial_group_map": [{101: "分组1"}],
                 "隐形物流费率": [0.01],
             }
         )
@@ -451,8 +438,11 @@ class TestStage6Pricing:
                 "市id": [10],
                 "省id": [1],
                 "区县id": [100],
-                "是否试验区域": [1],
-                "抽佣率": [0.03],
+                "运营类型": ["自营区域"],
+                "是否试验区域": [0],
+                "试验分组": [""],
+                "_trial_rate_map": [{101: {"self": 0.03, "agent": 0.02}}],
+                "_trial_group_map": [{101: "分组1"}],
                 "隐形物流费率": [0.01],
             }
         )
@@ -521,17 +511,16 @@ class TestFullPipeline:
         mock_conf_goods,
         mock_conf_trial_goods,
         mock_conf_county,
-        mock_conf_trial_group,
-        mock_conf_trial_commission,
+        mock_conf_trial_item_region_commission,
         mock_conf_hidden_logistics,
     ):
         products = filter_trial_products(
             mock_conf_goods, mock_conf_trial_goods, TARGET_DATE
         )
-        regions = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
+        regions = mark_trial_regions(mock_conf_county)
+        regions = associate_trial_item_region_commission(
+            products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
         )
-        regions = associate_commission(regions, mock_conf_trial_commission, TARGET_DATE)
         regions = associate_logistics_fee(
             regions, mock_conf_hidden_logistics, TARGET_DATE
         )
@@ -543,8 +532,8 @@ class TestFullPipeline:
 
         trial_rows = result[result["是否试验区域"] == 1]
         non_trial_rows = result[result["是否试验区域"] == 0]
-        assert len(trial_rows) == 2 * 2
-        assert len(non_trial_rows) == 2  # 只有匹配物流表的非试验行保留
+        assert len(trial_rows) == 3
+        assert len(non_trial_rows) == 3
 
         assert (trial_rows["固定抽佣比例"].notna()).all()
         assert (trial_rows["固定抽佣货值"].isna()).all()
@@ -563,8 +552,7 @@ class TestFullPipeline:
         self,
         mock_conf_trial_goods,
         mock_conf_county,
-        mock_conf_trial_group,
-        mock_conf_trial_commission,
+        mock_conf_trial_item_region_commission,
         mock_conf_hidden_logistics,
     ):
         empty_goods = pd.DataFrame(
@@ -584,10 +572,10 @@ class TestFullPipeline:
         )
         assert len(products) == 0
 
-        regions = mark_trial_regions(
-            mock_conf_county, mock_conf_trial_group, TARGET_DATE
+        regions = mark_trial_regions(mock_conf_county)
+        regions = associate_trial_item_region_commission(
+            products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
         )
-        regions = associate_commission(regions, mock_conf_trial_commission, TARGET_DATE)
         regions = associate_logistics_fee(
             regions, mock_conf_hidden_logistics, TARGET_DATE
         )
