@@ -22,14 +22,13 @@ class TestLarkSources:
     EXPECTED_NAMES = [
         "conf_county",
         "conf_goods",
-        "conf_trial_group",
-        "conf_trial_commission",
         "conf_trial_goods",
+        "conf_trial_item_region_commission",
         "conf_hidden_logistics",
     ]
 
     def test_count(self):
-        assert len(LARK_SOURCES) == 6
+        assert len(LARK_SOURCES) == 5
 
     def test_names(self):
         names = [s.name for s in LARK_SOURCES]
@@ -67,16 +66,13 @@ class TestLarkSources:
             assert src.date_fields == ["日期"], f"{name}: wrong date_fields"
 
     def test_unfiltered_sources(self):
-        """conf_trial_group, conf_trial_commission have no API date filter (pandas range filter)"""
+        """conf_trial_item_region_commission has no API date filter (pandas range filter)"""
         unfiltered = {s.name: s for s in LARK_SOURCES if not s.date_filter_field}
-        assert set(unfiltered.keys()) == {
-            "conf_trial_group",
-            "conf_trial_commission",
-        }
+        assert set(unfiltered.keys()) == {"conf_trial_item_region_commission"}
 
     def test_date_range_sources_have_date_fields(self):
         """Sources with date range columns should declare them in date_fields"""
-        range_sources = {"conf_trial_group", "conf_trial_commission"}
+        range_sources = {"conf_trial_item_region_commission"}
         for src in LARK_SOURCES:
             if src.name in range_sources:
                 assert (
@@ -134,17 +130,16 @@ class TestRegionOutputFields:
         "市id",
         "省id",
         "区县id",
+        "运营类型",
         "是否试验区域",
         "试验分组",
-        "运营类型",
-        "抽佣率",
     ]
 
     def test_exact_fields(self):
         assert REGION_OUTPUT_FIELDS == self.EXPECTED
 
     def test_count(self):
-        assert len(REGION_OUTPUT_FIELDS) == 10
+        assert len(REGION_OUTPUT_FIELDS) == 9
 
 
 class TestColumnRenameMap:

@@ -12,7 +12,7 @@ from .transformer import (
     extract_sources,
     filter_trial_products,
     mark_trial_regions,
-    associate_commission,
+    associate_trial_item_region_commission,
     associate_logistics_fee,
     compute_pricing,
     export_excel,
@@ -94,13 +94,16 @@ def run_cr_trail_pricing_pipeline(target_date: date, output_path: str) -> int:
         (
             "区域标记",
             lambda: mark_trial_regions(
-                lark_data["conf_county"], lark_data["conf_trial_group"], target_date
+                lark_data["conf_county"]
             ),
         ),
         (
-            "抽佣关联",
-            lambda: associate_commission(
-                regions_df, lark_data["conf_trial_commission"], target_date
+            "试验商品区域抽佣关联",
+            lambda: associate_trial_item_region_commission(
+                products_df,
+                regions_df,
+                lark_data["conf_trial_item_region_commission"],
+                target_date,
             ),
         ),
         (

@@ -66,6 +66,7 @@ class AttachmentTokenResolver:
     row_key_getter: Any = None
     persistence: RouteWritePersistence | None = None
     _token_cache: dict[str, str] = field(default_factory=dict, init=False)
+    _failed_reason_cache: dict[str, str] = field(default_factory=dict, init=False)
 
     def resolve(self, value: Any) -> list[dict]:
         urls = normalize_attachment_input(value)
@@ -165,6 +166,7 @@ class AttachmentTokenResolver:
                     )
 
                 self._token_cache[url] = file_token
+                self._failed_reason_cache.pop(url, None)
                 if self.persistence is not None:
                     self.persistence.append_upload_event(
                         target_name=self.target_name,
@@ -203,12 +205,16 @@ class AttachmentTokenResolver:
                     safe_remove_file(temp_path)
 
         logger.error("Resolve attachment failed for url=%s: %s", url, last_error)
+        self._failed_reason_cache[url] = str(last_error) if last_error is not None else ""
         return None
 
     def seed_token_cache(self, token_map: dict[str, str]) -> None:
         if not token_map:
             return
         self._token_cache.update(token_map)
+
+    def get_failed_reason(self, url: str) -> str | None:
+        return self._failed_reason_cache.get(url)
 
     def _get_row_key(self, value: Any) -> str:
         if callable(self.row_key_getter):

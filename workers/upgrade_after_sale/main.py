@@ -51,7 +51,11 @@ from .config import (
     SQL_BASE_DIR,
     SQL_QUERIES,
 )
-from .transformer import normalize_after_sale_df, normalize_order_item_df
+from .transformer import (
+    normalize_after_sale_df,
+    normalize_order_item_df,
+    normalize_store_stat_df,
+)
 
 logger = logging.getLogger("workers.upgrade_after_sale.main")
 
@@ -145,6 +149,17 @@ def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
         key_col = "售后单id"
     elif route_name == "order_detail":
         key_col = "明细订单id"
+    elif route_name == "store_stat_detail":
+        # 复合键：店铺id + 日期
+        for col in ("店铺id", "日期"):
+            if col not in df.columns:
+                raise ValueError(
+                    f"Missing row key column '{col}' for route '{route_name}'"
+                )
+        row_key = df["店铺id"].astype(str) + "_" + df["日期"].astype(str)
+        if row_key.eq("").any() or row_key.str.startswith("nan_").any():
+            raise ValueError(f"Empty row_key detected for route '{route_name}'")
+        return row_key
     else:
         raise ValueError(f"Unsupported route_name for row_key: {route_name}")
 
@@ -161,6 +176,7 @@ def _inject_row_key(mc_data: dict[str, pd.DataFrame]) -> None:
     route_to_source = {
         "after_sale_detail": "after_sale_item",
         "order_detail": "order_item",
+        "store_stat_detail": "store_stat",
     }
     for route_name, source_name in route_to_source.items():
         if source_name not in mc_data:
@@ -298,6 +314,8 @@ def run_upgrade_after_sale_pipeline(
     after_sale_end: int | None = None,
     order_start: int | None = None,
     order_end: int | None = None,
+    store_stat_start: int | None = None,
+    store_stat_end: int | None = None,
     enable_persistence: bool = False,
     persistence_dir: str | None = None,
     job_id: str | None = None,
@@ -319,7 +337,7 @@ def run_upgrade_after_sale_pipeline(
         logger.error("[Step 1/5] Client initialization failed: %s", e)
         return 1
 
-    # 两条 SQL 独立窗口
+    # 三条 SQL 独立窗口
     as_start = (
         after_sale_start
         if after_sale_start is not None
@@ -334,19 +352,32 @@ def run_upgrade_after_sale_pipeline(
         order_start if order_start is not None else QUERY_WINDOWS["order_item"]["start"]
     )
     od_end = order_end if order_end is not None else QUERY_WINDOWS["order_item"]["end"]
+    ss_start = (
+        store_stat_start
+        if store_stat_start is not None
+        else QUERY_WINDOWS["store_stat"]["start"]
+    )
+    ss_end = (
+        store_stat_end
+        if store_stat_end is not None
+        else QUERY_WINDOWS["store_stat"]["end"]
+    )
 
     try:
         _validate_offsets("after_sale_item", as_start, as_end)
         _validate_offsets("order_item", od_start, od_end)
+        _validate_offsets("store_stat", ss_start, ss_end)
     except ValueError as e:
         logger.error("[Step 1/5] Offset validation failed: %s", e)
         return 1
 
     as_params = _build_date_params(date_value, as_start, as_end)
     od_params = _build_date_params(date_value, od_start, od_end)
+    ss_params = _build_date_params(date_value, ss_start, ss_end)
 
     as_window = _compute_window(as_params)
     od_window = _compute_window(od_params)
+    ss_window = _compute_window(ss_params)
 
     logger.info(
         "after_sale_item params: date_param=%s, start=%s, end=%s, window=%s~%s",
@@ -363,6 +394,14 @@ def run_upgrade_after_sale_pipeline(
         od_end,
         od_window[0],
         od_window[1],
+    )
+    logger.info(
+        "store_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
+        ss_params.sql_params()["date_param"],
+        ss_start,
+        ss_end,
+        ss_window[0],
+        ss_window[1],
     )
 
     try:
@@ -382,13 +421,22 @@ def run_upgrade_after_sale_pipeline(
             hints=MC_HINTS,
             params=od_params.sql_params(),
         )
+        store_stat_data = execute_all_queries(
+            mc_client,
+            [query_map["store_stat"]],
+            SQL_BASE_DIR,
+            hints=MC_HINTS,
+            params=ss_params.sql_params(),
+        )
         mc_data: dict[str, pd.DataFrame] = {}
         mc_data.update(after_sale_data)
         mc_data.update(order_data)
+        mc_data.update(store_stat_data)
         logger.info(
-            "SQL results: after_sale_item=%s rows, order_item=%s rows",
+            "SQL results: after_sale_item=%s rows, order_item=%s rows, store_stat=%s rows",
             len(mc_data.get("after_sale_item", pd.DataFrame())),
             len(mc_data.get("order_item", pd.DataFrame())),
+            len(mc_data.get("store_stat", pd.DataFrame())),
         )
     except Exception as e:
         logger.error("[Step 2/5] SQL execution failed: %s", e)
@@ -405,6 +453,8 @@ def run_upgrade_after_sale_pipeline(
             )
         if "order_item" in mc_data:
             mc_data["order_item"] = normalize_order_item_df(mc_data["order_item"])
+        if "store_stat" in mc_data:
+            mc_data["store_stat"] = normalize_store_stat_df(mc_data["store_stat"])
         _inject_row_key(mc_data)
     except Exception as e:
         logger.error("[Step 3/5] Normalization failed: %s", e)
@@ -417,6 +467,7 @@ def run_upgrade_after_sale_pipeline(
             {
                 "after_sale_detail": as_window,
                 "order_detail": od_window,
+                "store_stat_detail": ss_window,
             },
         )
         router = DataRouter(
@@ -443,6 +494,7 @@ def run_upgrade_after_sale_pipeline(
         route_to_source = {
             "after_sale_detail": "after_sale_item",
             "order_detail": "order_item",
+            "store_stat_detail": "store_stat",
         }
         logger.info("[Step 4/5] Upload reconciliation (sql_rows vs uploaded_rows):")
         total_sql_rows = 0
@@ -498,6 +550,18 @@ def main() -> None:
         "--order-end", type=int, default=None, help="订单 SQL end offset"
     )
     parser.add_argument(
+        "--store-stat-start",
+        type=int,
+        default=None,
+        help="门店统计 SQL start offset",
+    )
+    parser.add_argument(
+        "--store-stat-end",
+        type=int,
+        default=None,
+        help="门店统计 SQL end offset",
+    )
+    parser.add_argument(
         "--enable-persistence", action="store_true", help="启用 route 写入持久化"
     )
     parser.add_argument(
@@ -515,6 +579,8 @@ def main() -> None:
         after_sale_end=args.as_end,
         order_start=args.order_start,
         order_end=args.order_end,
+        store_stat_start=args.store_stat_start,
+        store_stat_end=args.store_stat_end,
         enable_persistence=args.enable_persistence,
         persistence_dir=args.persistence_dir,
         job_id=args.job_id,
