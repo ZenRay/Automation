@@ -51,12 +51,20 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         use_temp_table=True,
         temp_table_project="datawarehouse_max_dev",
     ),
+    SQLQueryConfig(
+        name="store_stat",
+        sql_file="store_stat_query.sql",
+        depends_on=[],
+        use_temp_table=True,
+        temp_table_project="datawarehouse_max_dev",
+    ),
 ]
 
 # 各 SQL 独立 offset（可在 main 参数中覆盖）
 QUERY_WINDOWS = {
     "after_sale_item": {"start": -7, "end": 0},
     "order_item": {"start": -7, "end": 0},
+    "store_stat": {"start": -7, "end": 0},
 }
 
 # 应用层写入重试（route 粒度）
@@ -195,7 +203,68 @@ TARGET_ORDER_ITEM = LarkTargetConfig(
     cleanup_conditions=CleanupCondition.runtime_window(),
 )
 
-LARK_TARGETS: list[LarkTargetConfig] = [TARGET_AFTER_SALE, TARGET_ORDER_ITEM]
+TARGET_STORE_STAT = LarkTargetConfig(
+    name="store_stat",
+    url=BASE_URL,
+    table_name="门店维度统计表",
+    field_mappings=[
+        _fm("日期", LarkFieldType.DATE),
+        _fm("店铺id", LarkFieldType.NUMBER),
+        _fm("曝光次数", LarkFieldType.NUMBER),
+        _fm("下单金额", LarkFieldType.NUMBER),
+        _fm("送达金额", LarkFieldType.NUMBER),
+        _fm("送达数量", LarkFieldType.NUMBER),
+        _fm("质量问题售后数量", LarkFieldType.NUMBER),
+        _fm("售后数量", LarkFieldType.NUMBER),
+        _fm("质量问题售后赔付金额", LarkFieldType.NUMBER),
+        _fm("售后赔付金额", LarkFieldType.NUMBER),
+        _fm("自然日售后赔付金额", LarkFieldType.NUMBER),
+        _fm("平台抽佣金额", LarkFieldType.NUMBER),
+        _fm("近30天曝光次数", LarkFieldType.NUMBER),
+        _fm("近30天下单金额", LarkFieldType.NUMBER),
+        _fm("近30天送达金额", LarkFieldType.NUMBER),
+        _fm("近30天送达数量", LarkFieldType.NUMBER),
+        _fm("近30天质量问题售后数量", LarkFieldType.NUMBER),
+        _fm("近30天售后数量", LarkFieldType.NUMBER),
+        _fm("近30天质量问题售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近30天售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近30天自然日售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近30天平台抽佣金额", LarkFieldType.NUMBER),
+        _fm("近14天曝光次数", LarkFieldType.NUMBER),
+        _fm("近14天下单金额", LarkFieldType.NUMBER),
+        _fm("近14天送达金额", LarkFieldType.NUMBER),
+        _fm("近14天送达数量", LarkFieldType.NUMBER),
+        _fm("近14天质量问题售后数量", LarkFieldType.NUMBER),
+        _fm("近14天售后数量", LarkFieldType.NUMBER),
+        _fm("近14天质量问题售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近14天售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近14天自然日售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近14天平台抽佣金额", LarkFieldType.NUMBER),
+        _fm("近7天曝光次数", LarkFieldType.NUMBER),
+        _fm("近7天下单金额", LarkFieldType.NUMBER),
+        _fm("近7天送达金额", LarkFieldType.NUMBER),
+        _fm("近7天送达数量", LarkFieldType.NUMBER),
+        _fm("近7天质量问题售后数量", LarkFieldType.NUMBER),
+        _fm("近7天售后数量", LarkFieldType.NUMBER),
+        _fm("近7天质量问题售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近7天售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近7天自然日售后赔付金额", LarkFieldType.NUMBER),
+        _fm("近7天平台抽佣金额", LarkFieldType.NUMBER),
+        _fm("近30天曝光天数", LarkFieldType.NUMBER),
+        _fm("近30天下单天数", LarkFieldType.NUMBER),
+        _fm("m13到m7曝光天数", LarkFieldType.NUMBER),
+        _fm("m13到m7下单天数", LarkFieldType.NUMBER),
+        _fm("近7天曝光天数", LarkFieldType.NUMBER),
+        _fm("近7天下单天数", LarkFieldType.NUMBER),
+    ],
+    cleanup_conditions=CleanupCondition.runtime_window(),
+)
+
+LARK_TARGETS: list[LarkTargetConfig] = [
+    TARGET_AFTER_SALE,
+    TARGET_ORDER_ITEM,
+    TARGET_STORE_STAT,
+]
 
 DATA_ROUTES: list[DataRoute] = [
     DataRoute(
@@ -212,10 +281,18 @@ DATA_ROUTES: list[DataRoute] = [
         transforms=[],
         validation_level="warn",
     ),
+    DataRoute(
+        name="store_stat_detail",
+        target=TARGET_STORE_STAT,
+        source_ref="mc:store_stat",
+        transforms=[],
+        validation_level="warn",
+    ),
 ]
 
 # 路由清理窗口日期字段
 ROUTE_DATE_FIELDS = {
     "after_sale_detail": "申请日期",
     "order_detail": "日期",
+    "store_stat_detail": "日期",
 }

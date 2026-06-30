@@ -160,6 +160,11 @@ test*.py
 tests/*
 !tests/cr_trail_pricing/
 !tests/cr_trail_pricing/**
+!tests/test_store_stat_config.py
+!tests/test_store_stat_date_window.py
+!tests/test_store_stat_row_key.py
+!tests/test_store_stat_transformer.py
+!tests/test_e2e_store_stat_upload.py
 tests/cr_trail_pricing/**/__pycache__/
 time_utils.py
 
