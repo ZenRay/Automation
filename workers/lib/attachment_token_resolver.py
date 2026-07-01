@@ -205,7 +205,9 @@ class AttachmentTokenResolver:
                     safe_remove_file(temp_path)
 
         logger.error("Resolve attachment failed for url=%s: %s", url, last_error)
-        self._failed_reason_cache[url] = str(last_error) if last_error is not None else ""
+        self._failed_reason_cache[url] = (
+            str(last_error) if last_error is not None else ""
+        )
         return None
 
     def seed_token_cache(self, token_map: dict[str, str]) -> None:
@@ -233,5 +235,15 @@ class AttachmentTokenResolver:
         text = str(exc).lower()
         return any(
             keyword in text
-            for keyword in ("timeout", "temporar", "429", "503", "502", "504")
+            for keyword in (
+                "timeout",
+                "temporar",
+                "429",
+                "503",
+                "502",
+                "504",
+                "99991400",
+                "frequency limit",
+                "rate limit",
+            )
         )

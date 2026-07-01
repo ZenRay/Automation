@@ -56,6 +56,10 @@ def test_replace_cleanup_windows_store_stat():
             "after_sale_detail": (date(2026, 6, 19), date(2026, 6, 26)),
             "order_detail": (date(2026, 6, 19), date(2026, 6, 26)),
             "store_stat_detail": (date(2026, 6, 19), date(2026, 6, 26)),
+            "store_cat1_stat_detail": (date(2026, 6, 19), date(2026, 6, 26)),
+            "cat4_stat_detail": (date(2026, 6, 19), date(2026, 6, 26)),
+            "mct_cat4_stat_detail": (date(2026, 6, 19), date(2026, 6, 26)),
+            "sku_stat_detail": (date(2026, 6, 19), date(2026, 6, 26)),
         },
     )
 

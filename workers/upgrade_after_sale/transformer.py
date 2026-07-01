@@ -35,3 +35,39 @@ def normalize_store_stat_df(df: pd.DataFrame) -> pd.DataFrame:
     if "日期" in out.columns:
         out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
     return out
+
+
+def normalize_store_cat1_stat_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    if "日期" in out.columns:
+        out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
+    return out
+
+
+def normalize_cat4_stat_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    if "日期" in out.columns:
+        out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
+    return out
+
+
+def normalize_mct_cat4_stat_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    if "日期" in out.columns:
+        out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
+    return out
+
+
+def normalize_sku_stat_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    if "日期" in out.columns:
+        out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
+    return out

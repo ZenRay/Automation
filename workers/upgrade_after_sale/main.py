@@ -55,6 +55,10 @@ from .transformer import (
     normalize_after_sale_df,
     normalize_order_item_df,
     normalize_store_stat_df,
+    normalize_store_cat1_stat_df,
+    normalize_cat4_stat_df,
+    normalize_mct_cat4_stat_df,
+    normalize_sku_stat_df,
 )
 
 logger = logging.getLogger("workers.upgrade_after_sale.main")
@@ -160,6 +164,80 @@ def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
         if row_key.eq("").any() or row_key.str.startswith("nan_").any():
             raise ValueError(f"Empty row_key detected for route '{route_name}'")
         return row_key
+    elif route_name == "store_cat1_stat_detail":
+        # 三级复合键：店铺id + 一级类目id + 日期
+        for col in ("店铺id", "一级类目id", "日期"):
+            if col not in df.columns:
+                raise ValueError(
+                    f"Missing row key column '{col}' for route '{route_name}'"
+                )
+        row_key = (
+            df["店铺id"].astype(str)
+            + "_"
+            + df["一级类目id"].astype(str)
+            + "_"
+            + df["日期"].astype(str)
+        )
+        if row_key.eq("").any() or row_key.str.startswith("nan_").any():
+            raise ValueError(f"Empty row_key detected for route '{route_name}'")
+        return row_key
+    elif route_name == "cat4_stat_detail":
+        # 三级复合键：一级类目id + 四级类目id + 日期
+        for col in ("一级类目id", "四级类目id", "日期"):
+            if col not in df.columns:
+                raise ValueError(
+                    f"Missing row key column '{col}' for route '{route_name}'"
+                )
+        row_key = (
+            df["一级类目id"].astype(str)
+            + "_"
+            + df["四级类目id"].astype(str)
+            + "_"
+            + df["日期"].astype(str)
+        )
+        if row_key.eq("").any() or row_key.str.startswith("nan_").any():
+            raise ValueError(f"Empty row_key detected for route '{route_name}'")
+        return row_key
+    elif route_name == "mct_cat4_stat_detail":
+        # 四级复合键：商家id + 一级类目id + 四级类目id + 日期
+        for col in ("商家id", "一级类目id", "四级类目id", "日期"):
+            if col not in df.columns:
+                raise ValueError(
+                    f"Missing row key column '{col}' for route '{route_name}'"
+                )
+        row_key = (
+            df["商家id"].astype(str)
+            + "_"
+            + df["一级类目id"].astype(str)
+            + "_"
+            + df["四级类目id"].astype(str)
+            + "_"
+            + df["日期"].astype(str)
+        )
+        if row_key.eq("").any() or row_key.str.startswith("nan_").any():
+            raise ValueError(f"Empty row_key detected for route '{route_name}'")
+        return row_key
+    elif route_name == "sku_stat_detail":
+        # 五级复合键：商家id + 一级类目id + 四级类目id + 商品id + 日期
+        for col in ("商家id", "一级类目id", "四级类目id", "商品id", "日期"):
+            if col not in df.columns:
+                raise ValueError(
+                    f"Missing row key column '{col}' for route '{route_name}'"
+                )
+        row_key = (
+            df["商家id"].astype(str)
+            + "_"
+            + df["一级类目id"].astype(str)
+            + "_"
+            + df["四级类目id"].astype(str)
+            + "_"
+            + df["商品id"].astype(str)
+            + "_"
+            + df["日期"].astype(str)
+        )
+        if row_key.eq("").any() or row_key.str.startswith("nan_").any():
+            raise ValueError(f"Empty row_key detected for route '{route_name}'")
+        return row_key
     else:
         raise ValueError(f"Unsupported route_name for row_key: {route_name}")
 
@@ -177,6 +255,10 @@ def _inject_row_key(mc_data: dict[str, pd.DataFrame]) -> None:
         "after_sale_detail": "after_sale_item",
         "order_detail": "order_item",
         "store_stat_detail": "store_stat",
+        "store_cat1_stat_detail": "store_cat1_stat",
+        "cat4_stat_detail": "cat4_stat",
+        "mct_cat4_stat_detail": "mct_cat4_stat",
+        "sku_stat_detail": "sku_stat",
     }
     for route_name, source_name in route_to_source.items():
         if source_name not in mc_data:
@@ -316,6 +398,14 @@ def run_upgrade_after_sale_pipeline(
     order_end: int | None = None,
     store_stat_start: int | None = None,
     store_stat_end: int | None = None,
+    store_cat1_stat_start: int | None = None,
+    store_cat1_stat_end: int | None = None,
+    cat4_stat_start: int | None = None,
+    cat4_stat_end: int | None = None,
+    mct_cat4_stat_start: int | None = None,
+    mct_cat4_stat_end: int | None = None,
+    sku_stat_start: int | None = None,
+    sku_stat_end: int | None = None,
     enable_persistence: bool = False,
     persistence_dir: str | None = None,
     job_id: str | None = None,
@@ -337,7 +427,7 @@ def run_upgrade_after_sale_pipeline(
         logger.error("[Step 1/5] Client initialization failed: %s", e)
         return 1
 
-    # 三条 SQL 独立窗口
+    # 四条 SQL 独立窗口
     as_start = (
         after_sale_start
         if after_sale_start is not None
@@ -362,11 +452,53 @@ def run_upgrade_after_sale_pipeline(
         if store_stat_end is not None
         else QUERY_WINDOWS["store_stat"]["end"]
     )
+    sc1_start = (
+        store_cat1_stat_start
+        if store_cat1_stat_start is not None
+        else QUERY_WINDOWS["store_cat1_stat"]["start"]
+    )
+    sc1_end = (
+        store_cat1_stat_end
+        if store_cat1_stat_end is not None
+        else QUERY_WINDOWS["store_cat1_stat"]["end"]
+    )
+    c4_start = (
+        cat4_stat_start
+        if cat4_stat_start is not None
+        else QUERY_WINDOWS["cat4_stat"]["start"]
+    )
+    c4_end = (
+        cat4_stat_end
+        if cat4_stat_end is not None
+        else QUERY_WINDOWS["cat4_stat"]["end"]
+    )
+    mc4_start = (
+        mct_cat4_stat_start
+        if mct_cat4_stat_start is not None
+        else QUERY_WINDOWS["mct_cat4_stat"]["start"]
+    )
+    mc4_end = (
+        mct_cat4_stat_end
+        if mct_cat4_stat_end is not None
+        else QUERY_WINDOWS["mct_cat4_stat"]["end"]
+    )
+    sk_start = (
+        sku_stat_start
+        if sku_stat_start is not None
+        else QUERY_WINDOWS["sku_stat"]["start"]
+    )
+    sk_end = (
+        sku_stat_end if sku_stat_end is not None else QUERY_WINDOWS["sku_stat"]["end"]
+    )
 
     try:
         _validate_offsets("after_sale_item", as_start, as_end)
         _validate_offsets("order_item", od_start, od_end)
         _validate_offsets("store_stat", ss_start, ss_end)
+        _validate_offsets("store_cat1_stat", sc1_start, sc1_end)
+        _validate_offsets("cat4_stat", c4_start, c4_end)
+        _validate_offsets("mct_cat4_stat", mc4_start, mc4_end)
+        _validate_offsets("sku_stat", sk_start, sk_end)
     except ValueError as e:
         logger.error("[Step 1/5] Offset validation failed: %s", e)
         return 1
@@ -374,10 +506,18 @@ def run_upgrade_after_sale_pipeline(
     as_params = _build_date_params(date_value, as_start, as_end)
     od_params = _build_date_params(date_value, od_start, od_end)
     ss_params = _build_date_params(date_value, ss_start, ss_end)
+    sc1_params = _build_date_params(date_value, sc1_start, sc1_end)
+    c4_params = _build_date_params(date_value, c4_start, c4_end)
+    mc4_params = _build_date_params(date_value, mc4_start, mc4_end)
+    sk_params = _build_date_params(date_value, sk_start, sk_end)
 
     as_window = _compute_window(as_params)
     od_window = _compute_window(od_params)
     ss_window = _compute_window(ss_params)
+    sc1_window = _compute_window(sc1_params)
+    c4_window = _compute_window(c4_params)
+    mc4_window = _compute_window(mc4_params)
+    sk_window = _compute_window(sk_params)
 
     logger.info(
         "after_sale_item params: date_param=%s, start=%s, end=%s, window=%s~%s",
@@ -402,6 +542,38 @@ def run_upgrade_after_sale_pipeline(
         ss_end,
         ss_window[0],
         ss_window[1],
+    )
+    logger.info(
+        "store_cat1_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
+        sc1_params.sql_params()["date_param"],
+        sc1_start,
+        sc1_end,
+        sc1_window[0],
+        sc1_window[1],
+    )
+    logger.info(
+        "cat4_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
+        c4_params.sql_params()["date_param"],
+        c4_start,
+        c4_end,
+        c4_window[0],
+        c4_window[1],
+    )
+    logger.info(
+        "mct_cat4_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
+        mc4_params.sql_params()["date_param"],
+        mc4_start,
+        mc4_end,
+        mc4_window[0],
+        mc4_window[1],
+    )
+    logger.info(
+        "sku_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
+        sk_params.sql_params()["date_param"],
+        sk_start,
+        sk_end,
+        sk_window[0],
+        sk_window[1],
     )
 
     try:
@@ -428,15 +600,53 @@ def run_upgrade_after_sale_pipeline(
             hints=MC_HINTS,
             params=ss_params.sql_params(),
         )
+        store_cat1_stat_data = execute_all_queries(
+            mc_client,
+            [query_map["store_cat1_stat"]],
+            SQL_BASE_DIR,
+            hints=MC_HINTS,
+            params=sc1_params.sql_params(),
+        )
+        cat4_stat_data = execute_all_queries(
+            mc_client,
+            [query_map["cat4_stat"]],
+            SQL_BASE_DIR,
+            hints=MC_HINTS,
+            params=c4_params.sql_params(),
+        )
+        mct_cat4_stat_data = execute_all_queries(
+            mc_client,
+            [query_map["mct_cat4_stat"]],
+            SQL_BASE_DIR,
+            hints=MC_HINTS,
+            params=mc4_params.sql_params(),
+        )
+        sku_stat_data = execute_all_queries(
+            mc_client,
+            [query_map["sku_stat"]],
+            SQL_BASE_DIR,
+            hints=MC_HINTS,
+            params=sk_params.sql_params(),
+        )
         mc_data: dict[str, pd.DataFrame] = {}
         mc_data.update(after_sale_data)
         mc_data.update(order_data)
         mc_data.update(store_stat_data)
+        mc_data.update(store_cat1_stat_data)
+        mc_data.update(cat4_stat_data)
+        mc_data.update(mct_cat4_stat_data)
+        mc_data.update(sku_stat_data)
         logger.info(
-            "SQL results: after_sale_item=%s rows, order_item=%s rows, store_stat=%s rows",
+            "SQL results: after_sale_item=%s rows, order_item=%s rows, "
+            "store_stat=%s rows, store_cat1_stat=%s rows, "
+            "cat4_stat=%s rows, mct_cat4_stat=%s rows, sku_stat=%s rows",
             len(mc_data.get("after_sale_item", pd.DataFrame())),
             len(mc_data.get("order_item", pd.DataFrame())),
             len(mc_data.get("store_stat", pd.DataFrame())),
+            len(mc_data.get("store_cat1_stat", pd.DataFrame())),
+            len(mc_data.get("cat4_stat", pd.DataFrame())),
+            len(mc_data.get("mct_cat4_stat", pd.DataFrame())),
+            len(mc_data.get("sku_stat", pd.DataFrame())),
         )
     except Exception as e:
         logger.error("[Step 2/5] SQL execution failed: %s", e)
@@ -455,6 +665,18 @@ def run_upgrade_after_sale_pipeline(
             mc_data["order_item"] = normalize_order_item_df(mc_data["order_item"])
         if "store_stat" in mc_data:
             mc_data["store_stat"] = normalize_store_stat_df(mc_data["store_stat"])
+        if "store_cat1_stat" in mc_data:
+            mc_data["store_cat1_stat"] = normalize_store_cat1_stat_df(
+                mc_data["store_cat1_stat"]
+            )
+        if "cat4_stat" in mc_data:
+            mc_data["cat4_stat"] = normalize_cat4_stat_df(mc_data["cat4_stat"])
+        if "mct_cat4_stat" in mc_data:
+            mc_data["mct_cat4_stat"] = normalize_mct_cat4_stat_df(
+                mc_data["mct_cat4_stat"]
+            )
+        if "sku_stat" in mc_data:
+            mc_data["sku_stat"] = normalize_sku_stat_df(mc_data["sku_stat"])
         _inject_row_key(mc_data)
     except Exception as e:
         logger.error("[Step 3/5] Normalization failed: %s", e)
@@ -468,6 +690,10 @@ def run_upgrade_after_sale_pipeline(
                 "after_sale_detail": as_window,
                 "order_detail": od_window,
                 "store_stat_detail": ss_window,
+                "store_cat1_stat_detail": sc1_window,
+                "cat4_stat_detail": c4_window,
+                "mct_cat4_stat_detail": mc4_window,
+                "sku_stat_detail": sk_window,
             },
         )
         router = DataRouter(
@@ -495,6 +721,10 @@ def run_upgrade_after_sale_pipeline(
             "after_sale_detail": "after_sale_item",
             "order_detail": "order_item",
             "store_stat_detail": "store_stat",
+            "store_cat1_stat_detail": "store_cat1_stat",
+            "cat4_stat_detail": "cat4_stat",
+            "mct_cat4_stat_detail": "mct_cat4_stat",
+            "sku_stat_detail": "sku_stat",
         }
         logger.info("[Step 4/5] Upload reconciliation (sql_rows vs uploaded_rows):")
         total_sql_rows = 0
@@ -562,6 +792,54 @@ def main() -> None:
         help="门店统计 SQL end offset",
     )
     parser.add_argument(
+        "--store-cat1-stat-start",
+        type=int,
+        default=None,
+        help="门店一级类目统计 SQL start offset",
+    )
+    parser.add_argument(
+        "--store-cat1-stat-end",
+        type=int,
+        default=None,
+        help="门店一级类目统计 SQL end offset",
+    )
+    parser.add_argument(
+        "--cat4-stat-start",
+        type=int,
+        default=None,
+        help="四级类目统计 SQL start offset",
+    )
+    parser.add_argument(
+        "--cat4-stat-end",
+        type=int,
+        default=None,
+        help="四级类目统计 SQL end offset",
+    )
+    parser.add_argument(
+        "--mct-cat4-stat-start",
+        type=int,
+        default=None,
+        help="商家四级类目统计 SQL start offset",
+    )
+    parser.add_argument(
+        "--mct-cat4-stat-end",
+        type=int,
+        default=None,
+        help="商家四级类目统计 SQL end offset",
+    )
+    parser.add_argument(
+        "--sku-stat-start",
+        type=int,
+        default=None,
+        help="商品统计 SQL start offset",
+    )
+    parser.add_argument(
+        "--sku-stat-end",
+        type=int,
+        default=None,
+        help="商品统计 SQL end offset",
+    )
+    parser.add_argument(
         "--enable-persistence", action="store_true", help="启用 route 写入持久化"
     )
     parser.add_argument(
@@ -581,6 +859,14 @@ def main() -> None:
         order_end=args.order_end,
         store_stat_start=args.store_stat_start,
         store_stat_end=args.store_stat_end,
+        store_cat1_stat_start=args.store_cat1_stat_start,
+        store_cat1_stat_end=args.store_cat1_stat_end,
+        cat4_stat_start=args.cat4_stat_start,
+        cat4_stat_end=args.cat4_stat_end,
+        mct_cat4_stat_start=args.mct_cat4_stat_start,
+        mct_cat4_stat_end=args.mct_cat4_stat_end,
+        sku_stat_start=args.sku_stat_start,
+        sku_stat_end=args.sku_stat_end,
         enable_persistence=args.enable_persistence,
         persistence_dir=args.persistence_dir,
         job_id=args.job_id,
