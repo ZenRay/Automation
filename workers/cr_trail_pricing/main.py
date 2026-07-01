@@ -93,9 +93,7 @@ def run_cr_trail_pricing_pipeline(target_date: date, output_path: str) -> int:
         ),
         (
             "区域标记",
-            lambda: mark_trial_regions(
-                lark_data["conf_county"]
-            ),
+            lambda: mark_trial_regions(lark_data["conf_county"]),
         ),
         (
             "试验商品区域抽佣关联",

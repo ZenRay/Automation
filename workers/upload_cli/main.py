@@ -19,8 +19,16 @@ from automation.utils.common.attachment import normalize_attachment_input
 
 from workers.lib import AttachmentTokenResolver, FieldTypeCoercer
 from workers.lib.file_extractor import extract_single_local_source
-from workers.lib.local_attachment_preprocessor import preprocess_local_attachment_columns
-from workers.lib.models import CleanupCondition, FieldMapping, LarkFieldType, LarkTargetConfig, LocalFileSourceConfig
+from workers.lib.local_attachment_preprocessor import (
+    preprocess_local_attachment_columns,
+)
+from workers.lib.models import (
+    CleanupCondition,
+    FieldMapping,
+    LarkFieldType,
+    LarkTargetConfig,
+    LocalFileSourceConfig,
+)
 from workers.lib.lark_loader import _write_single_target
 
 logger = logging.getLogger("workers.upload_cli.main")
@@ -316,7 +324,9 @@ def _build_field_mappings(
     missing_target_fields: list[str] = []
 
     source_cols = list(df.columns)
-    local_columns = [col for col in source_cols if col != "row_key" and not col.endswith(bak_suffix)]
+    local_columns = [
+        col for col in source_cols if col != "row_key" and not col.endswith(bak_suffix)
+    ]
     local_field_count = len(local_columns)
     same_name_matched_count = sum(1 for col in local_columns if col in target_fields)
 
@@ -353,7 +363,9 @@ def _build_field_mappings(
             )
         )
 
-    coverage = 1.0 if local_field_count == 0 else same_name_matched_count / local_field_count
+    coverage = (
+        1.0 if local_field_count == 0 else same_name_matched_count / local_field_count
+    )
     return (
         mappings,
         coverage,
@@ -417,7 +429,9 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
         )
         source_df = extract_single_local_source(local_cfg)
         source_df = preprocess_local_attachment_columns(source_df, local_cfg)
-        _warn_unconfigured_attachment_columns(source_df, attachment_cols=attachment_cols)
+        _warn_unconfigured_attachment_columns(
+            source_df, attachment_cols=attachment_cols
+        )
         source_df = _apply_attachment_bak_columns(
             source_df,
             attachment_cols=attachment_cols,
@@ -428,11 +442,15 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
         if args.row_key_col:
             if args.row_key_col not in source_df.columns:
                 raise ValueError(f"row_key column not found: {args.row_key_col}")
-            source_df = source_df.assign(row_key=source_df[args.row_key_col].astype(str))
+            source_df = source_df.assign(
+                row_key=source_df[args.row_key_col].astype(str)
+            )
             if source_df["row_key"].eq("").any():
                 raise ValueError("row_key contains empty values")
 
-        non_empty_rows, items = _collect_attachment_stats(source_df, attachment_cols=attachment_cols)
+        non_empty_rows, items = _collect_attachment_stats(
+            source_df, attachment_cols=attachment_cols
+        )
         logger.info(
             "Source ready: rows=%s cols=%s attachment_rows=%s attachment_items=%s",
             source_df.shape[0],
@@ -506,7 +524,9 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
             raise ValueError("No field mappings resolved; nothing to upload")
 
         if args.validate_mapping_only:
-            logger.info("validate-mapping-only enabled, stopping after mapping validation")
+            logger.info(
+                "validate-mapping-only enabled, stopping after mapping validation"
+            )
             return 0
     except Exception as exc:
         logger.error("[Step 3/4] Mapping validation failed: %s", exc)
@@ -584,10 +604,16 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Upload local CSV/Excel to Feishu bitable")
+    parser = argparse.ArgumentParser(
+        description="Upload local CSV/Excel to Feishu bitable"
+    )
 
-    parser.add_argument("--file", required=True, help="本地文件路径（csv/xlsx/xls/tsv/txt）")
-    parser.add_argument("--file-format", default="auto", help="文件格式：auto/csv/tsv/txt/xlsx/xls")
+    parser.add_argument(
+        "--file", required=True, help="本地文件路径（csv/xlsx/xls/tsv/txt）"
+    )
+    parser.add_argument(
+        "--file-format", default="auto", help="文件格式：auto/csv/tsv/txt/xlsx/xls"
+    )
     parser.add_argument("--sheet-name", default="0", help="Excel sheet 名称或索引")
     parser.add_argument("--encoding", default="utf-8", help="文本文件编码")
     parser.add_argument("--delimiter", default=None, help="文本分隔符，默认按格式推断")
@@ -645,7 +671,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["data", "offset"],
         help="data=按源数据日期窗口清理；offset=按 date+offset 清理",
     )
-    parser.add_argument("--date", default=None, help="基准日期 YYYY-MM-DD（cleanup_mode=offset 时必填）")
+    parser.add_argument(
+        "--date", default=None, help="基准日期 YYYY-MM-DD（cleanup_mode=offset 时必填）"
+    )
     parser.add_argument("--start-offset", type=int, default=-7, help="清理窗口起始偏移")
     parser.add_argument("--end-offset", type=int, default=0, help="清理窗口结束偏移")
 
