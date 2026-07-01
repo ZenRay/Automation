@@ -4,7 +4,7 @@
 # 任务列表：
 #   1. OKR 数据管道 - 支持调度层参数透传（--date / --start / --end）
 #   2. CR Trail 商品配置 ETL - 使用 CURRENT_DATE，无需日期参数
-#   3. Upgrade After Sale - 包含售后商品、订单商品、门店统计三条链路
+#   3. Upgrade After Sale - 包含售后商品、订单商品、门店统计、门店一级类目统计、四级类目统计、商家四级类目统计、商品统计七条链路
 #
 # 用法：
 #   ./cron_task.sh                                     # 默认：today, T-7~T
@@ -54,8 +54,8 @@ fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[DRY-RUN] Task 1: python -m workers.okr.main ${ARGS[*]:-}"
     echo "[DRY-RUN] Task 2: python -m workers.cr_trail.main"
-    echo "[DRY-RUN] Task 3(main): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date>"
-    echo "[DRY-RUN] Task 3(retry-on-fail): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date> --retry-failed-only"
+    echo "[DRY-RUN] Task 3(main): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date>"
+    echo "[DRY-RUN] Task 3(retry-on-fail): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date> --retry-failed-only"
     exit 0
 fi
 
@@ -149,6 +149,14 @@ UA_BASE_ARGS=(
     --order-end 0
     --store-stat-start -7
     --store-stat-end 0
+    --store-cat1-stat-start -7
+    --store-cat1-stat-end 0
+    --cat4-stat-start -10
+    --cat4-stat-end 0
+    --mct-cat4-stat-start -10
+    --mct-cat4-stat-end 0
+    --sku-stat-start -15
+    --sku-stat-end 0
     --enable-persistence
     --persistence-dir "$PERSISTENCE_DIR/upgrade_after_sale"
     --job-id "$RUN_DATE"
