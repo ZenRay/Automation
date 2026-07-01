@@ -226,11 +226,11 @@ def associate_trial_item_region_commission(
 ):
     """按 商品id+城市id+运营类型 关联试验抽佣率。
 
-        说明：
-        - 抽佣率来源切到 conf_试验商品和区域抽佣率配置。
-        - 先按日期范围过滤生效记录，再按 商品id+区域id(城市id) 匹配。
-        - 本阶段仅缓存“商品->(自营费率, 代理费率, 试验分组)”映射；
-            在 Stage 6 按区域运营类型二选一路由取值。
+    说明：
+    - 抽佣率来源切到 conf_试验商品和区域抽佣率配置。
+    - 先按日期范围过滤生效记录，再按 商品id+区域id(城市id) 匹配。
+    - 本阶段仅缓存“商品->(自营费率, 代理费率, 试验分组)”映射；
+        在 Stage 6 按区域运营类型二选一路由取值。
     """
     if regions_df.empty:
         return regions_df.copy()
@@ -430,7 +430,9 @@ def compute_pricing(products_df, regions_df):
     has_value = result["固定抽佣比例"].notna() | result["固定抽佣货值"].notna()
     result = result[has_value].reset_index(drop=True)
 
-    result = result.drop(columns=["_trial_rate_map", "_trial_group_map"], errors="ignore")
+    result = result.drop(
+        columns=["_trial_rate_map", "_trial_group_map"], errors="ignore"
+    )
 
     result["调价幅度"] = np.nan
     result["设置状态"] = "启用"

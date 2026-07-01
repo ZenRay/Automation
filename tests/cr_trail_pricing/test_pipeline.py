@@ -188,7 +188,9 @@ class TestStage4AssociateTrialItemRegionCommission:
         mock_conf_county,
         mock_conf_trial_item_region_commission,
     ):
-        products = filter_trial_products(mock_conf_goods, mock_conf_trial_goods, TARGET_DATE)
+        products = filter_trial_products(
+            mock_conf_goods, mock_conf_trial_goods, TARGET_DATE
+        )
         regions = mark_trial_regions(mock_conf_county)
         result = associate_trial_item_region_commission(
             products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
@@ -204,7 +206,9 @@ class TestStage4AssociateTrialItemRegionCommission:
         mock_conf_county,
         mock_conf_trial_item_region_commission,
     ):
-        products = filter_trial_products(mock_conf_goods, mock_conf_trial_goods, TARGET_DATE)
+        products = filter_trial_products(
+            mock_conf_goods, mock_conf_trial_goods, TARGET_DATE
+        )
         regions = mark_trial_regions(mock_conf_county)
         result = associate_trial_item_region_commission(
             products, regions, mock_conf_trial_item_region_commission, TARGET_DATE
