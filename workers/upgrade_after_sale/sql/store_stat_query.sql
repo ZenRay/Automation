@@ -23,60 +23,60 @@ WITH dt_range AS(
         ,MAX(IF(t1.dt=t2.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time -- `售后赔付金额`
         ,MAX(IF(t1.dt=t2.dt, t2.final_refund_amt, 0)) AS final_refund_amt -- `自然日售后赔付金额`
         ,MAX(IF(t1.dt=t2.dt, t2.commission_amt, 0)) AS commission_amt -- `平台抽佣金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m29tcd -- `近30天曝光次数`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m29tcd -- `近30天下单金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m29tcd -- `近30天送达金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m29tcd -- `近30天送达数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m29tcd -- `近30天质量问题售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m29tcd -- `近30天售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m29tcd -- `近30天质量问题售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m29tcd -- `近30天售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m29tcd -- `近30天自然日售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt, t2.commission_amt, 0)) AS commission_amt_m29tcd -- `近30天平台抽佣金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m29tcd -- `近30天曝光次数`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m29tcd -- `近30天下单金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m29tcd -- `近30天送达金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m29tcd -- `近30天送达数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m29tcd -- `近30天质量问题售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m29tcd -- `近30天售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m29tcd -- `近30天质量问题售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m29tcd -- `近30天售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m29tcd -- `近30天自然日售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt, t2.commission_amt, 0)) AS commission_amt_m29tcd -- `近30天平台抽佣金额`
 
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m13tcd -- `近14天曝光次数`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m13tcd -- `近14天下单金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m13tcd -- `近14天送达金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m13tcd -- `近14天送达数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m13tcd -- `近14天质量问题售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m13tcd -- `近14天售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m13tcd -- `近14天质量问题售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m13tcd -- `近14天售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m13tcd -- `近14天自然日售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND t2.dt, t2.commission_amt, 0)) AS commission_amt_m13tcd -- `近14天平台抽佣金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m6tcd -- `近7天曝光次数`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m6tcd -- `近7天下单金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m6tcd -- `近7天送达金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m6tcd -- `近7天送达数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m6tcd -- `近7天质量问题售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m6tcd -- `近7天售后数量`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m6tcd -- `近7天质量问题售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m6tcd -- `近7天售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m6tcd -- `近7天自然日售后赔付金额`
-        ,SUM(IF(t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt, t2.commission_amt, 0)) AS commission_amt_m6tcd -- `近7天平台抽佣金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m13tcd -- `近14天曝光次数`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m13tcd -- `近14天下单金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m13tcd -- `近14天送达金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m13tcd -- `近14天送达数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m13tcd -- `近14天质量问题售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m13tcd -- `近14天售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m13tcd -- `近14天质量问题售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m13tcd -- `近14天售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m13tcd -- `近14天自然日售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND t1.dt, t2.commission_amt, 0)) AS commission_amt_m13tcd -- `近14天平台抽佣金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.exposed_cnt, 0)) AS exposed_cnt_m6tcd -- `近7天曝光次数`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m6tcd -- `近7天下单金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt_m6tcd -- `近7天送达金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.delivered_goods_num, 0)) AS delivered_goods_num_m6tcd -- `近7天送达数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.after_sale_num_quality_order_time, 0)) AS after_sale_num_quality_order_time_m6tcd -- `近7天质量问题售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m6tcd -- `近7天售后数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m6tcd -- `近7天质量问题售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m6tcd -- `近7天售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m6tcd -- `近7天自然日售后赔付金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt, t2.commission_amt, 0)) AS commission_amt_m6tcd -- `近7天平台抽佣金额`
 
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt AND t2.exposed_cnt > 0, t2.dt, NULL
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt AND t2.exposed_cnt > 0, t2.dt, NULL
         )) AS exposed_days_m29tcd -- `近30天曝光天数`
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt AND t2.ordered_goods_num > 0, t2.dt, NULL
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt AND t2.ordered_goods_num > 0, t2.dt, NULL
         )) AS ordered_days_m29tcd -- `近30天下单天数`
 
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
                 AND t2.exposed_cnt > 0, t2.dt, NULL
         )) AS exposed_days_m13tm7 -- `m13到m7曝光天数`
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             AND t2.ordered_goods_num > 0, t2.dt, NULL
         )) AS ordered_days_m13tm7 -- `m13到m7下单天数`
 
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
                 AND t2.exposed_cnt > 0, t2.dt, NULL
         )) AS exposed_days_m6tcd -- `近7天曝光天数`
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             AND t2.ordered_goods_num > 0, t2.dt, NULL
         )) AS ordered_days_m6tcd -- `近7天下单天数`
     FROM dt_range t1
@@ -105,7 +105,7 @@ WITH dt_range AS(
             AND NVL(t1.exposed_cnt ,0) + NVL(t1.ordered_goods_amt, 0) + NVL(t1.final_refund_amt, 0)> 0
     ) t2
         ON t2.dummy = t1.dummy
-        AND t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 29, "dd") AND t2.dt
+        AND t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 29, "dd") AND t1.dt
 
     GROUP BY t1.dt
         ,t2.customer_store_id
@@ -166,5 +166,5 @@ SELECT
 	,t1.ordered_days_m6tcd AS `近7天下单天数`
 FROM base t1
 WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
-                        AND DATEADD(${date_param}, ${end_offset}, "dd")
+    AND DATEADD(${date_param}, ${end_offset}, "dd")
 ;
