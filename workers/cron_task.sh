@@ -54,8 +54,8 @@ fi
 if [ "${DRY_RUN:-0}" = "1" ]; then
     echo "[DRY-RUN] Task 1: python -m workers.okr.main ${ARGS[*]:-}"
     echo "[DRY-RUN] Task 2: python -m workers.cr_trail.main"
-    echo "[DRY-RUN] Task 3(main): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date>"
-    echo "[DRY-RUN] Task 3(retry-on-fail): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end 0 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date> --retry-failed-only"
+    echo "[DRY-RUN] Task 3(main): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end -1 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date>"
+    echo "[DRY-RUN] Task 3(retry-on-fail): python -m workers.upgrade_after_sale.main --as-start -7 --as-end 0 --order-start -1 --order-end 0 --store-stat-start -7 --store-stat-end -1 --store-cat1-stat-start -7 --store-cat1-stat-end 0 --cat4-stat-start -10 --cat4-stat-end 0 --mct-cat4-stat-start -10 --mct-cat4-stat-end 0 --sku-stat-start -15 --sku-stat-end 0 --enable-persistence --persistence-dir $PERSISTENCE_DIR/upgrade_after_sale --job-id <date> --retry-failed-only"
     exit 0
 fi
 
@@ -148,7 +148,7 @@ UA_BASE_ARGS=(
     --order-start -1
     --order-end 0
     --store-stat-start -7
-    --store-stat-end 0
+    --store-stat-end -1
     --store-cat1-stat-start -7
     --store-cat1-stat-end 0
     --cat4-stat-start -10

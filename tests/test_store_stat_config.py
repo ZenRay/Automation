@@ -29,7 +29,7 @@ def test_sql_queries_contains_store_stat():
 
 def test_query_windows_contains_store_stat():
     assert "store_stat" in QUERY_WINDOWS
-    assert QUERY_WINDOWS["store_stat"] == {"start": -7, "end": 0}
+    assert QUERY_WINDOWS["store_stat"] == {"start": -7, "end": -1}
 
 
 def test_target_store_stat_field_count():
