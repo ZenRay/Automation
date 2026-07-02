@@ -29,94 +29,94 @@ WITH dt_range AS(
         ,MAX(IF(t1.dt=t2.dt, t2.final_refund_amt_quality_order_time, 0)) AS final_refund_amt_quality_order_time -- `质量问题售后赔付金额`
 
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.merchant_num_onsale, 0
         )) AS merchant_num_onsale_m13tm7d -- `m13d到m7d上架商家数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.sku_num_sold, 0
         )) AS sku_num_sold_m13tm7d -- `m13d到m7d动销商品数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.ordered_goods_amt, 0
         )) AS ordered_goods_amt_m13tm7d -- `m13d到m7d下单金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.ordered_goods_num, 0
         )) AS ordered_goods_num_m13tm7d -- `m13d到m7d下单数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.ordered_store_num, 0
         )) AS ordered_store_num_m13tm7d -- `m13d到m7d下单店铺数`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.delivered_goods_amt, 0
         )) AS delivered_goods_amt_m13tm7d -- `m13d到m7d送达金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.delivered_goods_num, 0
         )) AS delivered_goods_num_m13tm7d -- `m13d到m7d送达数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.after_sale_store_num_order_time, 0
         )) AS after_sale_store_num_order_time_m13tm7d -- `m13d到m7d售后店铺数`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.final_refund_amt_order_time, 0
         )) AS final_refund_amt_order_time_m13tm7d -- `m13d到m7d售后赔付金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd")
             , t2.final_refund_amt_quality_order_time, 0
         )) AS final_refund_amt_quality_order_time_m13tm7d -- `m13d到m7d质量问题售后赔付金额`
 
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t2.dt), ${end_offset} - 7, "dd") AND t2.ordered_goods_num>0
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 13, "dd") AND DATEADD(DATE(t1.dt), ${end_offset} - 7, "dd") AND t2.ordered_goods_num>0
             , t2.dt, NULL
         )) AS ordered_days_m13tm7d -- `m13d到m7d下单天数`
 
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.merchant_num_onsale, 0
         )) AS merchant_num_onsale_m6tcd -- `近7天上架商家数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.sku_num_sold, 0
         )) AS sku_num_sold_m6tcd -- `近7天动销商品数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.ordered_goods_amt, 0
         )) AS ordered_goods_amt_m6tcd -- `近7天下单金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.ordered_goods_num, 0
         )) AS ordered_goods_num_m6tcd -- `近7天下单数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.ordered_store_num, 0
         )) AS ordered_store_num_m6tcd -- `近7天下单店铺数`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.delivered_goods_amt, 0
         )) AS delivered_goods_amt_m6tcd -- `近7天送达金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.delivered_goods_num, 0
         )) AS delivered_goods_num_m6tcd -- `近7天送达数量`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.after_sale_store_num_order_time, 0
         )) AS after_sale_store_num_order_time_m6tcd -- `近7天售后店铺数`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.final_refund_amt_order_time, 0
         )) AS final_refund_amt_order_time_m6tcd -- `近7天售后赔付金额`
         ,SUM(IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt
             , t2.final_refund_amt_quality_order_time, 0
         )) AS final_refund_amt_quality_order_time_m6tcd -- `近7天质量问题售后赔付金额`
 
         ,COUNT(DISTINCT IF(
-            t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 6, "dd") AND t2.dt AND t2.ordered_goods_num>0
+            t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 6, "dd") AND t1.dt AND t2.ordered_goods_num>0
             , t2.dt, NULL
         )) AS ordered_days_m6tcd -- `近7天下单天数`
 
@@ -148,7 +148,7 @@ WITH dt_range AS(
             AND t1.category_level1_name = "水果"
     ) t2
         ON t2.dummy = t1.dummy
-        AND t1.dt BETWEEN DATEADD(DATE(t2.dt), ${end_offset} - 14, "dd") AND t2.dt
+        AND t2.dt BETWEEN DATEADD(DATE(t1.dt), ${end_offset} - 14, "dd") AND t1.dt
 
     GROUP BY t1.dt -- `日期`
         ,t2.category_level1_id -- `一级类目id`
