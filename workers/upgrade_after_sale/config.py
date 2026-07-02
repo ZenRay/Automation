@@ -92,7 +92,7 @@ SQL_QUERIES: list[SQLQueryConfig] = [
 QUERY_WINDOWS = {
     "after_sale_item": {"start": -7, "end": 0},
     "order_item": {"start": -7, "end": 0},
-    "store_stat": {"start": -7, "end": 0},
+    "store_stat": {"start": -7, "end": -1},
     "store_cat1_stat": {"start": -7, "end": 0},
     "cat4_stat": {"start": -10, "end": 0},
     "mct_cat4_stat": {"start": -10, "end": 0},
