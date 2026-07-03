@@ -35,41 +35,6 @@ logger = logging.getLogger("workers.lib.lark_loader")
 WRITE_BATCH_SIZE = 500
 DELETE_BATCH_SIZE = 500
 
-# 瞬时错误重试配置
-_TRANSIENT_ERROR_CODES = {"1254607"}  # Data not ready, please try again later
-_MAX_RETRIES = 3
-_RETRY_BASE_DELAY = 5  # 秒
-
-
-def _is_transient_error(error_msg: str) -> bool:
-    """判断是否为可重试的瞬时错误"""
-    return any(code in error_msg for code in _TRANSIENT_ERROR_CODES)
-
-
-def _write_batch_with_retry(
-    client, batch: list[dict], table_id: str, target_name: str, batch_num: int
-) -> None:
-    """带重试的批次写入
-
-    对瞬时错误（如 1254607: Data not ready）进行指数退避重试。
-    """
-    for attempt in range(_MAX_RETRIES + 1):
-        try:
-            client.add_batch_records(batch, table_id=table_id)
-            return
-        except Exception as e:
-            error_msg = str(e)
-            if attempt < _MAX_RETRIES and _is_transient_error(error_msg):
-                delay = _RETRY_BASE_DELAY * (2**attempt)
-                logger.warning(
-                    f"Target '{target_name}': batch {batch_num} transient error: "
-                    f"{error_msg}. Retrying in {delay}s (attempt {attempt + 1}/{_MAX_RETRIES})..."
-                )
-                time.sleep(delay)
-            else:
-                raise
-
-
 # 飞书索引字段支持的类型（第一个字段自动成为索引字段）
 # 参考: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table/create
 _INDEX_FIELD_TYPES = {
@@ -572,7 +537,7 @@ def _write_records_batched(
         )
 
         try:
-            _write_batch_with_retry(client, batch, table_id, target_name, batch_num)
+            client.add_batch_records(batch, table_id=table_id)
             success_count += len(batch)
             if persistence is not None and row_keys is not None:
                 start_idx = i
@@ -585,21 +550,62 @@ def _write_records_batched(
                         error_message=None,
                     )
         except Exception as e:
-            logger.error(
-                f"Target '{target_name}': batch {batch_num} failed: {e}. "
-                f"Records {i+1}-{i+len(batch)} not written."
-            )
-            failed_batches.append((batch_num, len(batch), str(e)))
-            if persistence is not None and row_keys is not None:
-                start_idx = i
-                for offset in range(len(batch)):
-                    row_key = row_keys[start_idx + offset]
-                    persistence.append_write_event(
-                        target_name=target_name,
-                        row_key=row_key,
-                        write_status="failed",
-                        error_message=str(e),
+            error_str = str(e)
+            # 重试 "Data not ready" 错误 (错误码 1254607)
+            if "1254607" in error_str or "Data not ready" in error_str:
+                for retry in range(1, 4):  # 最多重试 3 次
+                    wait_time = 5 * retry  # 5s, 10s, 15s
+                    logger.warning(
+                        f"Target '{target_name}': batch {batch_num} got 'Data not ready', "
+                        f"retrying in {wait_time}s (attempt {retry}/3)..."
                     )
+                    time.sleep(wait_time)
+                    try:
+                        client.add_batch_records(batch, table_id=table_id)
+                        success_count += len(batch)
+                        if persistence is not None and row_keys is not None:
+                            start_idx = i
+                            for offset in range(len(batch)):
+                                row_key = row_keys[start_idx + offset]
+                                persistence.append_write_event(
+                                    target_name=target_name,
+                                    row_key=row_key,
+                                    write_status="success",
+                                    error_message=None,
+                                )
+                        break  # 重试成功，跳出重试循环
+                    except Exception as retry_e:
+                        if retry == 3:  # 最后一次重试也失败
+                            logger.error(
+                                f"Target '{target_name}': batch {batch_num} failed after 3 retries: {retry_e}."
+                            )
+                            failed_batches.append((batch_num, len(batch), str(retry_e)))
+                            if persistence is not None and row_keys is not None:
+                                start_idx = i
+                                for offset in range(len(batch)):
+                                    row_key = row_keys[start_idx + offset]
+                                    persistence.append_write_event(
+                                        target_name=target_name,
+                                        row_key=row_key,
+                                        write_status="failed",
+                                        error_message=str(retry_e),
+                                    )
+            else:
+                logger.error(
+                    f"Target '{target_name}': batch {batch_num} failed: {e}. "
+                    f"Records {i+1}-{i+len(batch)} not written."
+                )
+                failed_batches.append((batch_num, len(batch), str(e)))
+                if persistence is not None and row_keys is not None:
+                    start_idx = i
+                    for offset in range(len(batch)):
+                        row_key = row_keys[start_idx + offset]
+                        persistence.append_write_event(
+                            target_name=target_name,
+                            row_key=row_key,
+                            write_status="failed",
+                            error_message=str(e),
+                        )
 
         # 批次间间隔，避免限流
         if i + WRITE_BATCH_SIZE < total:
