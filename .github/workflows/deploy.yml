@@ -144,6 +144,7 @@ jobs:
             done
 
             # 停止并移除旧容器
+            podman rm -f automation-worker 2>/dev/null || true
             podman rm -f automation-scheduler 2>/dev/null || true
 
             # 启动 scheduler 容器（定时执行 cron_task.sh）
