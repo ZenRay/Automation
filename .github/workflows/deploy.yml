@@ -1,7 +1,9 @@
 name: Deploy - Build, Scan & Push
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI - Lint & Test"]
+    types: [completed]
     branches: [staging, production]
 
 env:
@@ -12,80 +14,32 @@ permissions:
   packages: write
   contents: read
 
+concurrency:
+  group: deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
 jobs:
-  lint:
+  guard:
+    # 仅在 CI 成功且目标分支为 staging/production 时继续
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.head_branch == 'staging' ||
+       github.event.workflow_run.head_branch == 'production')
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ github.event.workflow_run.head_sha }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - run: |
+          echo "CI passed on ${{ github.event.workflow_run.head_branch }} at ${{ github.event.workflow_run.head_sha }}"
+
+  build-scan-push:
+    needs: guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install lint dependencies
-        run: pip install black flake8
-
-      - name: Black format check
-        run: black --check .
-
-      - name: Flake8 lint
-        run: flake8 .
-
-  test:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install project and dependencies
-        run: |
-          pip install -e .
-          pip install pytest
-
-      - name: Run unit tests (skip integration)
-        run: pytest tests/ -v -m "not integration" --tb=short
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build image (no push)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile
-          push: false
-          load: true
-          tags: automation:${{ github.sha }}
-
-      - name: Trivy secret scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: automation:${{ github.sha }}
-          scanners: secret
-          exit-code: "1"
-
-      - name: Verify no credential files in image
-        run: |
-          RESULT=$(docker run --rm automation:${{ github.sha }} find /app -name "*.ini" -o -name ".env")
-          if [ -n "$RESULT" ]; then
-            echo "FAIL: Credential files found in image:"
-            echo "$RESULT"
-            exit 1
-          fi
-          echo "PASS: No credential files found"
-
-  push:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+          ref: ${{ needs.guard.outputs.sha }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -101,9 +55,35 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=sha-,format=long
-            type=raw,value=${{ github.ref_name }}
+            type=raw,value=${{ needs.guard.outputs.branch }}
 
-      - name: Build and push
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: false
+          load: true
+          tags: automation:${{ github.event.workflow_run.head_sha }}
+
+      - name: Trivy secret scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: automation:${{ github.event.workflow_run.head_sha }}
+          scanners: secret
+          exit-code: "1"
+
+      - name: Verify no credential files in image
+        run: |
+          RESULT=$(docker run --rm automation:${{ github.event.workflow_run.head_sha }} find /app -name "*.ini" -o -name ".env")
+          if [ -n "$RESULT" ]; then
+            echo "FAIL: Credential files found in image:"
+            echo "$RESULT"
+            exit 1
+          fi
+          echo "PASS: No credential files found"
+
+      - name: Push image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -113,8 +93,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
-    needs: push
-    if: github.ref == 'refs/heads/production'
+    needs: [guard, build-scan-push]
+    if: needs.guard.outputs.branch == 'production'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to production server via SSH
@@ -129,7 +109,8 @@ jobs:
             set -euo pipefail
 
             CONFIG_DIR="${CONFIG_DIR:-/opt/automation/config}"
-            IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+            LOG_DIR="/opt/automation/logs"
+            IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ needs.guard.outputs.sha }}"
 
             # 登录 GHCR
             echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -147,23 +128,14 @@ jobs:
             podman rm -f automation-worker 2>/dev/null || true
             podman rm -f automation-scheduler 2>/dev/null || true
 
-            # 启动 worker 容器
-            podman run -d \
-              --name automation-worker \
-              --restart unless-stopped \
-              --cpus 4.0 --memory 8g \
-              -e TZ=Asia/Shanghai \
-              -e PYTHONLOGFORMAT=text \
-              -e LOG_LEVEL=INFO \
-              -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
-              -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
-              "$IMAGE" \
-              bash /app/workers/cron_task.sh
+            # 确保日志目录存在
+            mkdir -p "$LOG_DIR"
 
-            # 启动 scheduler 容器
+            # 启动 scheduler 容器（定时执行 cron_task.sh）
             podman run -d \
               --name automation-scheduler \
               --restart always \
+              --cpus 4.0 --memory 8g \
               -e TZ=Asia/Shanghai \
               -e PYTHONLOGFORMAT=text \
               -e LOG_LEVEL=INFO \
@@ -171,8 +143,19 @@ jobs:
               -e SCHEDULE_MIN=20 \
               -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
               -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
+              -v "${LOG_DIR}:/app/logs" \
               "$IMAGE" \
               bash /app/deploy/scripts/scheduler.sh
+
+            # 健康检查：等待容器启动并验证状态
+            sleep 5
+            STATUS=$(podman inspect automation-scheduler --format '{{.State.Status}}' 2>/dev/null || echo "not_found")
+            if [ "$STATUS" != "running" ]; then
+              echo "[deploy] FAIL: Container status is '$STATUS', expected 'running'"
+              podman logs --tail 20 automation-scheduler 2>&1 || true
+              exit 1
+            fi
+            echo "[deploy] Container health check passed: status=$STATUS"
 
             # 清理旧镜像
             podman image prune -f || true
