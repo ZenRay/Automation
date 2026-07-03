@@ -35,6 +35,41 @@ logger = logging.getLogger("workers.lib.lark_loader")
 WRITE_BATCH_SIZE = 500
 DELETE_BATCH_SIZE = 500
 
+# 瞬时错误重试配置
+_TRANSIENT_ERROR_CODES = {"1254607"}  # Data not ready, please try again later
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 5  # 秒
+
+
+def _is_transient_error(error_msg: str) -> bool:
+    """判断是否为可重试的瞬时错误"""
+    return any(code in error_msg for code in _TRANSIENT_ERROR_CODES)
+
+
+def _write_batch_with_retry(
+    client, batch: list[dict], table_id: str, target_name: str, batch_num: int
+) -> None:
+    """带重试的批次写入
+
+    对瞬时错误（如 1254607: Data not ready）进行指数退避重试。
+    """
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            client.add_batch_records(batch, table_id=table_id)
+            return
+        except Exception as e:
+            error_msg = str(e)
+            if attempt < _MAX_RETRIES and _is_transient_error(error_msg):
+                delay = _RETRY_BASE_DELAY * (2**attempt)
+                logger.warning(
+                    f"Target '{target_name}': batch {batch_num} transient error: "
+                    f"{error_msg}. Retrying in {delay}s (attempt {attempt + 1}/{_MAX_RETRIES})..."
+                )
+                time.sleep(delay)
+            else:
+                raise
+
+
 # 飞书索引字段支持的类型（第一个字段自动成为索引字段）
 # 参考: https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table/create
 _INDEX_FIELD_TYPES = {
@@ -537,7 +572,7 @@ def _write_records_batched(
         )
 
         try:
-            client.add_batch_records(batch, table_id=table_id)
+            _write_batch_with_retry(client, batch, table_id, target_name, batch_num)
             success_count += len(batch)
             if persistence is not None and row_keys is not None:
                 start_idx = i
