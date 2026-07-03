@@ -49,7 +49,7 @@ def test_store_stat_custom_window():
 
 
 def test_replace_cleanup_windows_store_stat():
-    """_replace_cleanup_windows 正确替换 store_stat_detail 的清理窗口"""
+    """store_stat 使用 clear_all()，不被 _replace_cleanup_windows 替换"""
     routes = _replace_cleanup_windows(
         DATA_ROUTES,
         {
@@ -66,11 +66,14 @@ def test_replace_cleanup_windows_store_stat():
     by_name = {r.name: r for r in routes}
     ss_cleanup = by_name["store_stat_detail"].target.cleanup_conditions
 
+    # store_stat 使用 clear_all()，不是 runtime 哨兵
     assert isinstance(ss_cleanup, CleanupCondition)
     assert not ss_cleanup.is_runtime
 
+    # 验证是 IS_NOT_EMPTY（清空全表）
     ss_filter = ss_cleanup.to_lark_filter()
     assert ss_filter["conditions"][0]["field_name"] == "日期"
+    assert ss_filter["conditions"][0]["operator"] == "isNotEmpty"
 
 
 def test_store_stat_window_independent_from_other_windows():

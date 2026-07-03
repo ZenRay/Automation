@@ -289,7 +289,7 @@ TARGET_STORE_STAT = LarkTargetConfig(
         _fm("近7天曝光天数", LarkFieldType.NUMBER),
         _fm("近7天下单天数", LarkFieldType.NUMBER),
     ],
-    cleanup_conditions=CleanupCondition.runtime_window(),
+    cleanup_conditions=CleanupCondition.clear_all(),
 )
 
 TARGET_STORE_CAT1_STAT = LarkTargetConfig(

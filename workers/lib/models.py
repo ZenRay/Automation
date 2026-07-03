@@ -369,6 +369,19 @@ class CleanupCondition:
             ]
         )
 
+    @classmethod
+    def clear_all(cls, date_field: str = "日期") -> "CleanupCondition":
+        """快捷构造：清空全表（匹配日期字段不为空的所有记录）
+
+        适用于每次写入前需要完全清空目标表的场景。
+
+        Args:
+            date_field: 日期字段名，默认 "日期"
+        """
+        return cls(
+            conditions=[FilterCondition(date_field, FilterOperator.IS_NOT_EMPTY)]
+        )
+
     def to_lark_filter(self) -> dict:
         """转换为飞书 search API 的 filter 参数格式
 

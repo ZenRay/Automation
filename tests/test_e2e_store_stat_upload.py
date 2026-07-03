@@ -31,16 +31,12 @@ from automation import hints as MC_HINTS
 from automation.client import LarkMultiDimTable, MaxComputerClient
 from automation.conf import lark as lark_conf, maxcomputer as mc_conf
 
-import dataclasses
-from datetime import timedelta
-
 from workers.lib import (
     DateRangeParams,
     FieldTypeCoercer,
     execute_all_queries,
     write_to_all_targets,
 )
-from workers.lib.models import CleanupCondition
 from workers.upgrade_after_sale.config import (
     SQL_BASE_DIR,
     SQL_QUERIES,
@@ -56,7 +52,7 @@ logger = logging.getLogger("test_e2e_store_stat_upload")
 
 
 def _build_store_stat_params(
-    date_value: str | None = None, start: int = -7, end: int = 0
+    date_value: str | None = None, start: int = -7, end: int = -1
 ) -> DateRangeParams:
     """构建 store_stat 的日期参数"""
     ref_date = (
@@ -129,19 +125,12 @@ def test_e2e_store_stat_upload():
     print("\n[Step 4] 写入飞书目标表...")
     print(f"  目标表: {TARGET_STORE_STAT.table_name}")
     print(f"  字段映射: {len(TARGET_STORE_STAT.field_mappings)} 个字段")
-
-    # 替换 runtime_window 哨兵为实际日期窗口
-    ref_date = params.reference_date
-    start_date = ref_date + timedelta(days=params.start_offset)
-    end_date = ref_date + timedelta(days=params.end_offset)
-    new_cleanup = CleanupCondition.date_window("日期", start_date, end_date)
-    new_target = dataclasses.replace(TARGET_STORE_STAT, cleanup_conditions=new_cleanup)
-    print(f"  清理窗口: 日期 in [{start_date}, {end_date})")
+    print(f"  清理策略: 清空全表（clear_all）")
 
     write_to_all_targets(
         client=lark_client,
         result_df=store_stat_df,
-        targets=[new_target],
+        targets=[TARGET_STORE_STAT],
         coercer=coercer,
         validation_level="warn",
     )

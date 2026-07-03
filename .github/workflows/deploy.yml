@@ -144,26 +144,13 @@ jobs:
             done
 
             # 停止并移除旧容器
-            podman rm -f automation-worker 2>/dev/null || true
             podman rm -f automation-scheduler 2>/dev/null || true
 
-            # 启动 worker 容器
-            podman run -d \
-              --name automation-worker \
-              --restart unless-stopped \
-              --cpus 4.0 --memory 8g \
-              -e TZ=Asia/Shanghai \
-              -e PYTHONLOGFORMAT=text \
-              -e LOG_LEVEL=INFO \
-              -v "${CONFIG_DIR}/_lark.ini:/app/automation/conf/_lark.ini:ro" \
-              -v "${CONFIG_DIR}/_maxcomputer.ini:/app/automation/conf/_maxcomputer.ini:ro" \
-              "$IMAGE" \
-              bash /app/workers/cron_task.sh
-
-            # 启动 scheduler 容器
+            # 启动 scheduler 容器（定时执行 cron_task.sh）
             podman run -d \
               --name automation-scheduler \
               --restart always \
+              --cpus 4.0 --memory 8g \
               -e TZ=Asia/Shanghai \
               -e PYTHONLOGFORMAT=text \
               -e LOG_LEVEL=INFO \
