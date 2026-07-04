@@ -11,9 +11,11 @@ Resolve attachment URLs into Feishu Bitable attachment payloads by:
 from __future__ import annotations
 
 import logging
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any
-import time
 
 from automation.utils.common.attachment import (
     DEFAULT_TIMEOUT,
@@ -67,6 +69,11 @@ class AttachmentTokenResolver:
     persistence: RouteWritePersistence | None = None
     _token_cache: dict[str, str] = field(default_factory=dict, init=False)
     _failed_reason_cache: dict[str, str] = field(default_factory=dict, init=False)
+    _cache_lock: threading.Lock = field(default_factory=threading.Lock, init=False)
+    _stats_total: int = field(default=0, init=False)
+    _stats_done: int = field(default=0, init=False)
+    _stats_failed: int = field(default=0, init=False)
+    _stats_start_time: float = field(default=0.0, init=False)
 
     def resolve(self, value: Any) -> list[dict]:
         urls = normalize_attachment_input(value)
@@ -116,8 +123,9 @@ class AttachmentTokenResolver:
         return resolved
 
     def resolve_single(self, url: str, *, row_key: str = "") -> str | None:
-        if url in self._token_cache:
-            return self._token_cache[url]
+        with self._cache_lock:
+            if url in self._token_cache:
+                return self._token_cache[url]
 
         last_error = None
         for attempt in range(self.max_retries + 1):
@@ -165,8 +173,9 @@ class AttachmentTokenResolver:
                         f"Attachment upload response missing file_token: {response}"
                     )
 
-                self._token_cache[url] = file_token
-                self._failed_reason_cache.pop(url, None)
+                with self._cache_lock:
+                    self._token_cache[url] = file_token
+                    self._failed_reason_cache.pop(url, None)
                 if self.persistence is not None:
                     self.persistence.append_upload_event(
                         target_name=self.target_name,
@@ -205,18 +214,21 @@ class AttachmentTokenResolver:
                     safe_remove_file(temp_path)
 
         logger.error("Resolve attachment failed for url=%s: %s", url, last_error)
-        self._failed_reason_cache[url] = (
-            str(last_error) if last_error is not None else ""
-        )
+        with self._cache_lock:
+            self._failed_reason_cache[url] = (
+                str(last_error) if last_error is not None else ""
+            )
         return None
 
     def seed_token_cache(self, token_map: dict[str, str]) -> None:
         if not token_map:
             return
-        self._token_cache.update(token_map)
+        with self._cache_lock:
+            self._token_cache.update(token_map)
 
     def get_failed_reason(self, url: str) -> str | None:
-        return self._failed_reason_cache.get(url)
+        with self._cache_lock:
+            return self._failed_reason_cache.get(url)
 
     def _get_row_key(self, value: Any) -> str:
         if callable(self.row_key_getter):
@@ -227,6 +239,102 @@ class AttachmentTokenResolver:
             except Exception:
                 pass
         return ""
+
+    def resolve_batch(
+        self, url_list: list[str], *, concurrency: int = 4
+    ) -> dict[str, str]:
+        """并行预解析所有 URL，填充 cache，返回 {url: file_token}。
+
+        设计原则：并发只发生在本方法内；调用方后续的串行逻辑（如 bak 处理）
+        通过 cache 命中实现零改动加速。
+
+        Args:
+            url_list: 待解析的 URL 列表
+            concurrency: 并发线程数，默认 4（飞书附件 API 限频 ~100 QPS，安全范围内）
+
+        Returns:
+            dict[str, str]: 成功解析的 {url: file_token} 映射
+        """
+        with self._cache_lock:
+            pending = [u for u in url_list if u not in self._token_cache]
+
+        if not pending:
+            logger.info("resolve_batch: all %d URLs already cached, nothing to do", len(url_list))
+            return dict(self._token_cache)
+
+        self._stats_total = len(pending)
+        self._stats_done = 0
+        self._stats_failed = 0
+        self._stats_start_time = time.monotonic()
+
+        logger.info(
+            "resolve_batch: %d URLs to resolve (%d already cached), concurrency=%d",
+            len(pending), len(url_list) - len(pending), concurrency,
+        )
+
+        results: dict[str, str] = {}
+        last_log_time = self._stats_start_time
+
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            futures = {pool.submit(self.resolve_single, url): url for url in pending}
+            for future in as_completed(futures):
+                url = futures[future]
+                try:
+                    token = future.result()
+                except Exception as exc:
+                    logger.error("resolve_batch: unexpected error for url=%s: %s", url, exc)
+                    token = None
+
+                self._stats_done += 1
+                if token:
+                    results[url] = token
+                else:
+                    self._stats_failed += 1
+
+                # 进度日志：每 50 个或每 60 秒输出一次
+                now = time.monotonic()
+                should_log = (
+                    self._stats_done % 50 == 0
+                    or self._stats_done == self._stats_total
+                    or (now - last_log_time) >= 60
+                )
+                if should_log:
+                    elapsed = now - self._stats_start_time
+                    rate = self._stats_done / max(elapsed, 1)
+                    remaining = (self._stats_total - self._stats_done) / max(rate, 0.01)
+                    logger.info(
+                        "resolve_batch progress: %d/%d (%.1f%%) done, %d failed, "
+                        "elapsed %.0fs, ETA %.0fs",
+                        self._stats_done, self._stats_total,
+                        self._stats_done / max(self._stats_total, 1) * 100,
+                        self._stats_failed, elapsed, remaining,
+                    )
+                    last_log_time = now
+
+        elapsed = time.monotonic() - self._stats_start_time
+        logger.info(
+            "resolve_batch completed: %d resolved, %d failed, %.1f minutes",
+            len(results), self._stats_failed, elapsed / 60,
+        )
+        return results
+
+    def log_summary(self) -> None:
+        """输出附件解析汇总统计。"""
+        elapsed = (
+            time.monotonic() - self._stats_start_time
+            if self._stats_start_time > 0
+            else 0
+        )
+        cache_size = len(self._token_cache)
+        failed_size = len(self._failed_reason_cache)
+        logger.info(
+            "Attachment summary: cached=%d, failed=%d, "
+            "batch_total=%d, batch_done=%d, batch_failed=%d, "
+            "elapsed=%.1f min",
+            cache_size, failed_size,
+            self._stats_total, self._stats_done, self._stats_failed,
+            elapsed / 60,
+        )
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:

@@ -123,6 +123,13 @@ ATTACHMENT_BAK_SOURCE_FIELDS = [
     "客户申请举证视频",
 ]
 
+# 售后明细表中所有附件字段（用于并行预解析）
+AFTER_SALE_ATTACHMENT_COLS = [
+    "送达签收照片",
+    "客户申请举证图片",
+    "客户申请举证视频",
+]
+
 # 飞书附件上限按 20MB 处理，运行时阈值保留 1MB 安全边界。
 FEISHU_ATTACHMENT_MAX_MB = 20
 ATTACHMENT_MAX_SIZE_MB = FEISHU_ATTACHMENT_MAX_MB - 1

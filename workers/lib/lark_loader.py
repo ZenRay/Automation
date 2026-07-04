@@ -367,9 +367,13 @@ def _do_cleanup(
 ) -> int:
     """执行单次清理操作（fetch + filter + delete）
 
-    当 cleanup 条件为日期范围时，使用 GET 接口拉取全表记录并在客户端过滤，
-    避免飞书 POST search API 对大表查询挂死的问题。
-    对于非日期范围条件，回退到原有的 POST search + filter 逻辑。
+    清理策略按优先级选择最快的 API 路径：
+    1. clear_all（isNotEmpty）→ GET 全量拉取，无服务端过滤
+    2. 日期范围（IS_GREATER + IS_LESS）→ GET 全量 + 客户端过滤
+    3. 其他条件 → POST search（服务端过滤）
+
+    避免飞书 POST search API 对大表查询挂死的问题
+    （实测 cat4 表 1200+ 行挂死 98 分钟）。
 
     Args:
         client:    LarkMultiDimTable 客户端
@@ -380,7 +384,6 @@ def _do_cleanup(
         int：删除的记录数
     """
     cleanup_cond = target.cleanup_conditions
-    filter_obj = cleanup_cond.to_lark_filter()
     date_range = _extract_date_range(cleanup_cond)
 
     if date_range:
@@ -394,7 +397,17 @@ def _do_cleanup(
             table_id=table_id,
             page_size=500,
         )
+    elif cleanup_cond.is_clear_all:
+        logger.info(
+            "Cleaning up target '%s': clear_all via GET (no filter)",
+            target.name,
+        )
+        records_gen = client.request_records_generator(
+            table_id=table_id,
+            page_size=500,
+        )
     else:
+        filter_obj = cleanup_cond.to_lark_filter()
         logger.info(f"Cleaning up target '{target.name}': filter={filter_obj}")
         # Non-date-range condition: use POST search with filter
         records_gen = client.request_records_generator(
@@ -405,6 +418,8 @@ def _do_cleanup(
 
     # 分页收集待删除的 record IDs
     all_record_ids = []
+    page_count = 0
+    fetch_start = time.time()
     for resp in records_gen:
         if resp.get("code", -1) != 0:
             msg = resp.get("msg", "Unknown error")
@@ -432,25 +447,60 @@ def _do_cleanup(
             else:
                 all_record_ids.append(rid)
 
+        page_count += 1
+        if page_count % 10 == 0:
+            logger.info(
+                "Cleanup '%s': fetched %d records (%d pages, %.1fs elapsed)",
+                target.name,
+                len(all_record_ids),
+                page_count,
+                time.time() - fetch_start,
+            )
+
+    fetch_elapsed = time.time() - fetch_start
+    logger.info(
+        "Cleanup '%s': collected %d record IDs in %d pages (%.1fs)",
+        target.name,
+        len(all_record_ids),
+        page_count,
+        fetch_elapsed,
+    )
+
     if not all_record_ids:
         logger.info(f"No records to clean up in target '{target.name}'")
         return 0
 
     # 批量删除
     deleted_count = 0
+    total_batches = (len(all_record_ids) + DELETE_BATCH_SIZE - 1) // DELETE_BATCH_SIZE
+    delete_start = time.time()
     for i in range(0, len(all_record_ids), DELETE_BATCH_SIZE):
         batch = all_record_ids[i : i + DELETE_BATCH_SIZE]
+        batch_num = i // DELETE_BATCH_SIZE + 1
         try:
             client.delete_batch_records(batch, table_id=table_id)
             deleted_count += len(batch)
-            logger.debug(
-                f"Deleted batch {i // DELETE_BATCH_SIZE + 1}: {len(batch)} records"
+            logger.info(
+                "Cleanup '%s': deleted batch %d/%d (%d records, total %d/%d)",
+                target.name,
+                batch_num,
+                total_batches,
+                len(batch),
+                deleted_count,
+                len(all_record_ids),
             )
         except Exception as e:
-            logger.error(f"Failed to delete batch {i // DELETE_BATCH_SIZE + 1}: {e}")
+            logger.error(f"Failed to delete batch {batch_num}: {e}")
             raise
         time.sleep(1)  # 避免限流
 
+    logger.info(
+        "Cleanup '%s': deleted %d records in %d batches (%.1fs)",
+        target.name,
+        deleted_count,
+        total_batches,
+        time.time() - delete_start,
+    )
     return deleted_count
 
 

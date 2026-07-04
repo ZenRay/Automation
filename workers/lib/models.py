@@ -291,6 +291,14 @@ class CleanupCondition:
         """是否为运行时窗口占位符（由管道 DateRangeParams 替换）"""
         return self._is_runtime
 
+    @property
+    def is_clear_all(self) -> bool:
+        """是否为清空全表策略（单条件 isNotEmpty）"""
+        return (
+            len(self.conditions) == 1
+            and self.conditions[0].operator == FilterOperator.IS_NOT_EMPTY
+        )
+
     @classmethod
     def runtime_window(cls) -> "CleanupCondition":
         """占位哨兵：标记「需要清理，窗口由管道运行时 DateRangeParams 决定」
