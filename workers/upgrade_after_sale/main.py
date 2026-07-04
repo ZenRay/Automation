@@ -366,7 +366,9 @@ def _pre_resolve_attachments(
         return
     logger.info(
         "Pre-resolving %d attachment URLs from columns %s (concurrency=%d)...",
-        len(all_urls), attachment_cols, concurrency,
+        len(all_urls),
+        attachment_cols,
+        concurrency,
     )
     attachment_resolver.resolve_batch(all_urls, concurrency=concurrency)
 

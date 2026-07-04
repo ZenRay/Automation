@@ -232,7 +232,9 @@ def _pre_resolve_attachments(
         return
     logger.info(
         "Pre-resolving %d attachment URLs from columns %s (concurrency=%d)...",
-        len(all_urls), sorted(attachment_cols), concurrency,
+        len(all_urls),
+        sorted(attachment_cols),
+        concurrency,
     )
     attachment_resolver.resolve_batch(all_urls, concurrency=concurrency)
 
@@ -601,7 +603,9 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
         )
 
         # ── 并行预解析：收集所有附件 URL → 并发上传填充 cache ──
-        _pre_resolve_attachments(source_df, attachment_cols, attachment_resolver, args.attachment_concurrency)
+        _pre_resolve_attachments(
+            source_df, attachment_cols, attachment_resolver, args.attachment_concurrency
+        )
 
         prepared_df, oversized_failed_count = _prepare_attachment_columns_for_upload(
             source_df,
