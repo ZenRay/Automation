@@ -259,7 +259,10 @@ class AttachmentTokenResolver:
             pending = [u for u in url_list if u not in self._token_cache]
 
         if not pending:
-            logger.info("resolve_batch: all %d URLs already cached, nothing to do", len(url_list))
+            logger.info(
+                "resolve_batch: all %d URLs already cached, nothing to do",
+                len(url_list),
+            )
             return dict(self._token_cache)
 
         self._stats_total = len(pending)
@@ -269,7 +272,9 @@ class AttachmentTokenResolver:
 
         logger.info(
             "resolve_batch: %d URLs to resolve (%d already cached), concurrency=%d",
-            len(pending), len(url_list) - len(pending), concurrency,
+            len(pending),
+            len(url_list) - len(pending),
+            concurrency,
         )
 
         results: dict[str, str] = {}
@@ -282,7 +287,9 @@ class AttachmentTokenResolver:
                 try:
                     token = future.result()
                 except Exception as exc:
-                    logger.error("resolve_batch: unexpected error for url=%s: %s", url, exc)
+                    logger.error(
+                        "resolve_batch: unexpected error for url=%s: %s", url, exc
+                    )
                     token = None
 
                 self._stats_done += 1
@@ -305,16 +312,21 @@ class AttachmentTokenResolver:
                     logger.info(
                         "resolve_batch progress: %d/%d (%.1f%%) done, %d failed, "
                         "elapsed %.0fs, ETA %.0fs",
-                        self._stats_done, self._stats_total,
+                        self._stats_done,
+                        self._stats_total,
                         self._stats_done / max(self._stats_total, 1) * 100,
-                        self._stats_failed, elapsed, remaining,
+                        self._stats_failed,
+                        elapsed,
+                        remaining,
                     )
                     last_log_time = now
 
         elapsed = time.monotonic() - self._stats_start_time
         logger.info(
             "resolve_batch completed: %d resolved, %d failed, %.1f minutes",
-            len(results), self._stats_failed, elapsed / 60,
+            len(results),
+            self._stats_failed,
+            elapsed / 60,
         )
         return results
 
@@ -331,8 +343,11 @@ class AttachmentTokenResolver:
             "Attachment summary: cached=%d, failed=%d, "
             "batch_total=%d, batch_done=%d, batch_failed=%d, "
             "elapsed=%.1f min",
-            cache_size, failed_size,
-            self._stats_total, self._stats_done, self._stats_failed,
+            cache_size,
+            failed_size,
+            self._stats_total,
+            self._stats_done,
+            self._stats_failed,
             elapsed / 60,
         )
 
