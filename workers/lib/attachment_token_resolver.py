@@ -351,8 +351,32 @@ class AttachmentTokenResolver:
             elapsed / 60,
         )
 
+    # 永久性错误关键词 — 匹配时直接判定不可重试
+    _PERMANENT_KEYWORDS: tuple[str, ...] = (
+        "size limit",
+        "exceeds",
+        "unsupported",
+        "forbidden",
+        "not found",
+        "403",
+        "404",
+        "410",
+    )
+
+    @staticmethod
+    def _is_permanent_failure(exc: Exception) -> bool:
+        """判断是否为永久性错误（重试无意义）。
+
+        永久性错误包括：附件超大小限制、URL 格式不支持、
+        HTTP 403/404/410 等客户端错误。
+        """
+        text = str(exc).lower()
+        return any(kw in text for kw in AttachmentTokenResolver._PERMANENT_KEYWORDS)
+
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:
+        if AttachmentTokenResolver._is_permanent_failure(exc):
+            return False
         if isinstance(exc, RETRYABLE_EXCEPTIONS):
             return True
         text = str(exc).lower()

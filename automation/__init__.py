@@ -1,6 +1,7 @@
 # coding:utf8
 
 import logging
+import os
 
 
 from automation.conf import maxcomputer, lark
@@ -14,7 +15,8 @@ from automation.client import (
 )
 
 logger = logging.getLogger("automation")
-logger.setLevel(logging.DEBUG)
+_log_level = os.getenv("AUTOMATION_LOG_LEVEL", "INFO").upper()
+logger.setLevel(getattr(logging, _log_level, logging.INFO))
 
 formater = logging.Formatter(
     fmt="[%(levelname)s]:%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
