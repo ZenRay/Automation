@@ -149,8 +149,9 @@ jobs:
             podman rm -f automation-worker 2>/dev/null || true
             podman rm -f automation-scheduler 2>/dev/null || true
 
-            # 确保日志目录存在
+            # 确保日志目录存在且权限正确（appuser UID=10001）
             mkdir -p "$LOG_DIR"
+            chown -R 10001:10001 "$LOG_DIR"
 
             # 启动 scheduler 容器（定时执行 cron_task.sh）
             podman run -d \
