@@ -21,6 +21,7 @@ set -euo pipefail
 # 时区：确保 date 命令取到正确的日期（cron 环境 locale 最小化）
 # ---------------------------------------------------------------------------
 export TZ='Asia/Shanghai'
+set -o pipefail  # 管道退出码取首个失败命令
 
 # ---------------------------------------------------------------------------
 # 路径配置
@@ -114,7 +115,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cron log file: $CRON_LOG_FILE"
 # ---------------------------------------------------------------------------
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
 
-if python -m workers.okr.main "${ARGS[@]}"; then
+if python -m workers.okr.main "${ARGS[@]}" 2>&1 | tee -a "$CRON_LOG_FILE"; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - SUCCESS" | tee -a "$CRON_LOG_FILE"
 else
     EXIT_CODE=$?
@@ -127,7 +128,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] CR Trail ETL - START" | tee -a "$CRON_LOG_FILE"
 
-if python -m workers.cr_trail.main; then
+if python -m workers.cr_trail.main 2>&1 | tee -a "$CRON_LOG_FILE"; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] CR Trail ETL - SUCCESS" | tee -a "$CRON_LOG_FILE"
 else
     EXIT_CODE=$?
@@ -162,13 +163,13 @@ UA_BASE_ARGS=(
     --job-id "$RUN_DATE"
 )
 
-if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}"; then
+if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" 2>&1 | tee -a "$CRON_LOG_FILE"; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (main run)" | tee -a "$CRON_LOG_FILE"
 else
     EXIT_CODE=$?
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - FAILED (main run, exit_code=$EXIT_CODE), retry failed rows" | tee -a "$CRON_LOG_FILE"
 
-    if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" --retry-failed-only; then
+    if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" --retry-failed-only 2>&1 | tee -a "$CRON_LOG_FILE"; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (retry_failed_only)" | tee -a "$CRON_LOG_FILE"
     else
         RETRY_EXIT_CODE=$?
