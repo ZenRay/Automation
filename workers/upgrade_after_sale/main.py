@@ -25,6 +25,7 @@ import pandas as pd
 from automation import hints as MC_HINTS
 from automation.client import LarkMultiDimTable, MaxComputerClient
 from automation.conf import lark as lark_conf, maxcomputer as mc_conf
+from automation.utils.common.attachment import normalize_attachment_input
 
 from workers.lib import (
     AttachmentTokenResolver,
@@ -40,6 +41,7 @@ from .config import (
     ATTACHMENT_MAX_SIZE_MB,
     ATTACHMENT_BAK_SOURCE_FIELDS,
     ATTACHMENT_BAK_SUFFIX,
+    AFTER_SALE_ATTACHMENT_COLS,
     DATA_ROUTES,
     ENABLE_ATTACHMENT_BAK,
     QUERY_WINDOWS,
@@ -50,6 +52,7 @@ from .config import (
     ROUTE_DATE_FIELDS,
     SQL_BASE_DIR,
     SQL_QUERIES,
+    TARGET_AFTER_SALE,
 )
 from .transformer import (
     normalize_after_sale_df,
@@ -339,6 +342,33 @@ def _apply_attachment_bak_columns(df: pd.DataFrame) -> pd.DataFrame:
         work_df.loc[work_df[source_col].isna(), bak_col] = ""
         # 保留原附件字段用于正常上传，bak 仅用于失败/超限时追溯原值。
     return work_df
+
+
+def _pre_resolve_attachments(
+    df: pd.DataFrame,
+    attachment_cols: list[str],
+    attachment_resolver: AttachmentTokenResolver,
+    concurrency: int = 4,
+) -> None:
+    """并行预解析附件列中的所有 URL，填充 resolver cache。
+
+    后续 DataRouter 写入时 resolve_single 会命中 cache，
+    bak 处理逻辑完全不变。
+    """
+    all_urls: list[str] = []
+    for col in attachment_cols:
+        if col not in df.columns:
+            continue
+        for value in df[col].dropna():
+            all_urls.extend(normalize_attachment_input(str(value)))
+    if not all_urls:
+        logger.info("No attachment URLs found in columns: %s", attachment_cols)
+        return
+    logger.info(
+        "Pre-resolving %d attachment URLs from columns %s (concurrency=%d)...",
+        len(all_urls), attachment_cols, concurrency,
+    )
+    attachment_resolver.resolve_batch(all_urls, concurrency=concurrency)
 
 
 def _route_with_retry(
@@ -709,6 +739,23 @@ def run_upgrade_after_sale_pipeline(
             ),
         )
         logger.info(router.describe_routes(effective_routes))
+
+        # ── 并行预解析售后明细表附件 ──
+        if "after_sale_item" in mc_data:
+            # 提前获取 app_token（正常流程中由 lark_loader 在写入阶段设置）
+            if not attachment_resolver.app_token:
+                lark_client.extract_app_information(url=TARGET_AFTER_SALE.url)
+                attachment_resolver.app_token = lark_client.app_token
+                logger.info(
+                    "Pre-resolve: extracted app_token=%s from target URL",
+                    attachment_resolver.app_token,
+                )
+            _pre_resolve_attachments(
+                mc_data["after_sale_item"],
+                AFTER_SALE_ATTACHMENT_COLS,
+                attachment_resolver,
+            )
+
         report = _route_with_retry(
             router,
             effective_routes,
@@ -761,6 +808,7 @@ def run_upgrade_after_sale_pipeline(
     logger.info("[Step 5/5] Pipeline summary:")
     for name, df in mc_data.items():
         logger.info("  - %s: %s rows, %s columns", name, df.shape[0], df.shape[1])
+    attachment_resolver.log_summary()
     logger.info("Upgrade After Sale Pipeline - COMPLETED SUCCESSFULLY")
     logger.info("=" * 60)
     return 0

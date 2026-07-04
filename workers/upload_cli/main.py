@@ -208,6 +208,35 @@ def _is_size_limit_error(error_text: str | None) -> bool:
     return "size limit" in lowered or "exceeds size limit" in lowered
 
 
+def _pre_resolve_attachments(
+    df: pd.DataFrame,
+    attachment_cols: set[str],
+    attachment_resolver: AttachmentTokenResolver,
+    concurrency: int,
+) -> None:
+    """并行预解析所有附件列中的 URL，填充 resolver cache。
+
+    后续的 _prepare_attachment_columns_for_upload 串行逻辑通过
+    cache 命中实现零改动加速，bak 字段处理逻辑完全不变。
+    """
+    if not attachment_cols:
+        return
+    all_urls: list[str] = []
+    for col in attachment_cols:
+        if col not in df.columns:
+            continue
+        for value in df[col].dropna():
+            all_urls.extend(normalize_attachment_input(value))
+    if not all_urls:
+        logger.info("No attachment URLs found in columns: %s", attachment_cols)
+        return
+    logger.info(
+        "Pre-resolving %d attachment URLs from columns %s (concurrency=%d)...",
+        len(all_urls), sorted(attachment_cols), concurrency,
+    )
+    attachment_resolver.resolve_batch(all_urls, concurrency=concurrency)
+
+
 def _prepare_attachment_columns_for_upload(
     df: pd.DataFrame,
     *,
@@ -570,6 +599,10 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
             backoff_seconds=0.4,
             target_name=target.name,
         )
+
+        # ── 并行预解析：收集所有附件 URL → 并发上传填充 cache ──
+        _pre_resolve_attachments(source_df, attachment_cols, attachment_resolver, args.attachment_concurrency)
+
         prepared_df, oversized_failed_count = _prepare_attachment_columns_for_upload(
             source_df,
             attachment_cols=attachment_cols,
@@ -590,6 +623,7 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
             validation_level="skip",
         )
 
+        attachment_resolver.log_summary()
         logger.info(
             "Upload completed: rows=%s table=%s attachment_cache=%s oversized_failed=%s",
             written_count,
@@ -705,6 +739,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument("--row-key-col", default=None, help="row_key 来源列")
+    parser.add_argument(
+        "--attachment-concurrency",
+        type=int,
+        default=4,
+        help="附件并发上传线程数（默认 4，飞书 API 限频 ~100 QPS）",
+    )
 
     return parser
 
