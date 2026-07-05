@@ -105,6 +105,8 @@ ROUTE_RETRY_BACKOFF_SECONDS = 0.8
 ROUTE_RETRY_BACKOFF_MULTIPLIER = 2.0
 RETRYABLE_ERROR_PATTERNS = [
     "timeout",
+    "timed out",
+    "connection aborted",
     "temporar",
     "429",
     "502",
