@@ -42,9 +42,9 @@ SELECT
     -- ,COUNT(1) OVER(PARTITION BY t1.dt, t1.sku_id) AS cnt
 FROM datawarehouse_max.dim_goods_daily_full t1
 LEFT JOIN datawarehouse_max.dim_goods_extra_info_daily_full t2
-    ON t2.dt = DATEADD(DATE(MAX_PT("datawarehouse_max.dim_goods_extra_info_daily_full")), -1, "dd")
+    ON t2.dt = DATEADD(DATE(MAX_PT("datawarehouse_max.dim_goods_extra_info_daily_full")), 0, "dd")
     AND t2.sku_id = t1.sku_id
-WHERE t1.dt = DATEADD(DATE(MAX_PT("datawarehouse_max.dim_goods_daily_full")), -1, "dd")
+WHERE t1.dt = DATEADD(DATE(MAX_PT("datawarehouse_max.dim_goods_daily_full")), 0, "dd")
     AND t1.mall_id = 871
     AND t1.back_category_id = 2407
     AND NVL(t1.is_up_today,0) + NVL(t1.is_sku_valid, 0) > 0
