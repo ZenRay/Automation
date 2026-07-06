@@ -245,12 +245,29 @@ def _write_single_target(
             if token_map:
                 attachment_resolver.seed_token_cache(token_map)
 
-    # 2. 清理旧数据
+    # 2. retry_failed_only 前置检查：无失败行时跳过整个写入（含清理）
+    if persistence is not None and getattr(
+        persistence_config, "retry_failed_only", False
+    ):
+        failed_rows = set(
+            persistence.load_current_failed_write_rows(target_name=target.name)
+        )
+        if not failed_rows:
+            logger.info(
+                "Target '%s': retry_failed_only enabled and no failed rows found, skip cleanup and write",
+                target.name,
+            )
+            persistence.save_checkpoint(
+                stage="write_done", batch_index=0, counters={"records": 0}
+            )
+            return 0
+
+    # 3. 清理旧数据
     if target.cleanup_conditions is not None:
         deleted_count = cleanup_target_table(client, target, table_id)
         logger.info(f"Target '{target.name}': cleaned up {deleted_count} old records")
 
-    # 3. 写入前校验（可选）
+    # 4. 写入前校验（可选）
     if validator is not None and validation_level != "skip":
         report = validator.validate(
             result_df, target.field_mappings, target_name=target.name
@@ -267,23 +284,11 @@ def _write_single_target(
                 f"but validation_level='{validation_level}', continuing..."
             )
 
-    # 4. 转换 DataFrame 为 records 格式
+    # 5. 转换 DataFrame 为 records 格式（retry_failed_only 时仅筛选失败行）
     filtered_df = result_df
     if persistence is not None and getattr(
         persistence_config, "retry_failed_only", False
     ):
-        failed_rows = set(
-            persistence.load_current_failed_write_rows(target_name=target.name)
-        )
-        if not failed_rows:
-            logger.info(
-                "Target '%s': retry_failed_only enabled and no failed rows found, skip write",
-                target.name,
-            )
-            persistence.save_checkpoint(
-                stage="write_done", batch_index=0, counters={"records": 0}
-            )
-            return 0
         if "row_key" not in result_df.columns:
             raise ValueError(
                 "retry_failed_only enabled but DataFrame has no row_key column"
