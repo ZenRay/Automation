@@ -746,8 +746,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--attachment-concurrency",
         type=int,
-        default=4,
-        help="附件并发上传线程数（默认 4，飞书 API 限频 ~100 QPS）",
+        default=10,
+        help="附件并发上传线程数（默认 10，飞书 API 限频 ~100 QPS）",
     )
 
     return parser

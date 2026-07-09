@@ -38,6 +38,7 @@ from workers.lib import (
 )
 from workers.lib.models import CleanupCondition, DataRoute
 from .config import (
+    ATTACHMENT_CONCURRENCY,
     ATTACHMENT_MAX_SIZE_MB,
     ATTACHMENT_BAK_SOURCE_FIELDS,
     ATTACHMENT_BAK_SUFFIX,
@@ -442,6 +443,7 @@ def run_upgrade_after_sale_pipeline(
     persistence_dir: str | None = None,
     job_id: str | None = None,
     retry_failed_only: bool = False,
+    attachment_concurrency: int | None = None,
 ) -> int:
     logger.info("=" * 60)
     logger.info("Upgrade After Sale Pipeline - START")
@@ -756,6 +758,7 @@ def run_upgrade_after_sale_pipeline(
                 mc_data["after_sale_item"],
                 AFTER_SALE_ATTACHMENT_COLS,
                 attachment_resolver,
+                concurrency=attachment_concurrency or ATTACHMENT_CONCURRENCY,
             )
 
         report = _route_with_retry(
@@ -899,6 +902,12 @@ def main() -> None:
     parser.add_argument(
         "--retry-failed-only", action="store_true", help="仅重试当前失败 row_key"
     )
+    parser.add_argument(
+        "--attachment-concurrency",
+        type=int,
+        default=None,
+        help="附件并发上传线程数（默认 10，飞书 API 限频 ~100 QPS）",
+    )
     args = parser.parse_args()
 
     code = run_upgrade_after_sale_pipeline(
@@ -921,6 +930,7 @@ def main() -> None:
         persistence_dir=args.persistence_dir,
         job_id=args.job_id,
         retry_failed_only=args.retry_failed_only,
+        attachment_concurrency=args.attachment_concurrency,
     )
     sys.exit(code)
 
