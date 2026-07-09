@@ -191,6 +191,7 @@ TARGET_AFTER_SALE = LarkTargetConfig(
         _fm("处理时长", LarkFieldType.NUMBER),
         _fm("商城id", LarkFieldType.NUMBER),
         _fm("运营区域类型", LarkFieldType.TEXT),
+        _fm("商家经理姓名", LarkFieldType.TEXT),
     ],
     cleanup_conditions=CleanupCondition.runtime_window(),
 )

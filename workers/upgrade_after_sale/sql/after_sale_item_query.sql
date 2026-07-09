@@ -1,4 +1,3 @@
--- 客户售后问题类型
 WITH as_problem_selected AS(
 
     SELECT
@@ -142,6 +141,8 @@ WITH as_problem_selected AS(
         ,IF(ISNOTNULL(t6.grid_id), "代理人区域", "直营区域") AS operation_region_type -- `运营区域类型`
         ,t1.company_id AS mall_id -- `商城id`
 
+        ,t01.dt AS ordere_date
+
     FROM datawarehouse_max.ods_css_demeter_after_sale_order_full t1
     LEFT JOIN datawarehouse_max.ods_css_demeter_after_sale_order_item_full t0
         ON t0.dt = MAX_PT("datawarehouse_max.ods_css_demeter_after_sale_order_item_full")
@@ -266,7 +267,15 @@ SELECT
 
 	,t1.mall_id AS `商城id`
     ,t1.operation_region_type AS `运营区域类型`
+    ,t2.operator_user_name AS `商家经理姓名`
 FROM base t1
+LEFT JOIN datawarehouse_max.dim_goods_daily_full t2
+    ON t2.dt BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
+            AND DATEADD(${date_param}, ${end_offset}, "dd")
+    AND t2.dt = t1.ordere_date
+    AND t2.sku_id = t1.sku_id
+    AND t2.mall_id = t1.mall_id
 WHERE DATE(t1.apply_time) BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
                         AND DATEADD(${date_param}, ${end_offset}, "dd")
+
 ;
