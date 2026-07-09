@@ -321,6 +321,21 @@ def _write_single_target(
             else filtered_df.to_dict("records")
         )
 
+    # 获取附件全部失败的行 key 集合，用于写入时标记 partial
+    attachment_failed_row_keys: set[str] = set()
+    if coercer is not None and isinstance(filtered_df, pd.DataFrame):
+        failed_positions = getattr(coercer, "attachment_failed_rows", frozenset())
+        if failed_positions and "row_key" in filtered_df.columns:
+            row_key_series = filtered_df["row_key"].astype(str).reset_index(drop=True)
+            for pos in failed_positions:
+                if pos < len(row_key_series):
+                    attachment_failed_row_keys.add(row_key_series.iloc[pos])
+            if attachment_failed_row_keys:
+                logger.info(
+                    "Target '%s': %d row(s) with all attachments failed, will mark as partial",
+                    target.name, len(attachment_failed_row_keys),
+                )
+
     if persistence is not None:
         persistence.save_checkpoint(
             stage="upload_done", batch_index=0, counters={"records": len(records)}
@@ -339,6 +354,7 @@ def _write_single_target(
             and "row_key" in filtered_df.columns
             else None
         ),
+        attachment_failed_row_keys=attachment_failed_row_keys or None,
     )
 
     if persistence is not None:
@@ -570,6 +586,7 @@ def _write_records_batched(
     records: list[dict],
     persistence: RouteWritePersistence | None = None,
     row_keys: list[str] | None = None,
+    attachment_failed_row_keys: set[str] | None = None,
 ) -> int:
     """分批写入记录到飞书多维表格
 
@@ -607,10 +624,18 @@ def _write_records_batched(
                 start_idx = i
                 for offset in range(len(batch)):
                     row_key = row_keys[start_idx + offset]
+                    # 附件全部失败的行标记为 partial，以便 retry 时重试
+                    if (
+                        attachment_failed_row_keys
+                        and row_key in attachment_failed_row_keys
+                    ):
+                        write_status = "partial"
+                    else:
+                        write_status = "success"
                     persistence.append_write_event(
                         target_name=target_name,
                         row_key=row_key,
-                        write_status="success",
+                        write_status=write_status,
                         error_message=None,
                     )
         except Exception as e:
