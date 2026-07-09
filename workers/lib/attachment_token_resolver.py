@@ -410,6 +410,11 @@ class AttachmentTokenResolver:
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:
+        """判断是否为可重试错误（瞬态网络故障、服务端错误、限频）。
+
+        注意：requests.exceptions.ConnectionError 不是内置 ConnectionError 的子类，
+        因此 isinstance 检查无法覆盖 requests 包装的网络错误，需依赖文本匹配。
+        """
         if AttachmentTokenResolver._is_permanent_failure(exc):
             return False
         if isinstance(exc, RETRYABLE_EXCEPTIONS):
@@ -427,5 +432,12 @@ class AttachmentTokenResolver:
                 "99991400",
                 "frequency limit",
                 "rate limit",
+                # requests.exceptions.ConnectionError 包装的瞬态网络错误
+                "connection aborted",
+                "connection reset",
+                "remote end closed",
+                "max retries exceeded",
+                "broken pipe",
+                "eof occurred",
             )
         )
