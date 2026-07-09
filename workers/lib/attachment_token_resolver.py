@@ -11,6 +11,7 @@ Resolve attachment URLs into Feishu Bitable attachment payloads by:
 from __future__ import annotations
 
 import logging
+import random
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -31,6 +32,9 @@ logger = logging.getLogger("workers.lib.attachment_token_resolver")
 
 
 RETRYABLE_EXCEPTIONS = (TimeoutError, ConnectionError)
+
+# Rate limit 专用最大重试次数（不计入普通 max_retries 配额）
+MAX_RATE_LIMIT_RETRIES = 5
 
 
 def _extract_file_token(payload: Any) -> str | None:
@@ -122,13 +126,25 @@ class AttachmentTokenResolver:
                 resolved.append({"file_token": file_token})
         return resolved
 
+    @staticmethod
+    def _is_rate_limited(exc: Exception) -> bool:
+        """判断是否为飞书 API 限频错误 (code=99991400)。"""
+        text = str(exc).lower()
+        return any(
+            kw in text
+            for kw in ("99991400", "rate limit", "frequency limit")
+        )
+
     def resolve_single(self, url: str, *, row_key: str = "") -> str | None:
         with self._cache_lock:
             if url in self._token_cache:
                 return self._token_cache[url]
 
         last_error = None
-        for attempt in range(self.max_retries + 1):
+        normal_retries = 0
+        rate_limit_retries = 0
+
+        while True:
             temp_path = None
             try:
                 temp_path, content_type = download_url_to_tempfile(
@@ -183,7 +199,7 @@ class AttachmentTokenResolver:
                         field_name=self.field_name,
                         normalized_url=url,
                         upload_status="success",
-                        retry_count=attempt,
+                        retry_count=normal_retries + rate_limit_retries,
                         file_token=file_token,
                         error_type=None,
                         error_message=None,
@@ -192,6 +208,7 @@ class AttachmentTokenResolver:
                 return file_token
             except Exception as exc:
                 last_error = exc
+                is_rate_limit = self._is_rate_limited(exc)
                 retryable = self._is_retryable(exc)
                 if self.persistence is not None:
                     self.persistence.append_upload_event(
@@ -200,15 +217,33 @@ class AttachmentTokenResolver:
                         field_name=self.field_name,
                         normalized_url=url,
                         upload_status="failed",
-                        retry_count=attempt,
+                        retry_count=normal_retries + rate_limit_retries,
                         file_token=None,
                         error_type=type(exc).__name__,
                         error_message=str(exc),
-                        retryable=retryable,
+                        retryable=retryable or is_rate_limit,
                     )
-                if not retryable or attempt >= self.max_retries:
-                    break
-                time.sleep(self.backoff_seconds * (2**attempt))
+
+                if is_rate_limit:
+                    # Rate limit 专用退避：指数增长 + 随机抖动避免惊群
+                    rate_limit_retries += 1
+                    if rate_limit_retries > MAX_RATE_LIMIT_RETRIES:
+                        break
+                    base_sleep = min(2 ** rate_limit_retries, 30)
+                    jitter = random.uniform(0, base_sleep * 0.5)
+                    sleep_time = base_sleep + jitter
+                    logger.debug(
+                        "Rate limited for url=%s, retry %d/%d, sleeping %.1fs",
+                        url, rate_limit_retries, MAX_RATE_LIMIT_RETRIES, sleep_time,
+                    )
+                else:
+                    # 普通错误退避
+                    normal_retries += 1
+                    if not retryable or normal_retries > self.max_retries:
+                        break
+                    sleep_time = self.backoff_seconds * (2 ** (normal_retries - 1))
+
+                time.sleep(sleep_time)
             finally:
                 if temp_path:
                     safe_remove_file(temp_path)
