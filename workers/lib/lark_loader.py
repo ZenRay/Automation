@@ -246,6 +246,7 @@ def _write_single_target(
                 attachment_resolver.seed_token_cache(token_map)
 
     # 2. retry_failed_only 前置检查：无失败行时跳过整个写入（含清理）
+    skip_cleanup = False
     if persistence is not None and getattr(
         persistence_config, "retry_failed_only", False
     ):
@@ -261,9 +262,17 @@ def _write_single_target(
                 stage="write_done", batch_index=0, counters={"records": 0}
             )
             return 0
+        # 有失败行：跳过 cleanup，仅追加写入失败行（避免删除已成功数据）
+        skip_cleanup = True
+        logger.info(
+            "Target '%s': retry_failed_only enabled with %d failed rows, "
+            "skipping cleanup to preserve existing data",
+            target.name,
+            len(failed_rows),
+        )
 
-    # 3. 清理旧数据
-    if target.cleanup_conditions is not None:
+    # 3. 清理旧数据（retry_failed_only 时跳过，避免误删已成功写入的数据）
+    if target.cleanup_conditions is not None and not skip_cleanup:
         deleted_count = cleanup_target_table(client, target, table_id)
         logger.info(f"Target '{target.name}': cleaned up {deleted_count} old records")
 

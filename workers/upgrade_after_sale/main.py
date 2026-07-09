@@ -33,6 +33,7 @@ from workers.lib import (
     DateRangeParams,
     FieldTypeCoercer,
     PersistenceConfig,
+    RouteWritePersistence,
     SchemaValidator,
     execute_all_queries,
 )
@@ -141,14 +142,21 @@ def _replace_cleanup_windows(
 
 def _build_attachment_resolver(
     lark_client: LarkMultiDimTable,
+    persistence: RouteWritePersistence | None = None,
 ) -> AttachmentTokenResolver:
-    """附件解析器：由 lark_loader 在写入阶段注入到 coercer。"""
+    """附件解析器：由 lark_loader 在写入阶段注入到 coercer。
+
+    Args:
+        lark_client: 飞书多维表格客户端
+        persistence: 可选的持久化对象，注入后 resolve_single 会记录上传结果
+    """
     return AttachmentTokenResolver(
         client=lark_client,
         app_token=None,
         max_size_mb=ATTACHMENT_MAX_SIZE_MB,
         max_retries=2,
         backoff_seconds=0.4,
+        persistence=persistence,
     )
 
 
@@ -743,6 +751,19 @@ def run_upgrade_after_sale_pipeline(
             ),
         )
         logger.info(router.describe_routes(effective_routes))
+
+        # 注入持久化到附件解析器，确保 resolve_single 能够持久化上传结果
+        persistence_cfg = router._persistence_config
+        if enable_persistence and persistence_cfg is not None:
+            attachment_resolver.persistence = RouteWritePersistence(
+                artifact_dir=persistence_cfg.artifact_dir,
+                job_id=persistence_cfg.job_id,
+            )
+            logger.info(
+                "Attachment resolver persistence injected: dir=%s, job_id=%s",
+                persistence_cfg.artifact_dir,
+                persistence_cfg.job_id,
+            )
 
         # ── 并行预解析售后明细表附件 ──
         if "after_sale_item" in mc_data:
