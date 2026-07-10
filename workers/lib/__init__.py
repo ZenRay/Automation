@@ -28,6 +28,7 @@ from .transformer import DataTransformer
 from .lark_loader import write_to_all_targets, cleanup_target_table
 from .validator import SchemaValidator, ValidationReport, ValidationIssue
 from .router import DataRouter
+from .route_write_persistence import RouteWritePersistence
 
 __all__ = [
     # 配置数据模型
@@ -66,4 +67,6 @@ __all__ = [
     "ValidationIssue",
     # 数据路由
     "DataRouter",
+    # 持久化
+    "RouteWritePersistence",
 ]

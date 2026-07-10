@@ -44,8 +44,22 @@ class FieldTypeCoercer:
 
     def __init__(self, attachment_resolver=None):
         self.attachment_resolver = attachment_resolver
+        self._attachment_failed_rows: set[int] = set()
 
-    def coerce_for_write(self, value: Any, lark_type: int, ui_type: str = "") -> Any:
+    @property
+    def attachment_failed_rows(self) -> frozenset[int]:
+        """返回附件全部失败的行位置索引集合（只读副本）。"""
+        return frozenset(self._attachment_failed_rows)
+
+    def coerce_for_write(
+        self,
+        value: Any,
+        lark_type: int,
+        ui_type: str = "",
+        *,
+        row_idx: int | None = None,
+        row_key: str = "",
+    ) -> Any:
         """将单个单元格值转换为飞书写入格式
 
         Args:
@@ -78,7 +92,7 @@ class FieldTypeCoercer:
             elif lark_type == LarkFieldType.URL:
                 return self._coerce_url(value)
             elif lark_type == LarkFieldType.ATTACHMENT:
-                return self._coerce_attachment(value)
+                return self._coerce_attachment(value, row_idx=row_idx, row_key=row_key)
             else:
                 # 未知类型原样传递，避免数据丢失
                 logger.debug(
@@ -165,11 +179,14 @@ class FieldTypeCoercer:
         url = str(value)
         return {"link": url, "text": url}
 
-    def _coerce_attachment(self, value: Any) -> list[dict]:
+    def _coerce_attachment(
+        self, value: Any, *, row_idx: int | None = None, row_key: str = ""
+    ) -> list[dict]:
         """type=17 附件：归一化为 [{"file_token": "..."}] 格式。
 
-        当前第一版默认只做输入解析；若注入 attachment_resolver，
-        则可由 resolver 将 URL 下载并上传为 file_token。
+        当 attachment_resolver 存在时，逐个 URL 下载并上传为 file_token。
+        如果某行有附件 URL 但全部上传失败，记录 row_idx 到
+        _attachment_failed_rows，供 lark_loader 标记为 partial 写入。
         """
         normalized_urls = normalize_attachment_input(value)
         if not normalized_urls:
@@ -180,13 +197,31 @@ class FieldTypeCoercer:
 
         attachments = []
         for url in normalized_urls:
-            resolved = self.attachment_resolver(url)
+            if hasattr(self.attachment_resolver, "resolve_single"):
+                # 完整 resolver 对象 — 传 row_key 上下文
+                resolved = self.attachment_resolver.resolve_single(
+                    url,
+                    row_key=row_key,
+                )
+            else:
+                # 兼容旧接口: callable(url)
+                resolved = self.attachment_resolver(url)
             if resolved is None:
                 continue
             if isinstance(resolved, dict):
                 attachments.append(resolved)
             else:
                 attachments.append({"file_token": str(resolved)})
+
+        # 有附件 URL 但全部上传失败 → 标记行级失败
+        if not attachments and normalized_urls and row_idx is not None:
+            self._attachment_failed_rows.add(row_idx)
+            logger.warning(
+                "All %d attachment(s) failed for row_idx=%d, marking as attachment_failed",
+                len(normalized_urls),
+                row_idx,
+            )
+
         return attachments
 
     # ------------------------------------------------------------------
@@ -288,14 +323,19 @@ class FieldTypeCoercer:
             )
             raise KeyError(f"DataFrame missing required columns: {missing_cols}")
 
-        for row_idx, row in df.iterrows():
+        self._attachment_failed_rows.clear()
+
+        for pos, (row_idx, row) in enumerate(df.iterrows()):
             fields = {}
+            row_key = str(row.get("row_key", "")) if "row_key" in row.index else ""
             for mapping in field_mappings:
                 raw_value = row[mapping.source_col]
                 fields[mapping.target_field] = self.coerce_for_write(
                     raw_value,
                     lark_type=mapping.lark_type,
                     ui_type=mapping.lark_ui_type,
+                    row_idx=pos,
+                    row_key=row_key,
                 )
             records.append({"fields": fields})
 
