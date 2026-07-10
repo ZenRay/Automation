@@ -219,7 +219,8 @@ class RouteWritePersistence:
             key = (item.get("target_name", ""), item.get("row_key", ""))
             latest_status[key] = item.get("write_status", "")
         failed = [
-            key[1] for key, status in latest_status.items()
+            key[1]
+            for key, status in latest_status.items()
             if status in ("failed", "partial")
         ]
         return failed

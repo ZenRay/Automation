@@ -26,14 +26,14 @@ if str(PROJECT_ROOT) not in sys.path:
 from workers.lib.type_coercer import FieldTypeCoercer
 from workers.lib.models import FieldMapping, LarkFieldType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _make_attachment_mapping(
-    source_col: str = "附件", target_field: str = "附件",
+    source_col: str = "附件",
+    target_field: str = "附件",
 ) -> FieldMapping:
     return FieldMapping(
         source_col=source_col,
@@ -49,10 +49,12 @@ def _resolver_all_fail():
 
 def _resolver_some_fail(fail_urls: set[str]):
     """Returns a resolver that fails for specific URLs, succeeds for others."""
+
     def resolver(url):
         if url in fail_urls:
             return None
         return {"file_token": f"tok_{url}"}
+
     return resolver
 
 
@@ -92,7 +94,8 @@ class TestCoerceAttachmentFailureTracking:
         """When all URLs succeed, row is NOT marked as failed."""
         coercer = FieldTypeCoercer(attachment_resolver=_resolver_all_succeed())
         result = coercer._coerce_attachment(
-            "http://example.com/a.jpg", row_idx=2,
+            "http://example.com/a.jpg",
+            row_idx=2,
         )
         assert len(result) == 1
         assert coercer.attachment_failed_rows == frozenset()
@@ -101,7 +104,8 @@ class TestCoerceAttachmentFailureTracking:
         """Without attachment_resolver, no failure is tracked."""
         coercer = FieldTypeCoercer(attachment_resolver=None)
         result = coercer._coerce_attachment(
-            "http://example.com/a.jpg", row_idx=0,
+            "http://example.com/a.jpg",
+            row_idx=0,
         )
         # Without resolver, returns [{"url": ...}] format
         assert result == [{"url": "http://example.com/a.jpg"}]
@@ -124,14 +128,16 @@ class TestApplyToDataframeAttachmentFailure:
     def test_tracks_multiple_failed_rows(self):
         """Multiple rows with all-attachment-failure are all tracked."""
         coercer = FieldTypeCoercer(attachment_resolver=_resolver_all_fail())
-        df = pd.DataFrame({
-            "附件": [
-                "http://example.com/a.jpg",
-                "http://example.com/b.jpg",
-                "",  # empty — not a failure
-                "http://example.com/c.jpg",
-            ],
-        })
+        df = pd.DataFrame(
+            {
+                "附件": [
+                    "http://example.com/a.jpg",
+                    "http://example.com/b.jpg",
+                    "",  # empty — not a failure
+                    "http://example.com/c.jpg",
+                ],
+            }
+        )
         mappings = [_make_attachment_mapping()]
         records = coercer.apply_to_dataframe(df, mappings)
 

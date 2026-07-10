@@ -69,9 +69,7 @@ class TestResolveSingleWithPersistence:
             "workers.lib.attachment_token_resolver.download_url_to_tempfile"
         ) as mock_dl:
             mock_dl.return_value = ("/tmp/test.jpg", "image/jpeg")
-            with patch(
-                "workers.lib.attachment_token_resolver.safe_remove_file"
-            ):
+            with patch("workers.lib.attachment_token_resolver.safe_remove_file"):
                 result = resolver_with_persistence.resolve_single(
                     "https://example.com/test.jpg", row_key="row_1"
                 )
@@ -97,9 +95,7 @@ class TestResolveSingleWithPersistence:
             "workers.lib.attachment_token_resolver.download_url_to_tempfile"
         ) as mock_dl:
             mock_dl.return_value = ("/tmp/test.jpg", "image/jpeg")
-            with patch(
-                "workers.lib.attachment_token_resolver.safe_remove_file"
-            ):
+            with patch("workers.lib.attachment_token_resolver.safe_remove_file"):
                 result = resolver_with_persistence.resolve_single(
                     "https://example.com/fail.jpg", row_key="row_2"
                 )
@@ -131,19 +127,17 @@ class TestResolveSingleWithPersistence:
             "workers.lib.attachment_token_resolver.download_url_to_tempfile"
         ) as mock_dl:
             mock_dl.return_value = ("/tmp/test.jpg", "image/jpeg")
-            with patch(
-                "workers.lib.attachment_token_resolver.safe_remove_file"
-            ):
+            with patch("workers.lib.attachment_token_resolver.safe_remove_file"):
                 result = resolver.resolve_single("https://example.com/ok.jpg")
 
         assert result == "ft_no_persist"
 
 
-class TestResolveInputSnapshotWithPersistence:
-    """resolve() 方法中 input_snapshot 和 parsed_snapshot 持久化验证。"""
+class TestResolveNoLongerWritesSnapshots:
+    """resolve() 已移除 input_snapshot / parsed_snapshot 持久化（B.5）。"""
 
-    def test_resolve_calls_input_and_parsed_snapshot(self):
-        """resolve() 应调用 append_input_snapshot 和 append_parsed_snapshot。"""
+    def test_resolve_does_not_call_snapshot(self):
+        """resolve() 不再调用 append_input_snapshot / append_parsed_snapshot。"""
         client = MagicMock()
         client.app_token = "test_app_token"
         persistence = MagicMock()
@@ -155,18 +149,36 @@ class TestResolveInputSnapshotWithPersistence:
             target_name="test_target",
             field_name="附件字段",
         )
-
-        # resolve_single 返回 None（上传失败），避免完整上传流程
         resolver.resolve_single = MagicMock(return_value=None)
-
         resolver.resolve("https://example.com/photo.jpg")
 
-        persistence.append_input_snapshot.assert_called_once()
-        input_kwargs = persistence.append_input_snapshot.call_args[1]
-        assert input_kwargs["target_name"] == "test_target"
-        assert input_kwargs["field_name"] == "附件字段"
+        persistence.append_input_snapshot.assert_not_called()
+        persistence.append_parsed_snapshot.assert_not_called()
 
-        persistence.append_parsed_snapshot.assert_called_once()
-        parsed_kwargs = persistence.append_parsed_snapshot.call_args[1]
-        assert parsed_kwargs["parse_status"] == "success"
-        assert len(parsed_kwargs["normalized_urls"]) == 1
+    def test_resolve_single_empty_row_key_skips_persistence(self):
+        """resolve_single 在 row_key='' 时不写入 upload_events（pre-resolve 阶段）。"""
+        client = MagicMock()
+        client.app_token = "test_app_token"
+        persistence = MagicMock()
+        resolver = AttachmentTokenResolver(
+            client=client,
+            app_token="test_app_token",
+            max_retries=0,
+            backoff_seconds=0.1,
+            persistence=persistence,
+            target_name="test_target",
+        )
+        mock_response = {"data": {"file_token": "ft_123"}}
+        client.upload_attachment.return_value = mock_response
+
+        with patch(
+            "workers.lib.attachment_token_resolver.download_url_to_tempfile"
+        ) as mock_dl:
+            mock_dl.return_value = ("/tmp/test.jpg", "image/jpeg")
+            with patch("workers.lib.attachment_token_resolver.safe_remove_file"):
+                result = resolver.resolve_single(
+                    "https://example.com/test.jpg", row_key=""
+                )
+
+        assert result == "ft_123"
+        persistence.append_upload_event.assert_not_called()

@@ -616,7 +616,7 @@ def run_upload_pipeline(args: argparse.Namespace) -> int:
             attachment_separator=args.attachment_separator,
         )
         coercer = FieldTypeCoercer(
-            attachment_resolver=attachment_resolver.resolve_single,
+            attachment_resolver=attachment_resolver,
         )
         written_count = _write_single_target(
             lark_client,

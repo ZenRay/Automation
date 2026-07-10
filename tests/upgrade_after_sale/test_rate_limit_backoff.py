@@ -26,10 +26,10 @@ from workers.lib.attachment_token_resolver import (
     AttachmentTokenResolver,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_resolver(
     *,
@@ -54,6 +54,7 @@ class RateLimitError(Exception):
 
 class NormalRetryableError(ConnectionError):
     """Simulates a normal retryable error (ConnectionError is in RETRYABLE_EXCEPTIONS)."""
+
     pass
 
 
@@ -98,9 +99,13 @@ class TestIsRateLimited:
 
 @patch("workers.lib.attachment_token_resolver.safe_remove_file")
 @patch("workers.lib.attachment_token_resolver.guess_media_type", return_value="image")
-@patch("workers.lib.attachment_token_resolver.normalize_filename", return_value="file.jpg")
-@patch("workers.lib.attachment_token_resolver.download_url_to_tempfile",
-       return_value=("/tmp/fake.jpg", "image/jpeg"))
+@patch(
+    "workers.lib.attachment_token_resolver.normalize_filename", return_value="file.jpg"
+)
+@patch(
+    "workers.lib.attachment_token_resolver.download_url_to_tempfile",
+    return_value=("/tmp/fake.jpg", "image/jpeg"),
+)
 class TestResolveSingleBackoff:
     """Rate-limit vs normal retry behaviour in resolve_single."""
 
@@ -114,7 +119,11 @@ class TestResolveSingleBackoff:
     # --- Rate limit tests ---------------------------------------------------
 
     def test_rate_limit_uses_exponential_backoff(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Sleep times for rate limit should be 2^n + jitter (not 0.4*2^n)."""
         resolver = _make_resolver(max_retries=2, backoff_seconds=0.4)
@@ -131,10 +140,13 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, upload_side_effect)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=0.0):  # no jitter for predictable test
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform", return_value=0.0
+            ):  # no jitter for predictable test
                 result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result == "token_ok"
@@ -144,7 +156,11 @@ class TestResolveSingleBackoff:
         assert sleep_times == pytest.approx([2.0, 4.0, 8.0])
 
     def test_rate_limit_does_not_consume_max_retries(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Rate-limit retries should be independent of max_retries (default 2)."""
         resolver = _make_resolver(max_retries=2)
@@ -161,8 +177,9 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, upload_side_effect)
 
         with patch("workers.lib.attachment_token_resolver.time.sleep"):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=0.0):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform", return_value=0.0
+            ):
                 result = resolver.resolve_single("http://example.com/img.jpg")
 
         # Should succeed despite 4 rate-limit retries > max_retries=2
@@ -170,7 +187,11 @@ class TestResolveSingleBackoff:
         assert call_count["n"] == 5
 
     def test_rate_limit_gives_up_after_max_rate_limit_retries(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """After MAX_RATE_LIMIT_RETRIES (5) rate limit failures, return None."""
         resolver = _make_resolver()
@@ -181,10 +202,13 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, always_rate_limit)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=0.0):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform", return_value=0.0
+            ):
                 result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result is None
@@ -194,7 +218,11 @@ class TestResolveSingleBackoff:
         assert sleep_times == pytest.approx([2.0, 4.0, 8.0, 16.0, 30.0])
 
     def test_rate_limit_sleep_capped_at_30_seconds(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Sleep time should be capped at 30 seconds."""
         resolver = _make_resolver()
@@ -212,17 +240,24 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, upload_side_effect)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=0.0):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform", return_value=0.0
+            ):
                 resolver.resolve_single("http://example.com/img.jpg")
 
         # All sleeps capped at 30
         assert all(t <= 30.0 for t in sleep_times)
 
     def test_rate_limit_jitter_adds_random_component(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Jitter should add random.uniform(0, base*0.5) to sleep time."""
         resolver = _make_resolver()
@@ -239,10 +274,14 @@ class TestResolveSingleBackoff:
 
         jitter_value = 0.75
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=jitter_value):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform",
+                return_value=jitter_value,
+            ):
                 result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result == "tok"
@@ -252,7 +291,11 @@ class TestResolveSingleBackoff:
     # --- Normal retry tests -------------------------------------------------
 
     def test_normal_error_uses_original_backoff(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Non-rate-limit retryable errors should use backoff_seconds * 2^(n-1)."""
         resolver = _make_resolver(max_retries=3, backoff_seconds=0.4)
@@ -268,8 +311,10 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, upload_side_effect)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
             result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result == "tok"
@@ -277,7 +322,11 @@ class TestResolveSingleBackoff:
         assert sleep_times == pytest.approx([0.4, 0.8])
 
     def test_normal_error_exhausts_max_retries(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Non-retryable error or max_retries exceeded → returns None."""
         resolver = _make_resolver(max_retries=2, backoff_seconds=0.1)
@@ -288,8 +337,10 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, always_fail)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
             result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result is None
@@ -297,7 +348,11 @@ class TestResolveSingleBackoff:
         assert len(sleep_times) == 2
 
     def test_permanent_error_breaks_immediately(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Permanent (non-retryable) error should break without sleeping."""
         resolver = _make_resolver(max_retries=3)
@@ -308,8 +363,10 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, permanent_fail)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
             result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result is None
@@ -318,7 +375,11 @@ class TestResolveSingleBackoff:
     # --- Mixed scenario -----------------------------------------------------
 
     def test_rate_limit_then_normal_error_independent_counters(
-        self, _dl, _fn, _gmt, _rm,
+        self,
+        _dl,
+        _fn,
+        _gmt,
+        _rm,
     ):
         """Rate limit and normal retries use independent counters."""
         resolver = _make_resolver(max_retries=1, backoff_seconds=0.1)
@@ -338,10 +399,13 @@ class TestResolveSingleBackoff:
         self._setup_upload_side_effect(resolver, mixed_side_effect)
 
         sleep_times = []
-        with patch("workers.lib.attachment_token_resolver.time.sleep",
-                   side_effect=lambda s: sleep_times.append(s)):
-            with patch("workers.lib.attachment_token_resolver.random.uniform",
-                       return_value=0.0):
+        with patch(
+            "workers.lib.attachment_token_resolver.time.sleep",
+            side_effect=lambda s: sleep_times.append(s),
+        ):
+            with patch(
+                "workers.lib.attachment_token_resolver.random.uniform", return_value=0.0
+            ):
                 result = resolver.resolve_single("http://example.com/img.jpg")
 
         assert result == "tok"

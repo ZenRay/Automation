@@ -82,7 +82,10 @@ def test_pre_resolve_attachments_collects_urls_and_calls_batch():
                 "https://example.com/b.jpg",
             ],
             "客户申请举证图片": ["https://example.com/d.jpg", None],
-            "客户申请举证视频": ['["https://example.com/e.mp4","https://example.com/f.mp4"]', ""],
+            "客户申请举证视频": [
+                '["https://example.com/e.mp4","https://example.com/f.mp4"]',
+                "",
+            ],
             "其他字段": [1, 2],
         }
     )

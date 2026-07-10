@@ -126,9 +126,7 @@ def test_e2e_after_sale_upload():
     start_date = ref_date + timedelta(days=params.start_offset)
     end_date = ref_date + timedelta(days=params.end_offset)
     new_cleanup = CleanupCondition.date_window("申请日期", start_date, end_date)
-    new_target = dataclasses.replace(
-        TARGET_AFTER_SALE, cleanup_conditions=new_cleanup
-    )
+    new_target = dataclasses.replace(TARGET_AFTER_SALE, cleanup_conditions=new_cleanup)
     print(f"  清理窗口: 申请日期 in [{start_date}, {end_date})")
 
     write_to_all_targets(

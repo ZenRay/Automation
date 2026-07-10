@@ -307,11 +307,16 @@ def _write_single_target(
         ].copy()
 
     if coercer is not None:
+        # 如果 coercer 没有 attachment_resolver 但外部提供了，注入它
         if (
             attachment_resolver is not None
             and getattr(coercer, "attachment_resolver", None) is None
         ):
             coercer = type(coercer)(attachment_resolver=attachment_resolver)
+        # 设置 resolver 的 target_name（用于 upload_events 持久化）
+        resolver = getattr(coercer, "attachment_resolver", None)
+        if hasattr(resolver, "resolve_single"):
+            resolver.target_name = target.name
         records = coercer.apply_to_dataframe(filtered_df, target.field_mappings)
     else:
         # 假定 result_df 已经是 records 格式（list of {"fields": {...}}）
@@ -333,7 +338,8 @@ def _write_single_target(
             if attachment_failed_row_keys:
                 logger.info(
                     "Target '%s': %d row(s) with all attachments failed, will mark as partial",
-                    target.name, len(attachment_failed_row_keys),
+                    target.name,
+                    len(attachment_failed_row_keys),
                 )
 
     if persistence is not None:

@@ -27,8 +27,12 @@ def _make_target(name="test_target"):
         url="https://example.com/base/abc?table=tbl123&view=vew456",
         table_name="测试表",
         field_mappings=[
-            FieldMapping(source_col="id", target_field="id", lark_type=LarkFieldType.TEXT),
-            FieldMapping(source_col="value", target_field="value", lark_type=LarkFieldType.NUMBER),
+            FieldMapping(
+                source_col="id", target_field="id", lark_type=LarkFieldType.TEXT
+            ),
+            FieldMapping(
+                source_col="value", target_field="value", lark_type=LarkFieldType.NUMBER
+            ),
         ],
         cleanup_conditions=CleanupCondition.date_window(
             "日期", pd.Timestamp("2026-07-01").date(), pd.Timestamp("2026-07-09").date()

@@ -462,9 +462,7 @@ def run_upgrade_after_sale_pipeline(
         lark_client = _init_lark_client()
         mc_client = _init_mc_client()
         attachment_resolver = _build_attachment_resolver(lark_client)
-        coercer = FieldTypeCoercer(
-            attachment_resolver=attachment_resolver.resolve_single
-        )
+        coercer = FieldTypeCoercer(attachment_resolver=attachment_resolver)
     except Exception as e:
         logger.error("[Step 1/5] Client initialization failed: %s", e)
         return 1

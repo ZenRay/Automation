@@ -69,7 +69,9 @@ class TestRetryableClassification:
 
     def test_connection_aborted_message(self):
         """'Connection aborted.' in message → retryable."""
-        exc = Exception("('Connection aborted.', RemoteDisconnected('Remote end closed'))")
+        exc = Exception(
+            "('Connection aborted.', RemoteDisconnected('Remote end closed'))"
+        )
         assert _is_retryable(exc)
 
     def test_connection_reset_message(self):
@@ -156,6 +158,7 @@ class TestProductionErrorPatterns:
         """Exact error message from 2026-07-08 upload_events.jsonl (394 occurrences)."""
         # Simulate requests.exceptions.ConnectionError wrapping RemoteDisconnected
         from http.client import RemoteDisconnected
+
         inner = RemoteDisconnected("Remote end closed connection without response")
         exc = requests.exceptions.ConnectionError("Connection aborted.", inner)
         assert _is_retryable(exc), (

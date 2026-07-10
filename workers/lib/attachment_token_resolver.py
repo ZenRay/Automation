@@ -91,22 +91,6 @@ class AttachmentTokenResolver:
         ):
             parse_error = "Malformed bracket attachment input"
 
-        if self.persistence is not None:
-            self.persistence.append_input_snapshot(
-                target_name=self.target_name,
-                row_key=row_key,
-                field_name=self.field_name,
-                raw_value=value,
-            )
-            self.persistence.append_parsed_snapshot(
-                target_name=self.target_name,
-                row_key=row_key,
-                field_name=self.field_name,
-                normalized_urls=urls,
-                parse_status="success" if urls else "failed",
-                parse_error=parse_error,
-            )
-
         if not urls:
             if parse_error:
                 logger.warning(
@@ -130,10 +114,7 @@ class AttachmentTokenResolver:
     def _is_rate_limited(exc: Exception) -> bool:
         """判断是否为飞书 API 限频错误 (code=99991400)。"""
         text = str(exc).lower()
-        return any(
-            kw in text
-            for kw in ("99991400", "rate limit", "frequency limit")
-        )
+        return any(kw in text for kw in ("99991400", "rate limit", "frequency limit"))
 
     def resolve_single(self, url: str, *, row_key: str = "") -> str | None:
         with self._cache_lock:
@@ -192,7 +173,7 @@ class AttachmentTokenResolver:
                 with self._cache_lock:
                     self._token_cache[url] = file_token
                     self._failed_reason_cache.pop(url, None)
-                if self.persistence is not None:
+                if self.persistence is not None and row_key:
                     self.persistence.append_upload_event(
                         target_name=self.target_name,
                         row_key=row_key,
@@ -210,7 +191,7 @@ class AttachmentTokenResolver:
                 last_error = exc
                 is_rate_limit = self._is_rate_limited(exc)
                 retryable = self._is_retryable(exc)
-                if self.persistence is not None:
+                if self.persistence is not None and row_key:
                     self.persistence.append_upload_event(
                         target_name=self.target_name,
                         row_key=row_key,
@@ -229,12 +210,15 @@ class AttachmentTokenResolver:
                     rate_limit_retries += 1
                     if rate_limit_retries > MAX_RATE_LIMIT_RETRIES:
                         break
-                    base_sleep = min(2 ** rate_limit_retries, 30)
+                    base_sleep = min(2**rate_limit_retries, 30)
                     jitter = random.uniform(0, base_sleep * 0.5)
                     sleep_time = base_sleep + jitter
                     logger.debug(
                         "Rate limited for url=%s, retry %d/%d, sleeping %.1fs",
-                        url, rate_limit_retries, MAX_RATE_LIMIT_RETRIES, sleep_time,
+                        url,
+                        rate_limit_retries,
+                        MAX_RATE_LIMIT_RETRIES,
+                        sleep_time,
                     )
                 else:
                     # 普通错误退避
