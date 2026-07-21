@@ -7,6 +7,20 @@ export TZ='Asia/Shanghai'
 SCHEDULE_HOUR="${SCHEDULE_HOUR:-7}"
 SCHEDULE_MIN="${SCHEDULE_MIN:-30}"
 
+# 逗号分隔的任务名，传递给 cron_task.sh --skip-task
+# 默认跳过 cr_trail（数据量超飞书 5 万行限制，待修复后移除此默认值）
+CRON_SKIP_TASKS="${CRON_SKIP_TASKS:-cr_trail}"
+
+# 构建 --skip-task 参数数组
+SKIP_ARGS=()
+if [ -n "$CRON_SKIP_TASKS" ]; then
+    IFS=',' read -ra _tasks <<< "$CRON_SKIP_TASKS"
+    for _t in "${_tasks[@]}"; do
+        SKIP_ARGS+=("--skip-task" "$_t")
+    done
+    echo "[scheduler] Skip tasks: $CRON_SKIP_TASKS"
+fi
+
 echo "[scheduler] Starting, schedule: daily at ${SCHEDULE_HOUR}:$(printf '%02d' "$SCHEDULE_MIN")"
 
 while true; do
@@ -25,7 +39,7 @@ while true; do
     sleep "$((wait_min * 60))"
 
     echo "[scheduler] $(date '+%Y-%m-%d %H:%M:%S') Running cron_task.sh"
-    if bash /app/workers/cron_task.sh; then
+    if bash /app/workers/cron_task.sh "${SKIP_ARGS[@]+"${SKIP_ARGS[@]}"}"; then
         echo "[scheduler] $(date '+%Y-%m-%d %H:%M:%S') cron_task.sh finished successfully"
     else
         exit_code=$?
