@@ -166,6 +166,11 @@ TARGET_OKR_CAT1 = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
+            source_col="送达毛重",
+            target_field="送达毛重",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
             source_col="剔除特定品类送达金额",
             target_field="剔除特定品类送达金额",
             lark_type=LarkFieldType.NUMBER,
