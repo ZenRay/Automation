@@ -1,3 +1,8 @@
+/*
+一级类目统计
+*/
+
+-- 1. 基础信息： 商城维度信息 和门店商品标签、前台类目信息
 WITH mall AS(
     SELECT
         t1.mall_id
@@ -151,6 +156,7 @@ WITH mall AS(
         ,t1.category_level1_id -- `一级类目id`
         ,t1.category_level1_name -- `一级类目名称`
         ,SUM(t1.delivered_goods_amt) AS delivered_goods_amt -- `送达金额`
+        ,SUM(t1.deliveried_gross_wgt) AS deliveried_gross_wgt -- `送达毛重`
         ,SUM(t1.is_filtered * t1.delivered_goods_amt) AS delivered_goods_amt_filtered -- `剔除特定品类送达金额`
         ,SUM(t1.final_refund_amt) AS final_refund_amt -- `赔付金额`
         ,SUM(t1.delivered_goods_num) AS delivered_goods_num -- `送达数量`
@@ -221,6 +227,7 @@ WITH mall AS(
             ) AS is_special_operate -- `是否特殊品类运营`
             ,t1.delivered_goods_amt -- `送达金额`
             ,t1.delivered_goods_num -- `送达数量`
+            ,t1.deliveried_gross_wgt -- `送达毛重`
 
             -- 规模
             ,IF(t1.category_level1_name IN ("蔬菜", "干货"), 1, 0) AS is_vegitable -- `是否蔬菜类目`
@@ -324,6 +331,7 @@ SELECT
         NVL(t3.ordered_store_num / t4.ordered_store_num, 0) , 5
     ) AS `日活覆盖率`
     ,NVL(t1.delivered_goods_amt,0) AS `送达金额`
+    ,NVL(t1.deliveried_gross_wgt,0) AS `送达毛重`
     ,NVL(t1.delivered_goods_amt_filtered,0) AS `剔除特定品类送达金额`
     ,NVL(t1.final_refund_amt,0) AS `赔付金额`
     ,NVL(t1.delivered_goods_num,0) AS `送达数量`
@@ -334,8 +342,6 @@ SELECT
     ,NVL(t1.sku_num_sold,0) AS `动销sku数`
     ,NVL(t1.delivered_goods_amt_ka_operate,0) AS `ka运营品类送达金额`
     ,NVL(t1.final_refund_amt_ka_operate,0) AS `ka运营品类赔付金额`
-
-
 
     ,NVL(t1.cat4_num_onsale,0) AS `在售四级类目数`
     ,NVL(t1.cate4_num_sold,0) AS `动销四级类目数`
