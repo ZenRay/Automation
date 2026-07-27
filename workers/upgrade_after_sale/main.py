@@ -231,16 +231,14 @@ def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
             raise ValueError(f"Empty row_key detected for route '{route_name}'")
         return row_key
     elif route_name == "sku_stat_detail":
-        # 五级复合键：商家id + 一级类目id + 四级类目id + 商品id + 日期
-        for col in ("商家id", "一级类目id", "四级类目id", "商品id", "日期"):
+        # 四级复合键：商家id + 四级类目id + 商品id + 日期
+        for col in ("商家id", "四级类目id", "商品id", "日期"):
             if col not in df.columns:
                 raise ValueError(
                     f"Missing row key column '{col}' for route '{route_name}'"
                 )
         row_key = (
             df["商家id"].astype(str)
-            + "_"
-            + df["一级类目id"].astype(str)
             + "_"
             + df["四级类目id"].astype(str)
             + "_"
