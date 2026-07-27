@@ -7,12 +7,12 @@ SELECT
     ,t1.ordered_goods_amt AS `下单金额`
     ,t1.delivered_goods_num AS `送达数量`
     ,t1.delivered_goods_amt AS `送达金额`
-    ,t2.payment_amt AS `实际金额`
+    ,t2.payment_amt AS `实付金额`
     ,t1.final_refund_amt_order_time AS `售后赔付金额`
     ,t1.final_refund_amt_order_time_quality AS `品质问题售后赔付金额`
     ,t1.commission_amt AS `平台抽佣金额`
     ,t1.final_refund_amt AS `自然日售后赔付金额`
-
+    
 FROM datawarehouse_max.dws_store_mall_store_category_level1_base_daily_asc t1
 LEFT JOIN (
     SELECT
