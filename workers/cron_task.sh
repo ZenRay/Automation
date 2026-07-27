@@ -288,7 +288,7 @@ UA_BASE_ARGS=(
     --as-end -1
     --order-start -1
     --order-end 0
-    --store-stat-start -6
+    --store-stat-start -5
     --store-stat-end -1
     --store-cat1-stat-start -7
     --store-cat1-stat-end 0
@@ -298,6 +298,8 @@ UA_BASE_ARGS=(
     --mct-cat4-stat-end 0
     --sku-stat-start -15
     --sku-stat-end 0
+    --mct-stat-start -15
+    --mct-stat-end 0
     --enable-persistence
     --persistence-dir "$PERSISTENCE_DIR/upgrade_after_sale"
     --job-id "$RUN_DATE"
