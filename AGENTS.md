@@ -201,27 +201,40 @@ git commit  # 如 merge 自动产生 commit 则跳过
 git checkout workers
 ```
 
-**分支职责**:
-- `workers` — 开发分支，所有功能变更首先提交到此分支
+**分支职责**（两段式）:
+- `workers` — 业务开发分支，所有功能变更首先提交到此分支
 - `production` — 生产分支，仅通过 merge workers 获得变更
 
-### 三段式提交流程（紧急修复/回滚）
+### 三段式提交流程（影响基础服务时使用）
 
-适用于需要跳过 workers 直接修复 production 的场景：
+适用于影响基础服务（如 `automation/`、`workers/lib/`、配置文件等共享模块）的变更：
 
 ```bash
-# Stage 1: 在 workers 分支提交（保留完整历史）
-git checkout workers
+# Stage 1: 在 master 分支提交基础服务变更
+git checkout master
 git add <files>
 git commit -m "<type>(<scope>): <subject>"
 
-# Stage 2: 合并到 production 分支
+# Stage 2: 合并到 workers 分支
+git checkout workers
+git merge master -m "Merge master: <简要描述>"
+git add <files>  # 如有业务层联动的修改
+git commit -m "<type>(<scope>): <业务层适配描述>"  # 可选
+
+# Stage 3: 合并到 production 分支
 git checkout production
 git merge workers -m "Merge: <简要描述>"
 
-# Stage 3: 验证并回到 workers
+# 回到 workers 分支（不 push，等待用户指示）
 git checkout workers
 ```
+
+**分支职责**:
+- `master` — 基础服务分支，存放共享模块和基础设施代码
+- `workers` — 业务开发分支，承接 master 变更并叠加业务逻辑
+- `production` — 生产分支，仅通过 merge workers 获得变更
+
+**触发条件**: 仅当变更涉及基础服务时才使用三段式，常规业务变更使用两段式即可
 
 ### 提交前检查
 
