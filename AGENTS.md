@@ -170,18 +170,66 @@ API_KEY = lark_config.get("prod", "APP_SECRET")
 
 ---
 
-## 📤 提交
+# 📤 提交与发布
 
-**提交前检查**:
+### ⛔ 禁止自动推送
+
+**未经用户明确指示，严禁执行 `git push`。** Agent 只负责本地 commit，推送操作由用户自行决定和执行。
+
+### 提交信息格式
+
+`<type>(<scope>): <subject>`
+
+类型: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
+
+### 两段式提交流程（标准）
+
+适用于常规功能开发和 Bug 修复：
+
+```bash
+# Stage 1: 在 workers 分支提交
+git checkout workers
+git add <files>
+git commit -m "<type>(<scope>): <subject>"
+
+# Stage 2: 合并到 production 分支并提交
+git checkout production
+git merge workers -m "Merge: <简要描述>"
+git commit  # 如 merge 自动产生 commit 则跳过
+
+# 回到 workers 分支（不 push，等待用户指示）
+git checkout workers
+```
+
+**分支职责**:
+- `workers` — 开发分支，所有功能变更首先提交到此分支
+- `production` — 生产分支，仅通过 merge workers 获得变更
+
+### 三段式提交流程（紧急修复/回滚）
+
+适用于需要跳过 workers 直接修复 production 的场景：
+
+```bash
+# Stage 1: 在 workers 分支提交（保留完整历史）
+git checkout workers
+git add <files>
+git commit -m "<type>(<scope>): <subject>"
+
+# Stage 2: 合并到 production 分支
+git checkout production
+git merge workers -m "Merge: <简要描述>"
+
+# Stage 3: 验证并回到 workers
+git checkout workers
+```
+
+### 提交前检查
+
 ```bash
 python test_env.py          # 运行测试
 black --check .             # 检查格式
 python -m workers.okr.main  # 验证功能
 ```
-
-**提交信息格式**: `<type>(<scope>): <subject>`
-
-类型: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
 
 ---
 
