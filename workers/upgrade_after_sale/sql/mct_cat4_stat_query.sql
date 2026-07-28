@@ -15,7 +15,7 @@ WITH dt_range AS(
         ,t1.category_level1_name -- `一级类目名称`
         ,t1.category_level4_id -- `四级类目id`
         ,t1.category_level4_name -- `四级类目名称`
-        
+
         ,t1.ordered_store_num -- `下单店铺数`
         ,t1.delivered_goods_amt -- `送达金额`
         ,t1.final_refund_amt_order_time -- `售后赔付金额`
@@ -53,7 +53,7 @@ WITH dt_range AS(
         FROM datawarehouse_max.dwt_order_after_sale_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset} -40, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
-            
+
             AND DATE(t1.order_create_time) BETWEEN DATEADD(${date_param}, ${start_offset} -30, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
             AND t1.mall_id = 871
@@ -135,14 +135,14 @@ FROM(
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -6, "dd") AND t1.dt, t2.final_refund_amt_order_time_quality, 0)) AS final_refund_amt_order_time_quality_m6dtcd -- `近7天品质问题售后赔付金额`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -6, "dd") AND t1.dt, t2.after_sale_num_order_time, 0)) AS after_sale_num_m6dtcd -- `近7天售后数量`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -6, "dd") AND t1.dt, t2.after_sale_ticket_num, 0)) AS after_sale_ticket_num_m6dtcd -- `近7天售后单数量`
-        
+
         ,COUNT(DISTINCT IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -29, "dd") AND t1.dt AND t2.ordered_store_num>0, t2.dt, NULL)) AS ordered_days_m29dtcd -- `近30天下单天数`
         ,COUNT(DISTINCT IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -6, "dd") AND t1.dt AND t2.ordered_store_num>0, t2.dt, NULL)) AS ordered_days_m6dtcd -- `近7天下单天数`
     FROM dt_range t1
     LEFT JOIN temp t2
         ON t2.dummy = t1.dummy
         AND t2.dt BETWEEN DATEADD(DATE(t1.dt), -30, "dd") AND t1.dt
-        
+
     GROUP BY t1.dt
         ,t2.merchant_id
         ,t2.category_level1_id -- `一级类目id`
@@ -151,28 +151,24 @@ FROM(
 
 JOIN (
     SELECT
-        t1.dt
-        ,t1.merchant_id
+        t1.merchant_id
         ,t1.merchant_name
         ,t1.category_level1_id
         ,t1.category_level1_name
         ,t1.category_level4_id
         ,t1.category_level4_name
     FROM datawarehouse_max.dim_goods_daily_full  t1
-    WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
-            AND DATEADD(${date_param}, ${end_offset}, "dd")
+    WHERE t1.dt = MAX_PT("datawarehouse_max.dim_goods_daily_full")
         AND t1.mall_id = 871
         AND INSTR(t1.category_level1_name, "水果") > 0
-    GROUP BY t1.dt
-        ,t1.merchant_id
+    GROUP BY t1.merchant_id
         ,t1.merchant_name
         ,t1.category_level1_id
         ,t1.category_level1_name
         ,t1.category_level4_id
         ,t1.category_level4_name
 ) t2
-    ON t2.dt = t1.dt
-    AND t2.merchant_id = t1.merchant_id
+    ON t2.merchant_id = t1.merchant_id
     AND t2.category_level4_id = t1.category_level4_id
     AND t2.category_level1_id = t1.category_level1_id
 

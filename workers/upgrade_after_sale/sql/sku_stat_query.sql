@@ -19,7 +19,7 @@ WITH dt_range AS(
         ,t1.category_level4_id -- `四级类目id`
         ,t1.category_level4_name -- `四级类目名称`
         ,t1.sku_id -- `商品id`
-        
+
         ,t1.ordered_store_num -- `下单店铺数`
         ,t1.delivered_goods_amt -- `送达金额`
         ,t2.payment_amt -- `实付金额`
@@ -35,7 +35,7 @@ WITH dt_range AS(
             ,t1.sku_id
             ,SUM(t1.payment_amt) AS payment_amt
         FROM datawarehouse_max.dwt_order_order_item_daily_asc t1
-    
+
         WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset} -8, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
             AND t1.mall_id = 871
@@ -54,7 +54,7 @@ WITH dt_range AS(
         FROM datawarehouse_max.dwt_order_after_sale_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset} -8, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
-            
+
             AND DATE(t1.order_create_time) BETWEEN DATEADD(${date_param}, ${start_offset} -15, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
             AND t1.mall_id = 871
@@ -145,14 +145,12 @@ FROM(
     LEFT JOIN temp t2
     ON t2.dummy = t1.dummy
         AND t2.dt BETWEEN DATEADD(DATE(t1.dt), -8, "dd") AND t1.dt
-        
+
     GROUP BY t1.dt
         ,t2.sku_id
 ) t1
 JOIN datawarehouse_max.dim_goods_daily_full t2
-    ON t2.dt BETWEEN DATEADD(${date_param}, ${start_offset}, "dd")
-        AND DATEADD(${date_param}, ${end_offset}, "dd")
-    AND t2.dt = t1.dt
+    ON t2.dt = MAX_PT("datawarehouse_max.dim_goods_daily_full")
     AND t2.sku_id = t1.sku_id
     AND t2.mall_id = 871
 
