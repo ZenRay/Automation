@@ -288,7 +288,7 @@ UA_BASE_ARGS=(
     --as-end -1
     --order-start -1
     --order-end 0
-    --store-stat-start -5
+    --store-stat-start -2
     --store-stat-end -1
     --store-cat1-stat-start -7
     --store-cat1-stat-end 0
