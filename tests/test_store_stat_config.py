@@ -33,7 +33,7 @@ def test_query_windows_contains_store_stat():
 
 
 def test_target_store_stat_field_count():
-    assert len(TARGET_STORE_STAT.field_mappings) == 47
+    assert len(TARGET_STORE_STAT.field_mappings) == 48
 
 
 def test_target_store_stat_table_name():
@@ -50,7 +50,7 @@ def test_target_store_stat_field_types():
     # 店铺id 为 NUMBER 类型
     assert mapping["店铺id"].lark_type == LarkFieldType.NUMBER
 
-    # 其余 45 个指标字段均为 NUMBER 类型
+    # 其余 46 个指标字段均为 NUMBER 类型
     non_numeric = [
         col
         for col, m in mapping.items()
