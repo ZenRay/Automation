@@ -170,18 +170,79 @@ API_KEY = lark_config.get("prod", "APP_SECRET")
 
 ---
 
-## 📤 提交
+# 📤 提交与发布
 
-**提交前检查**:
+### ⛔ 禁止自动推送
+
+**未经用户明确指示，严禁执行 `git push`。** Agent 只负责本地 commit，推送操作由用户自行决定和执行。
+
+### 提交信息格式
+
+`<type>(<scope>): <subject>`
+
+类型: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
+
+### 两段式提交流程（标准）
+
+适用于常规功能开发和 Bug 修复：
+
+```bash
+# Stage 1: 在 workers 分支提交
+git checkout workers
+git add <files>
+git commit -m "<type>(<scope>): <subject>"
+
+# Stage 2: 合并到 production 分支并提交
+git checkout production
+git merge workers -m "Merge: <简要描述>"
+git commit  # 如 merge 自动产生 commit 则跳过
+
+# 回到 workers 分支（不 push，等待用户指示）
+git checkout workers
+```
+
+**分支职责**（两段式）:
+- `workers` — 业务开发分支，所有功能变更首先提交到此分支
+- `production` — 生产分支，仅通过 merge workers 获得变更
+
+### 三段式提交流程（影响基础服务时使用）
+
+适用于影响基础服务（如 `automation/`、`workers/lib/`、配置文件等共享模块）的变更：
+
+```bash
+# Stage 1: 在 master 分支提交基础服务变更
+git checkout master
+git add <files>
+git commit -m "<type>(<scope>): <subject>"
+
+# Stage 2: 合并到 workers 分支
+git checkout workers
+git merge master -m "Merge master: <简要描述>"
+git add <files>  # 如有业务层联动的修改
+git commit -m "<type>(<scope>): <业务层适配描述>"  # 可选
+
+# Stage 3: 合并到 production 分支
+git checkout production
+git merge workers -m "Merge: <简要描述>"
+
+# 回到 workers 分支（不 push，等待用户指示）
+git checkout workers
+```
+
+**分支职责**:
+- `master` — 基础服务分支，存放共享模块和基础设施代码
+- `workers` — 业务开发分支，承接 master 变更并叠加业务逻辑
+- `production` — 生产分支，仅通过 merge workers 获得变更
+
+**触发条件**: 仅当变更涉及基础服务时才使用三段式，常规业务变更使用两段式即可
+
+### 提交前检查
+
 ```bash
 python test_env.py          # 运行测试
 black --check .             # 检查格式
 python -m workers.okr.main  # 验证功能
 ```
-
-**提交信息格式**: `<type>(<scope>): <subject>`
-
-类型: `feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
 
 ---
 
