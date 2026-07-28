@@ -273,6 +273,7 @@ TARGET_STORE_STAT = LarkTargetConfig(
         _fm("自然日售后赔付金额", LarkFieldType.NUMBER),
         _fm("平台抽佣金额", LarkFieldType.NUMBER),
         _fm("近90天下单金额", LarkFieldType.NUMBER),
+        _fm("近90天下单天数", LarkFieldType.NUMBER),
         _fm("近30天下单金额", LarkFieldType.NUMBER),
         _fm("近30天送达金额", LarkFieldType.NUMBER),
         _fm("近30天送达数量", LarkFieldType.NUMBER),
