@@ -94,4 +94,5 @@ def test_data_routes_order():
         "store_cat1_stat_detail",
         "order_detail",
         "after_sale_detail",
+        "dim_sku_detail",
     ]
