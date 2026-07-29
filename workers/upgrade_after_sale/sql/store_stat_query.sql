@@ -18,6 +18,11 @@ WITH dt_range AS(
 
             ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
         ) AS ordered_goods_amt_m89tcd
+        ,COUNT(DISTINCT t1.dt) FILTER(WHERE t1.ordered_goods_num>0) OVER(
+            PARTITION BY customer_store_id
+            ORDER BY CAST(dt AS TIMESTAMP)
+            ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
+        ) AS ordered_days_m89tcd
     FROM datawarehouse_max.dws_store_mall_store_base_daily_asc t1
     WHERE dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 89, "dd")
                 AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
@@ -189,56 +194,58 @@ WITH dt_range AS(
 
 
 SELECT
-    t1.dt AS `日期`
-    ,t1.customer_store_id AS `店铺id`
-    ,t1.ordered_goods_amt AS `下单金额`
-    ,t1.delivered_goods_amt AS `送达金额`
-    ,t1.delivered_goods_num AS `送达数量`
-    ,t1.after_sale_num_quality_order_time AS `质量问题售后数量`
-    ,t1.after_sale_num_order_time AS `售后数量`
-    ,t1.final_refund_amt_order_time_quality AS `质量问题售后赔付金额`
-    ,t1.final_refund_amt_order_time AS `售后赔付金额`
-    ,t1.final_refund_amt AS `自然日售后赔付金额`
-    ,t1.commission_amt AS `平台抽佣金额`
+	t1.dt AS `日期`
+	,t1.customer_store_id AS `店铺id`
+	,t1.ordered_goods_amt AS `下单金额`
+	,t1.delivered_goods_amt AS `送达金额`
+	,t1.delivered_goods_num AS `送达数量`
+	,t1.after_sale_num_quality_order_time AS `质量问题售后数量`
+	,t1.after_sale_num_order_time AS `售后数量`
+	,t1.final_refund_amt_order_time_quality AS `质量问题售后赔付金额`
+	,t1.final_refund_amt_order_time AS `售后赔付金额`
+	,t1.final_refund_amt AS `自然日售后赔付金额`
+	,t1.commission_amt AS `平台抽佣金额`
 
     ,t2.ordered_goods_amt_m89tcd AS `近90天下单金额`
-    ,t1.ordered_goods_amt_m29tcd AS `近30天下单金额`
-    ,t1.delivered_goods_amt_m29tcd AS `近30天送达金额`
-    ,t1.delivered_goods_num_m29tcd AS `近30天送达数量`
-    ,t1.after_sale_num_quality_order_time_m29tcd AS `近30天质量问题售后数量`
-    ,t1.after_sale_num_order_time_m29tcd AS `近30天售后数量`
-    ,t1.final_refund_amt_order_time_quality_m29tcd AS `近30天质量问题售后赔付金额`
-    ,t1.final_refund_amt_order_time_m29tcd AS `近30天售后赔付金额`
-    ,t1.final_refund_amt_m29tcd AS `近30天自然日售后赔付金额`
-    ,t1.commission_amt_m29tcd AS `近30天平台抽佣金额`
+    ,t2.ordered_days_m89tcd AS `近90天下单天数`
 
-    ,t1.ordered_goods_amt_m13tcd AS `近14天下单金额`
-    ,t1.delivered_goods_amt_m13tcd AS `近14天送达金额`
-    ,t1.delivered_goods_num_m13tcd AS `近14天送达数量`
-    ,t1.after_sale_num_quality_order_time_m13tcd AS `近14天质量问题售后数量`
-    ,t1.after_sale_num_order_time_m13tcd AS `近14天售后数量`
-    ,t1.final_refund_amt_order_time_quality_m13tcd AS `近14天质量问题售后赔付金额`
-    ,t1.final_refund_amt_order_time_m13tcd AS `近14天售后赔付金额`
-    ,t1.final_refund_amt_m13tcd AS `近14天自然日售后赔付金额`
-    ,t1.commission_amt_m13tcd AS `近14天平台抽佣金额`
-    ,t1.ordered_goods_amt_m6tcd AS `近7天下单金额`
-    ,t1.delivered_goods_amt_m6tcd AS `近7天送达金额`
-    ,t1.delivered_goods_num_m6tcd AS `近7天送达数量`
-    ,t1.after_sale_num_quality_order_time_m6tcd AS `近7天质量问题售后数量`
-    ,t1.after_sale_num_order_time_m6tcd AS `近7天售后数量`
-    ,t1.final_refund_amt_order_time_quality_m6tcd AS `近7天质量问题售后赔付金额`
-    ,t1.final_refund_amt_order_time_m6tcd AS `近7天售后赔付金额`
-    ,t1.final_refund_amt_m6tcd AS `近7天自然日售后赔付金额`
-    ,t1.commission_amt_m6tcd AS `近7天平台抽佣金额`
+	,t1.ordered_goods_amt_m29tcd AS `近30天下单金额`
+	,t1.delivered_goods_amt_m29tcd AS `近30天送达金额`
+	,t1.delivered_goods_num_m29tcd AS `近30天送达数量`
+	,t1.after_sale_num_quality_order_time_m29tcd AS `近30天质量问题售后数量`
+	,t1.after_sale_num_order_time_m29tcd AS `近30天售后数量`
+	,t1.final_refund_amt_order_time_quality_m29tcd AS `近30天质量问题售后赔付金额`
+	,t1.final_refund_amt_order_time_m29tcd AS `近30天售后赔付金额`
+	,t1.final_refund_amt_m29tcd AS `近30天自然日售后赔付金额`
+	,t1.commission_amt_m29tcd AS `近30天平台抽佣金额`
+
+	,t1.ordered_goods_amt_m13tcd AS `近14天下单金额`
+	,t1.delivered_goods_amt_m13tcd AS `近14天送达金额`
+	,t1.delivered_goods_num_m13tcd AS `近14天送达数量`
+	,t1.after_sale_num_quality_order_time_m13tcd AS `近14天质量问题售后数量`
+	,t1.after_sale_num_order_time_m13tcd AS `近14天售后数量`
+	,t1.final_refund_amt_order_time_quality_m13tcd AS `近14天质量问题售后赔付金额`
+	,t1.final_refund_amt_order_time_m13tcd AS `近14天售后赔付金额`
+	,t1.final_refund_amt_m13tcd AS `近14天自然日售后赔付金额`
+	,t1.commission_amt_m13tcd AS `近14天平台抽佣金额`
+	,t1.ordered_goods_amt_m6tcd AS `近7天下单金额`
+	,t1.delivered_goods_amt_m6tcd AS `近7天送达金额`
+	,t1.delivered_goods_num_m6tcd AS `近7天送达数量`
+	,t1.after_sale_num_quality_order_time_m6tcd AS `近7天质量问题售后数量`
+	,t1.after_sale_num_order_time_m6tcd AS `近7天售后数量`
+	,t1.final_refund_amt_order_time_quality_m6tcd AS `近7天质量问题售后赔付金额`
+	,t1.final_refund_amt_order_time_m6tcd AS `近7天售后赔付金额`
+	,t1.final_refund_amt_m6tcd AS `近7天自然日售后赔付金额`
+	,t1.commission_amt_m6tcd AS `近7天平台抽佣金额`
     ,t1.commission_amt_cdta6d AS `后7天平台抽佣金额`
 
     ,t1.order_ticked_num_m29tcd AS `近30天订单数量`
     ,t1.order_item_ticked_num_m29tcd AS `近30天明细订单数量`
     ,t1.withdraw_after_sale_ticket_num_m29tcd AS `近30天自然日撤销售后单数量`
     ,t1.total_after_sale_ticket_num_m29tcd AS `近30天自然日售后单数量`
-    ,t1.ordered_days_m29tcd AS `近30天下单天数`
-    ,t1.ordered_days_m13tm7 AS `m13到m7下单天数`
-    ,t1.ordered_days_m6tcd AS `近7天下单天数`
+	,t1.ordered_days_m29tcd AS `近30天下单天数`
+	,t1.ordered_days_m13tm7 AS `m13到m7下单天数`
+	,t1.ordered_days_m6tcd AS `近7天下单天数`
 FROM base t1
 LEFT JOIN gmv90 t2
     ON t2.dt = t1.dt
