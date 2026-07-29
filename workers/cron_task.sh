@@ -4,7 +4,7 @@
 # 任务列表：
 #   1. OKR 数据管道          (okr)           - 支持调度层参数透传（--date / --start / --end）
 #   2. CR Trail 商品配置 ETL  (cr_trail)      - 使用 CURRENT_DATE，无需日期参数
-#   3. Upgrade After Sale    (upgrade_after_sale) - 包含售后商品、订单商品、门店统计等七条链路
+#   3. Upgrade After Sale    (upgrade_after_sale) - 包含售后商品、订单商品、门店统计等九条链路
 #
 # 用法：
 #   ./cron_task.sh                                     # 默认：today, T-7~T, 全部任务
@@ -300,6 +300,8 @@ UA_BASE_ARGS=(
     --sku-stat-end 0
     --mct-stat-start -15
     --mct-stat-end 0
+    --dim-sku-start 0
+    --dim-sku-end 0
     --enable-persistence
     --persistence-dir "$PERSISTENCE_DIR/upgrade_after_sale"
     --job-id "$RUN_DATE"
