@@ -80,3 +80,10 @@ def normalize_mct_stat_df(df: pd.DataFrame) -> pd.DataFrame:
     if "日期" in out.columns:
         out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
     return out
+
+
+def normalize_dim_sku_df(df: pd.DataFrame) -> pd.DataFrame:
+    """商品维度表转换（纯维度数据，无日期字段，直接透传）"""
+    if df.empty:
+        return df
+    return df.copy()

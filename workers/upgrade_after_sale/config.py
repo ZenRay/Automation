@@ -26,6 +26,12 @@ BASE_URL = (
     "?table=tblvkY8n2lcW3I0f&view=vewHlpPmew"
 )
 
+# 商品维度表（wiki 类型，独立 Base）
+DIM_SKU_URL = (
+    "https://bggc.feishu.cn/wiki/IM07wGjh9iVU64kNu8gcjirQn0K"
+    "?table=tblEMESCIIr4pqz8&view=vewdVsAfk9"
+)
+
 
 def _fm(
     source_col: str, lark_type: LarkFieldType, target_field: str | None = None
@@ -93,6 +99,11 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         use_temp_table=True,
         temp_table_project="datawarehouse_max_dev",
     ),
+    SQLQueryConfig(
+        name="dim_sku",
+        sql_file="dim_sku_query.sql",
+        depends_on=[],
+    ),
 ]
 
 # 各 SQL 独立 offset（可在 main 参数中覆盖）
@@ -105,6 +116,7 @@ QUERY_WINDOWS = {
     "mct_cat4_stat": {"start": -10, "end": 0},
     "sku_stat": {"start": -15, "end": 0},
     "mct_stat": {"start": -15, "end": 0},
+    "dim_sku": {"start": 0, "end": 0},  # 维度表，使用 MAX_PT，无日期窗口
 }
 
 # 应用层写入重试（route 粒度）
@@ -468,6 +480,21 @@ TARGET_MCT_STAT = LarkTargetConfig(
     cleanup_conditions=CleanupCondition.clear_all(),
 )
 
+TARGET_DIM_SKU = LarkTargetConfig(
+    name="dim_sku",
+    url=DIM_SKU_URL,
+    table_name="商品维度表",
+    field_mappings=[
+        _fm("商品id", LarkFieldType.NUMBER),
+        _fm("商家id", LarkFieldType.NUMBER),
+        _fm("一级类目id", LarkFieldType.NUMBER),
+        _fm("一级类目名称", LarkFieldType.TEXT),
+        _fm("四级类目id", LarkFieldType.NUMBER),
+        _fm("四级类目名称", LarkFieldType.TEXT),
+    ],
+    cleanup_conditions=CleanupCondition.clear_all(),
+)
+
 LARK_TARGETS: list[LarkTargetConfig] = [
     TARGET_AFTER_SALE,
     TARGET_ORDER_ITEM,
@@ -477,6 +504,7 @@ LARK_TARGETS: list[LarkTargetConfig] = [
     TARGET_MCT_CAT4_STAT,
     TARGET_SKU_STAT,
     TARGET_MCT_STAT,
+    TARGET_DIM_SKU,
 ]
 
 DATA_ROUTES: list[DataRoute] = [
@@ -541,6 +569,14 @@ DATA_ROUTES: list[DataRoute] = [
         name="after_sale_detail",
         target=TARGET_AFTER_SALE,
         source_ref="mc:after_sale_item",
+        transforms=[],
+        validation_level="warn",
+    ),
+    # 8. 商品维度表（维度数据，clear_all 全量覆盖）
+    DataRoute(
+        name="dim_sku_detail",
+        target=TARGET_DIM_SKU,
+        source_ref="mc:dim_sku",
         transforms=[],
         validation_level="warn",
     ),
