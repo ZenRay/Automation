@@ -571,11 +571,7 @@ def run_upgrade_after_sale_pipeline(
         if dim_sku_start is not None
         else QUERY_WINDOWS["dim_sku"]["start"]
     )
-    ds_end = (
-        dim_sku_end
-        if dim_sku_end is not None
-        else QUERY_WINDOWS["dim_sku"]["end"]
-    )
+    ds_end = dim_sku_end if dim_sku_end is not None else QUERY_WINDOWS["dim_sku"]["end"]
 
     try:
         _validate_offsets("after_sale_item", as_start, as_end)
