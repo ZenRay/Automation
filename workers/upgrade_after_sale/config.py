@@ -473,9 +473,9 @@ TARGET_MCT_STAT = LarkTargetConfig(
     field_mappings=[
         _fm("日期", LarkFieldType.DATE),
         _fm("商家id", LarkFieldType.NUMBER),
-        _fm("售后单数量", LarkFieldType.NUMBER),
-        _fm("前7天售后单数量", LarkFieldType.NUMBER),
-        _fm("近7天售后单数量", LarkFieldType.NUMBER),
+        _fm("自然日售后单数量", LarkFieldType.NUMBER),
+        _fm("前7天自然日售后单数量", LarkFieldType.NUMBER),
+        _fm("近7天自然日售后单数量", LarkFieldType.NUMBER),
     ],
     cleanup_conditions=CleanupCondition.clear_all(),
 )
