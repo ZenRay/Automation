@@ -491,6 +491,7 @@ TARGET_DIM_SKU = LarkTargetConfig(
         _fm("一级类目名称", LarkFieldType.TEXT),
         _fm("四级类目id", LarkFieldType.NUMBER),
         _fm("四级类目名称", LarkFieldType.TEXT),
+        _fm("是否全品类商家", LarkFieldType.NUMBER),
     ],
     cleanup_conditions=CleanupCondition.clear_all(),
 )

@@ -5,6 +5,7 @@ SELECT
     ,t1.category_level1_name AS `一级类目名称`
     ,t1.category_level4_id AS `四级类目id`
     ,t1.category_level4_name AS `四级类目名称`
+    ,IF(INSTR(t1.merchant_name, "老顽童")+INSTR(t1.merchant_name, "阿玲果行")>0, 1, 0) AS `是否全品类商家`
 FROM datawarehouse_max.dim_goods_daily_full t1
 WHERE t1.dt = MAX_PT('datawarehouse_max.dim_goods_daily_full')
     AND t1.mall_id = 871
