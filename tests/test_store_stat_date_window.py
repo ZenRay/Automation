@@ -18,13 +18,13 @@ from workers.upgrade_after_sale.main import (
 
 
 def test_store_stat_default_window_sql_params():
-    """store_stat 默认窗口 (-5, -1) 生成正确的 SQL 参数"""
+    """store_stat 默认窗口 (-1, -1) 生成正确的 SQL 参数"""
     window = QUERY_WINDOWS["store_stat"]
     params = _build_date_params("2026-06-26", window["start"], window["end"])
     sql = params.sql_params()
 
     assert sql["date_param"] == "DATE '2026-06-26'"
-    assert sql["start_offset"] == "-5"
+    assert sql["start_offset"] == "-1"
     assert sql["end_offset"] == "-1"
 
 
