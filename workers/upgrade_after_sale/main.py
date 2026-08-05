@@ -232,21 +232,13 @@ def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
             raise ValueError(f"Empty row_key detected for route '{route_name}'")
         return row_key
     elif route_name == "sku_stat_detail":
-        # 四级复合键：商家id + 四级类目id + 商品id + 日期
-        for col in ("商家id", "四级类目id", "商品id", "日期"):
+        # 复合键：商品id + 日期
+        for col in ("商品id", "日期"):
             if col not in df.columns:
                 raise ValueError(
                     f"Missing row key column '{col}' for route '{route_name}'"
                 )
-        row_key = (
-            df["商家id"].astype(str)
-            + "_"
-            + df["四级类目id"].astype(str)
-            + "_"
-            + df["商品id"].astype(str)
-            + "_"
-            + df["日期"].astype(str)
-        )
+        row_key = df["商品id"].astype(str) + "_" + df["日期"].astype(str)
         if row_key.eq("").any() or row_key.str.startswith("nan_").any():
             raise ValueError(f"Empty row_key detected for route '{route_name}'")
         return row_key
