@@ -34,6 +34,7 @@ WITH dt_range AS(
 ,base AS(
     SELECT
         t1.dt -- `日期`
+        ,871 AS mall_id
         ,t2.customer_store_id -- `店铺id`
         ,MAX(IF(t1.dt=t2.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt -- `下单金额`
         ,MAX(IF(t1.dt=t2.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt -- `送达金额`
@@ -78,7 +79,7 @@ WITH dt_range AS(
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time_m6tcd -- `近7天售后赔付金额`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt, t2.final_refund_amt, 0)) AS final_refund_amt_m6tcd -- `近7天自然日售后赔付金额`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt, t2.commission_amt, 0)) AS commission_amt_m6tcd -- `近7天平台抽佣金额`
-        ,SUM(IF(t2.dt BETWEEN t1.dt AND DATEADD(DATE(t1.dt),  - 6, "dd"), t2.commission_amt, 0)) AS commission_amt_cdta6d -- `后7天平台抽佣金额`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt, t2.uas_platform_refund_amt, 0)) AS uas_platform_refund_amt_m6tcd -- `近7日升级售后自然日平台承担金额`
 
         ,COUNT(DISTINCT IF(
             t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND t1.dt AND t2.ordered_goods_num > 0, t2.dt, NULL
@@ -112,8 +113,8 @@ WITH dt_range AS(
             ,0 AS total_after_sale_ticket_num -- `自然日售后单数量`
             ,0 AS order_ticked_num -- `订单数量`
             ,0 AS order_item_ticked_num -- `明细订单数量`
+            ,0 AS uas_platform_refund_amt -- `升级售后自然日平台承担金额`
             ,1 AS dummy
-
         FROM datawarehouse_max.dws_store_mall_store_base_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
                     AND DATEADD(DATE(${date_param}), ${end_offset} + 7, "dd")
@@ -141,8 +142,8 @@ WITH dt_range AS(
             ,0 AS order_ticked_num -- `订单数量`
             ,0 AS order_item_ticked_num -- `明细订单数量`
 
+            ,0 AS uas_platform_refund_amt -- `升级售后自然日平台承担金额`
             ,1 AS dummy
-
         FROM datawarehouse_max.dwt_order_after_sale_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
                     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
@@ -172,8 +173,8 @@ WITH dt_range AS(
             ,COUNT(DISTINCT t1.order_id) AS order_ticked_num -- `订单数量`
             ,COUNT(DISTINCT t1.order_item_id) AS order_item_ticked_num -- `明细订单数量`
 
+            ,0 AS uas_platform_refund_amt -- `升级售后自然日平台承担金额`
             ,1 AS dummy
-
         FROM datawarehouse_max.dwt_order_order_item_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
                     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
@@ -182,6 +183,42 @@ WITH dt_range AS(
 
         GROUP BY t1.dt -- `日期`
             ,t1.customer_store_id -- `店铺id`
+
+        -- 升级售后
+        UNION ALL
+        SELECT
+            DATE(t1.create_time) AS dt
+            ,t1.store_id AS customer_store_id
+
+            ,0 AS ordered_goods_amt -- `下单金额`
+            ,0 AS ordered_goods_num
+            ,0 AS delivered_goods_amt -- `送达金额`
+            ,0 AS delivered_goods_num -- `送达数量`
+            ,0 AS after_sale_num_quality_order_time -- `质量问题售后数量`
+            ,0 AS after_sale_num_order_time -- `售后数量`
+            ,0 AS final_refund_amt_order_time_quality -- `质量问题售后赔付金额`
+            ,0 AS final_refund_amt_order_time -- `售后赔付金额`
+            ,0 AS final_refund_amt -- `自然日售后赔付金额`
+            ,0 AS commission_amt -- `平台抽佣金额`
+
+            ,0 AS withdraw_after_sale_ticket_num -- `自然日撤销售后单数量`
+            ,0 AS total_after_sale_ticket_num -- `自然日售后单数量`
+
+            ,0 AS order_ticked_num -- `订单数量`
+            ,0 AS order_item_ticked_num -- `明细订单数量`
+
+            ,SUM(t1.guo_li_payment_amount) AS uas_platform_refund_amt -- `升级售后自然日平台承担金额`
+
+            ,1 AS dummy
+        FROM datawarehouse_max.ods_css_upgrade_after_sales_order_full t1
+        WHERE t1.dt = MAX_PT('datawarehouse_max.ods_css_upgrade_after_sales_order_full')
+            AND DATE(t1.create_time) BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
+                        AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+            AND t1.company_id = 871
+
+            AND t1.guo_li_payment_amount > 0
+        GROUP BY DATE(t1.create_time)
+            ,t1.store_id
 
     ) t2
         ON t2.dummy = t1.dummy
@@ -196,6 +233,11 @@ WITH dt_range AS(
 SELECT
 	t1.dt AS `日期`
 	,t1.customer_store_id AS `店铺id`
+    ,t3.grid_id AS `网格id`
+    ,t3.grid_name AS `网格名称`
+    ,t3.bd_id AS `bd_id`
+    ,t3.bd_name AS `bd姓名`
+
 	,t1.ordered_goods_amt AS `下单金额`
 	,t1.delivered_goods_amt AS `送达金额`
 	,t1.delivered_goods_num AS `送达数量`
@@ -237,7 +279,7 @@ SELECT
 	,t1.final_refund_amt_order_time_m6tcd AS `近7天售后赔付金额`
 	,t1.final_refund_amt_m6tcd AS `近7天自然日售后赔付金额`
 	,t1.commission_amt_m6tcd AS `近7天平台抽佣金额`
-    ,t1.commission_amt_cdta6d AS `后7天平台抽佣金额`
+    ,t1.uas_platform_refund_amt_m6tcd AS `近7日升级售后自然日平台承担金额`
 
     ,t1.order_ticked_num_m29tcd AS `近30天订单数量`
     ,t1.order_item_ticked_num_m29tcd AS `近30天明细订单数量`
@@ -250,6 +292,25 @@ FROM base t1
 LEFT JOIN gmv90 t2
     ON t2.dt = t1.dt
     AND t2.customer_store_id = t1.customer_store_id
+
+LEFT JOIN (
+    SELECT
+        t1.dt
+        ,t1.mall_id
+        ,t1.customer_store_id
+        ,t1.grid_id -- `网格id`
+        ,t1.grid_name -- `网格名称`
+        ,t1.bd_id -- `bd_id`
+        ,t1.bd_name -- `bd姓名`
+
+    FROM datawarehouse_max.dim_store_daily_full t1
+    WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
+        AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+    AND t1.mall_id = 871
+) t3
+    ON t3.dt = t1.dt
+    AND t3.customer_store_id = t1.customer_store_id
+    ANd t3.mall_id = t1.mall_id
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
-    AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+    AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")   
 ;
