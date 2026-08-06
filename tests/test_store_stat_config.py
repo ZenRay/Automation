@@ -33,7 +33,7 @@ def test_query_windows_contains_store_stat():
 
 
 def test_target_store_stat_field_count():
-    assert len(TARGET_STORE_STAT.field_mappings) == 48
+    assert len(TARGET_STORE_STAT.field_mappings) == 52
 
 
 def test_target_store_stat_table_name():
@@ -50,11 +50,16 @@ def test_target_store_stat_field_types():
     # 店铺id 为 NUMBER 类型
     assert mapping["店铺id"].lark_type == LarkFieldType.NUMBER
 
-    # 其余 46 个指标字段均为 NUMBER 类型
+    # TEXT 类型字段
+    assert mapping["网格名称"].lark_type == LarkFieldType.TEXT
+    assert mapping["bd姓名"].lark_type == LarkFieldType.TEXT
+
+    # 其余指标字段均为 NUMBER 类型
+    text_fields = {"日期", "店铺id", "网格名称", "bd姓名"}
     non_numeric = [
         col
         for col, m in mapping.items()
-        if col not in ("日期", "店铺id") and m.lark_type != LarkFieldType.NUMBER
+        if col not in text_fields and m.lark_type != LarkFieldType.NUMBER
     ]
     assert non_numeric == [], f"Expected all NUMBER, got non-NUMERIC: {non_numeric}"
 
