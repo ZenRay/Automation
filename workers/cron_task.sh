@@ -4,8 +4,7 @@
 # 任务列表：
 #   1. OKR 数据管道          (okr)           - 支持调度层参数透传（--date / --start / --end）
 #   2. Daily Report          (daily_report)  - 日报数据管道（缩写: dr）
-#   3. CR Trail 商品配置 ETL  (cr_trail)      - 使用 CURRENT_DATE，无需日期参数
-#   4. Upgrade After Sale    (upgrade_after_sale) - 包含售后商品、订单商品、门店统计等九条链路
+#   3. Upgrade After Sale    (upgrade_after_sale) - 包含售后商品、订单商品、门店统计等九条链路
 #
 # 用法：
 #   ./cron_task.sh                                     # 默认：today, T-7~T, 全部任务
@@ -18,14 +17,12 @@
 #   --only-task <name>     仅运行指定任务（可多次使用，与其他 --only-task 取并集）
 #   --help, -h             显示帮助信息
 #
-#   任务名称：okr | daily_report | cr_trail | upgrade_after_sale（缩写 ua / dr）
+#   任务名称：okr | daily_report | upgrade_after_sale（缩写 ua / dr）
 #
 # 任务控制示例：
-#   ./cron_task.sh --skip-task cr_trail                # 跳过 CR Trail，运行 OKR + Upgrade
-#   ./cron_task.sh --skip-task cr_trail --skip-task okr  # 仅运行 Upgrade After Sale
-#   ./cron_task.sh --only-task upgrade_after_sale      # 同上，仅运行 Upgrade After Sale
-#   ./cron_task.sh --only-task okr --only-task ua      # 运行 OKR + Upgrade（ua=upgrade_after_sale）
-#   ./cron_task.sh 2026-07-21 --skip-task cr_trail     # 指定日期 + 跳过 CR Trail
+#   ./cron_task.sh --skip-task okr                 # 跳过 OKR，运行 Daily Report + Upgrade
+#   ./cron_task.sh --only-task okr --only-task ua  # 仅运行 OKR + Upgrade（ua=upgrade_after_sale）
+#   ./cron_task.sh 2026-07-21 --skip-task okr       # 指定日期 + 跳过 OKR
 #
 # crontab 示例（每天凌晨 2 点执行）：
 #   0 2 * * * /home/ray/Documents/RecentWorks/Automation/workers/cron_task.sh >> /home/ray/Documents/RecentWorks/Automation/logs/cron_task.log 2>&1
@@ -55,7 +52,7 @@ show_help() {
     cat <<'HELP'
 用法: cron_task.sh [DATE] [OPTIONS] [-- START/END OPTIONS]
 
-数据管道定时任务脚本（串行执行 4 个任务）
+数据管道定时任务脚本（串行执行 3 个任务）
 
 位置参数:
   DATE                      基准日期 (YYYY-MM-DD)，默认 today
@@ -68,8 +65,7 @@ show_help() {
   任务名称:
     okr                     Task 1: OKR 数据管道
     daily_report            Task 2: Daily Report 日报（缩写: dr）
-    cr_trail                Task 3: CR Trail 商品配置 ETL
-    upgrade_after_sale      Task 4: Upgrade After Sale（缩写: ua）
+    upgrade_after_sale      Task 3: Upgrade After Sale（缩写: ua）
 
 调度参数（透传给 OKR 管道）:
   --start <N>               窗口起点偏移（默认 -7）
@@ -77,9 +73,9 @@ show_help() {
 
 示例:
   cron_task.sh                                  # 全部任务，today
-  cron_task.sh --skip-task cr_trail                 # 跳过 CR Trail
-  cron_task.sh --only-task okr --only-task dr       # 仅 OKR + Daily Report
-  cron_task.sh 2026-07-21 --skip-task cr_trail      # 指定日期 + 跳过 CR Trail
+  cron_task.sh --skip-task okr                  # 跳过 OKR
+  cron_task.sh --only-task okr --only-task dr   # 仅 OKR + Daily Report
+  cron_task.sh 2026-07-21 --skip-task okr       # 指定日期 + 跳过 OKR
 
 环境变量:
   DRY_RUN=1                 仅打印命令，不实际执行
@@ -101,7 +97,6 @@ _normalize_task_name() {
         ua|upgrade_after_sale|upgrade) echo "upgrade_after_sale" ;;
         okr|OKR)                        echo "okr" ;;
         dr|daily_report)                echo "daily_report" ;;
-        cr_trail|cr|cr_trail)           echo "cr_trail" ;;
         *)                              echo "$1" ;;
     esac
 }
@@ -114,7 +109,7 @@ while [ $# -gt 0 ]; do
             ;;
         --skip-task)
             if [ -z "${2:-}" ]; then
-                echo "错误: --skip-task 需要参数 (okr | daily_report | cr_trail | upgrade_after_sale)" >&2
+                echo "错误: --skip-task 需要参数 (okr | daily_report | upgrade_after_sale)" >&2
                 exit 1
             fi
             SKIP_TASKS+=("$(_normalize_task_name "$2")")
@@ -122,7 +117,7 @@ while [ $# -gt 0 ]; do
             ;;
         --only-task)
             if [ -z "${2:-}" ]; then
-                echo "错误: --only-task 需要参数 (okr | daily_report | cr_trail | upgrade_after_sale)" >&2
+                echo "错误: --only-task 需要参数 (okr | daily_report | upgrade_after_sale)" >&2
                 exit 1
             fi
             ONLY_TASKS+=("$(_normalize_task_name "$2")")
@@ -167,8 +162,7 @@ _task_enabled() {
 if [ "${DRY_RUN:-0}" = "1" ]; then
     _task_enabled "okr"                 && echo "[DRY-RUN] Task 1: python -m workers.okr.main ${ARGS[*]:-}" || echo "[DRY-RUN] Task 1: SKIPPED (okr)"
     _task_enabled "daily_report"        && echo "[DRY-RUN] Task 2: python -m workers.daily_report.main ${ARGS[*]:-}" || echo "[DRY-RUN] Task 2: SKIPPED (daily_report)"
-    _task_enabled "cr_trail"            && echo "[DRY-RUN] Task 3: python -m workers.cr_trail.main" || echo "[DRY-RUN] Task 3: SKIPPED (cr_trail)"
-    _task_enabled "upgrade_after_sale"  && echo "[DRY-RUN] Task 4: python -m workers.upgrade_after_sale.main <UA_BASE_ARGS>" || echo "[DRY-RUN] Task 4: SKIPPED (upgrade_after_sale)"
+    _task_enabled "upgrade_after_sale"  && echo "[DRY-RUN] Task 3: python -m workers.upgrade_after_sale.main <UA_BASE_ARGS>" || echo "[DRY-RUN] Task 3: SKIPPED (upgrade_after_sale)"
     exit 0
 fi
 
@@ -233,21 +227,20 @@ TASKS_FAILED=0
 # Task 1: OKR 数据管道
 # ---------------------------------------------------------------------------
 if ! _task_enabled "okr"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/4] OKR 数据管道 - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
     TASKS_SKIPPED=$((TASKS_SKIPPED + 1))
 else
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/4] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
 
 if python -m workers.okr.main "${ARGS[@]}" 2>&1 | tee -a "$CRON_LOG_FILE"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/4] OKR 数据管道 - SUCCESS" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - SUCCESS" | tee -a "$CRON_LOG_FILE"
     TASKS_RUN=$((TASKS_RUN + 1))
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/4] OKR 数据管道 - FAILED (exit_code=$EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 1/3] OKR 数据管道 - FAILED (exit_code=$EXIT_CODE), continuing..." | tee -a "$CRON_LOG_FILE"
     TASKS_RUN=$((TASKS_RUN + 1))
     TASKS_FAILED=$((TASKS_FAILED + 1))
-    exit $EXIT_CODE
 fi
 
 fi  # _task_enabled okr
@@ -256,58 +249,34 @@ fi  # _task_enabled okr
 # Task 2: Daily Report 日报数据管道
 # ---------------------------------------------------------------------------
 if ! _task_enabled "daily_report"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/4] Daily Report 日报 - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] Daily Report 日报 - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
     TASKS_SKIPPED=$((TASKS_SKIPPED + 1))
 else
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/4] Daily Report 日报 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] Daily Report 日报 - START (参数: ${ARGS[*]:-默认})" | tee -a "$CRON_LOG_FILE"
 
 if python -m workers.daily_report.main "${ARGS[@]}" 2>&1 | tee -a "$CRON_LOG_FILE"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/4] Daily Report 日报 - SUCCESS" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] Daily Report 日报 - SUCCESS" | tee -a "$CRON_LOG_FILE"
     TASKS_RUN=$((TASKS_RUN + 1))
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/4] Daily Report 日报 - FAILED (exit_code=$EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 2/3] Daily Report 日报 - FAILED (exit_code=$EXIT_CODE), continuing..." | tee -a "$CRON_LOG_FILE"
     TASKS_RUN=$((TASKS_RUN + 1))
     TASKS_FAILED=$((TASKS_FAILED + 1))
-    exit $EXIT_CODE
 fi
 
 fi  # _task_enabled daily_report
 
 # ---------------------------------------------------------------------------
-# Task 3: CR Trail 商品配置 ETL（使用 CURRENT_DATE，无需日期参数）
-# ---------------------------------------------------------------------------
-if ! _task_enabled "cr_trail"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/4] CR Trail ETL - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
-    TASKS_SKIPPED=$((TASKS_SKIPPED + 1))
-else
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/4] CR Trail ETL - START" | tee -a "$CRON_LOG_FILE"
-
-if python -m workers.cr_trail.main 2>&1 | tee -a "$CRON_LOG_FILE"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/4] CR Trail ETL - SUCCESS" | tee -a "$CRON_LOG_FILE"
-    TASKS_RUN=$((TASKS_RUN + 1))
-else
-    EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/4] CR Trail ETL - FAILED (exit_code=$EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
-    TASKS_RUN=$((TASKS_RUN + 1))
-    TASKS_FAILED=$((TASKS_FAILED + 1))
-    exit $EXIT_CODE
-fi
-
-fi  # _task_enabled cr_trail
-
-# ---------------------------------------------------------------------------
-# Task 4: Upgrade After Sale（末位执行）
+# Task 3: Upgrade After Sale（末位执行）
 # 规则：先主跑，失败时再补跑 retry_failed_only。
 # ---------------------------------------------------------------------------
 if ! _task_enabled "upgrade_after_sale"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SKIPPED (--skip-task/--only-task)" | tee -a "$CRON_LOG_FILE"
     TASKS_SKIPPED=$((TASKS_SKIPPED + 1))
 else
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - START (main run)" | tee -a "$CRON_LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - START (main run)" | tee -a "$CRON_LOG_FILE"
 
 UA_BASE_ARGS=(
     --date "$RUN_DATE"
@@ -335,24 +304,26 @@ UA_BASE_ARGS=(
 )
 
 if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" 2>&1 | tee -a "$CRON_LOG_FILE"; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - SUCCESS (main run)" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (main run)" | tee -a "$CRON_LOG_FILE"
     TASKS_RUN=$((TASKS_RUN + 1))
 else
     EXIT_CODE=$?
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - FAILED (main run, exit_code=$EXIT_CODE), retry failed rows" | tee -a "$CRON_LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - FAILED (main run, exit_code=$EXIT_CODE), retry failed rows" | tee -a "$CRON_LOG_FILE"
 
     if WORKERS_LOG_LEVEL=INFO python -m workers.upgrade_after_sale.main "${UA_BASE_ARGS[@]}" --retry-failed-only 2>&1 | tee -a "$CRON_LOG_FILE"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - SUCCESS (retry_failed_only)" | tee -a "$CRON_LOG_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - SUCCESS (retry_failed_only)" | tee -a "$CRON_LOG_FILE"
         TASKS_RUN=$((TASKS_RUN + 1))
     else
         RETRY_EXIT_CODE=$?
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 4/4] Upgrade After Sale - FAILED (retry_failed_only, exit_code=$RETRY_EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Task 3/3] Upgrade After Sale - FAILED (retry_failed_only, exit_code=$RETRY_EXIT_CODE)" | tee -a "$CRON_LOG_FILE"
         TASKS_RUN=$((TASKS_RUN + 1))
         TASKS_FAILED=$((TASKS_FAILED + 1))
-        exit $RETRY_EXIT_CODE
     fi
 fi
 
 fi  # _task_enabled upgrade_after_sale
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== 任务执行完成 (运行: $TASKS_RUN, 跳过: $TASKS_SKIPPED, 失败: $TASKS_FAILED) ==========" | tee -a "$CRON_LOG_FILE"
+if [ $TASKS_FAILED -gt 0 ]; then
+    exit 1
+fi
