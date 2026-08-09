@@ -33,7 +33,7 @@ def test_query_windows_contains_sku_stat():
 
 
 def test_target_sku_stat_field_count():
-    assert len(TARGET_SKU_STAT.field_mappings) == 32
+    assert len(TARGET_SKU_STAT.field_mappings) == 38
 
 
 def test_target_sku_stat_table_name():

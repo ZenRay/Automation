@@ -81,9 +81,15 @@ WITH dt_range AS(
 SELECT
 	t1.dt AS `日期`
 	,t1.sku_id AS `商品id`
+    ,t2.merchant_id AS `商家id`
+    ,t2.merchant_name AS `商家名称`
+    ,t2.category_level1_id AS `一级类目id`
+    ,t2.category_level1_name AS `一级类目名称`
+    ,t2.category_level4_id AS `四级类目id`
+    ,t2.category_level4_name AS `四级类目名称`
 
-	,t1.operation_type AS `运营标签`
-	,t1.filter_label AS `前端标签`
+	,IF(LENGTH(t1.operation_type)>1, t1.operation_type, NULL) AS `运营标签`
+	,IF(LENGTH(t1.filter_label)>1, t1.filter_label, NULL) AS `前端标签`
 	,t1.ordered_store_num AS `下单店铺数`
 	,t1.delivered_goods_amt AS `送达金额`
 	,t1.payment_amt AS `实付金额`
