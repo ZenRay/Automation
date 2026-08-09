@@ -304,12 +304,10 @@ LEFT JOIN (
         ,t1.bd_name -- `bd姓名`
 
     FROM datawarehouse_max.dim_store_daily_full t1
-    WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
-        AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+    WHERE t1.dt = MAX_PT('datawarehouse_max.dim_store_daily_full')  
     AND t1.mall_id = 871
 ) t3
-    ON t3.dt = t1.dt
-    AND t3.customer_store_id = t1.customer_store_id
+    ON t3.customer_store_id = t1.customer_store_id
     ANd t3.mall_id = t1.mall_id
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")   
