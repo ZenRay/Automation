@@ -440,6 +440,12 @@ TARGET_SKU_STAT = LarkTargetConfig(
     field_mappings=[
         _fm("日期", LarkFieldType.DATE),
         _fm("商品id", LarkFieldType.NUMBER),
+        _fm("商家id", LarkFieldType.NUMBER),
+        _fm("商家名称", LarkFieldType.TEXT),
+        _fm("一级类目id", LarkFieldType.NUMBER),
+        _fm("一级类目名称", LarkFieldType.TEXT),
+        _fm("四级类目id", LarkFieldType.NUMBER),
+        _fm("四级类目名称", LarkFieldType.TEXT),
         _fm("运营标签", LarkFieldType.TEXT),
         _fm("前端标签", LarkFieldType.TEXT),
         _fm("下单店铺数", LarkFieldType.NUMBER),
