@@ -189,7 +189,7 @@ WITH mall AS(
             ,t1.deliveried_gross_wgt -- `送达重量`
 
             -- 规模
-            ,IF(t1.category_level1_name IN ("蔬菜", "干货"), 1, 0) AS is_vegitable -- `是否蔬菜类目`
+            ,IF(t1.category_level1_name IN ("蔬菜"), 1, 0) AS is_vegitable -- `是否蔬菜类目`
             ,IF(t1.category_level1_name ="水果", 1, 0) AS is_fruit -- `是否水果类目`
 
             ,t1.final_refund_amt -- `赔付金额`
