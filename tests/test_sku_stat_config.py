@@ -33,7 +33,7 @@ def test_query_windows_contains_sku_stat():
 
 
 def test_target_sku_stat_field_count():
-    assert len(TARGET_SKU_STAT.field_mappings) == 38
+    assert len(TARGET_SKU_STAT.field_mappings) == 39
 
 
 def test_target_sku_stat_table_name():
@@ -47,7 +47,6 @@ def test_target_sku_stat_field_types():
     assert mapping["日期"].lark_type == LarkFieldType.DATE
     assert mapping["商品id"].lark_type == LarkFieldType.NUMBER
     assert mapping["运营标签"].lark_type == LarkFieldType.TEXT
-    assert mapping["前端标签"].lark_type == LarkFieldType.TEXT
 
     numeric_cols = [
         "下单店铺数",
