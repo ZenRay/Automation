@@ -112,10 +112,10 @@ QUERY_WINDOWS = {
     "order_item": {"start": -7, "end": 0},
     "store_stat": {"start": -1, "end": -1},
     "store_cat1_stat": {"start": -7, "end": 0},
-    "cat4_stat": {"start": -10, "end": 0},
-    "mct_cat4_stat": {"start": -10, "end": 0},
-    "sku_stat": {"start": -15, "end": 0},
-    "mct_stat": {"start": -15, "end": 0},
+    "cat4_stat": {"start": -14, "end": 0},
+    "mct_cat4_stat": {"start": -14, "end": 0},
+    "sku_stat": {"start": -14, "end": 0},
+    "mct_stat": {"start": -14, "end": 0},
     "dim_sku": {"start": 0, "end": 0},  # 维度表，使用 MAX_PT，无日期窗口
 }
 
@@ -400,7 +400,7 @@ TARGET_CAT4_STAT = LarkTargetConfig(
         _fm("近7天质量问题售后赔付金额", LarkFieldType.NUMBER),
         _fm("近7天下单天数", LarkFieldType.NUMBER),
     ],
-    cleanup_conditions=CleanupCondition.runtime_window(),
+    cleanup_conditions=CleanupCondition.clear_all(),
 )
 
 TARGET_MCT_CAT4_STAT = LarkTargetConfig(
@@ -436,7 +436,7 @@ TARGET_MCT_CAT4_STAT = LarkTargetConfig(
         _fm("近30天下单天数", LarkFieldType.NUMBER),
         _fm("近7天下单天数", LarkFieldType.NUMBER),
     ],
-    cleanup_conditions=CleanupCondition.runtime_window(),
+    cleanup_conditions=CleanupCondition.clear_all(),
 )
 
 TARGET_SKU_STAT = LarkTargetConfig(
@@ -484,7 +484,7 @@ TARGET_SKU_STAT = LarkTargetConfig(
         _fm("近7日下单天数", LarkFieldType.NUMBER),
         _fm("近7日有售后天数", LarkFieldType.NUMBER),
     ],
-    cleanup_conditions=CleanupCondition.runtime_window(),
+    cleanup_conditions=CleanupCondition.clear_all(),
 )
 
 TARGET_MCT_STAT = LarkTargetConfig(

@@ -29,7 +29,7 @@ def test_sql_queries_contains_sku_stat():
 
 def test_query_windows_contains_sku_stat():
     assert "sku_stat" in QUERY_WINDOWS
-    assert QUERY_WINDOWS["sku_stat"] == {"start": -15, "end": 0}
+    assert QUERY_WINDOWS["sku_stat"] == {"start": -14, "end": 0}
 
 
 def test_target_sku_stat_field_count():

@@ -288,13 +288,13 @@ UA_BASE_ARGS=(
     --store-stat-end -1
     --store-cat1-stat-start -7
     --store-cat1-stat-end 0
-    --cat4-stat-start -10
+    --cat4-stat-start -14
     --cat4-stat-end 0
-    --mct-cat4-stat-start -10
+    --mct-cat4-stat-start -14
     --mct-cat4-stat-end 0
-    --sku-stat-start -15
+    --sku-stat-start -14
     --sku-stat-end 0
-    --mct-stat-start -15
+    --mct-stat-start -14
     --mct-stat-end 0
     --dim-sku-start 0
     --dim-sku-end 0
