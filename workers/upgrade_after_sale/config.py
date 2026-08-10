@@ -2,9 +2,10 @@
 """workers.upgrade_after_sale.config -- 订单/售后明细写入配置
 
 需求：
-1. 执行两条 SQL（售后明细、订单明细）
-2. 写入同一 Base 下两张表（售后明细表、明细订单表）
+1. 执行多条 SQL（售后明细、门店统计、四级类目、商品维度等）
+2. 写入同一 Base 下多张表
 3. 每次按各自日期窗口清理后写入（幂等）
+4. order_item（订单明细）已暂停，相关配置保留但不再激活
 """
 
 from pathlib import Path
@@ -50,13 +51,14 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         sql_file="after_sale_item_query.sql",
         depends_on=[],
     ),
-    SQLQueryConfig(
-        name="order_item",
-        sql_file="order_item_query.sql",
-        depends_on=[],
-        use_temp_table=True,
-        temp_table_project="datawarehouse_max_dev",
-    ),
+    # order_item 已暂停：不再执行该 SQL
+    # SQLQueryConfig(
+    #     name="order_item",
+    #     sql_file="order_item_query.sql",
+    #     depends_on=[],
+    #     use_temp_table=True,
+    #     temp_table_project="datawarehouse_max_dev",
+    # ),
     SQLQueryConfig(
         name="store_stat",
         sql_file="store_stat_query.sql",
@@ -109,7 +111,8 @@ SQL_QUERIES: list[SQLQueryConfig] = [
 # 各 SQL 独立 offset（可在 main 参数中覆盖）
 QUERY_WINDOWS = {
     "after_sale_item": {"start": -7, "end": 0},
-    "order_item": {"start": -7, "end": 0},
+    # order_item 已暂停
+    # "order_item": {"start": -7, "end": 0},
     "store_stat": {"start": -1, "end": -1},
     "store_cat1_stat": {"start": -7, "end": 0},
     "cat4_stat": {"start": -14, "end": 0},
@@ -495,7 +498,13 @@ TARGET_MCT_STAT = LarkTargetConfig(
         _fm("日期", LarkFieldType.DATE),
         _fm("商家id", LarkFieldType.NUMBER),
         _fm("自然日售后单数量", LarkFieldType.NUMBER),
+        _fm("自然日申述售后单量", LarkFieldType.NUMBER),
+        _fm("自然日申述通过售后单量", LarkFieldType.NUMBER),
+        _fm("自然日申诉最低商家赔付金额", LarkFieldType.NUMBER),
+        _fm("前7日最高自然日申诉最低商家赔付金额", LarkFieldType.NUMBER),
         _fm("前7天自然日售后单数量", LarkFieldType.NUMBER),
+        _fm("前7天自然日申述售后单量", LarkFieldType.NUMBER),
+        _fm("前7天自然日申述通过售后单量", LarkFieldType.NUMBER),
         _fm("近7天自然日售后单数量", LarkFieldType.NUMBER),
     ],
     cleanup_conditions=CleanupCondition.clear_all(),
@@ -519,7 +528,7 @@ TARGET_DIM_SKU = LarkTargetConfig(
 
 LARK_TARGETS: list[LarkTargetConfig] = [
     TARGET_AFTER_SALE,
-    TARGET_ORDER_ITEM,
+    # TARGET_ORDER_ITEM,  # 订单明细已暂停
     TARGET_STORE_STAT,
     TARGET_STORE_CAT1_STAT,
     TARGET_CAT4_STAT,
@@ -578,14 +587,14 @@ DATA_ROUTES: list[DataRoute] = [
         transforms=[],
         validation_level="warn",
     ),
-    # 6. 订单明细表
-    DataRoute(
-        name="order_detail",
-        target=TARGET_ORDER_ITEM,
-        source_ref="mc:order_item",
-        transforms=[],
-        validation_level="warn",
-    ),
+    # 6. 订单明细表（已暂停）
+    # DataRoute(
+    #     name="order_detail",
+    #     target=TARGET_ORDER_ITEM,
+    #     source_ref="mc:order_item",
+    #     transforms=[],
+    #     validation_level="warn",
+    # ),
     # 7. 售后明细表
     DataRoute(
         name="after_sale_detail",
@@ -607,7 +616,8 @@ DATA_ROUTES: list[DataRoute] = [
 # 路由清理窗口日期字段
 ROUTE_DATE_FIELDS = {
     "after_sale_detail": "申请日期",
-    "order_detail": "日期",
+    # order_item 已暂停
+    # "order_detail": "日期",
     "store_stat_detail": "日期",
     "store_cat1_stat_detail": "日期",
     "cat4_stat_detail": "日期",

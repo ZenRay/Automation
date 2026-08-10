@@ -79,7 +79,7 @@ def test_lark_targets_contains_cat4_stat():
 
 
 def test_data_routes_order():
-    """上传顺序：四级类目 -> 商家四级类目 -> 商品统计 -> 商家统计 -> 门店维度 -> 门店一级类目 -> 订单 -> 售后"""
+    """上传顺序：四级类目 -> 商家四级类目 -> 商品统计 -> 商家统计 -> 门店维度 -> 门店一级类目 -> 售后（订单明细已暂停）"""
     route_names = [r.name for r in DATA_ROUTES]
     assert route_names == [
         "cat4_stat_detail",
@@ -88,7 +88,6 @@ def test_data_routes_order():
         "mct_stat_detail",
         "store_stat_detail",
         "store_cat1_stat_detail",
-        "order_detail",
         "after_sale_detail",
         "dim_sku_detail",
     ]

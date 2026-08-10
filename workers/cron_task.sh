@@ -282,8 +282,7 @@ UA_BASE_ARGS=(
     --date "$RUN_DATE"
     --as-start -2
     --as-end -1
-    --order-start -1
-    --order-end 0
+    # order_item 已暂停：移除 --order-start/--order-end
     --store-stat-start -1
     --store-stat-end -1
     --store-cat1-stat-start -7

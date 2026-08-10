@@ -58,7 +58,7 @@ from .config import (
 )
 from .transformer import (
     normalize_after_sale_df,
-    normalize_order_item_df,
+    # normalize_order_item_df,  # order_item 已暂停
     normalize_store_stat_df,
     normalize_store_cat1_stat_df,
     normalize_cat4_stat_df,
@@ -279,7 +279,7 @@ def _build_row_key(df: pd.DataFrame, route_name: str) -> pd.Series:
 def _inject_row_key(mc_data: dict[str, pd.DataFrame]) -> None:
     route_to_source = {
         "after_sale_detail": "after_sale_item",
-        "order_detail": "order_item",
+        # order_item 已暂停
         "store_stat_detail": "store_stat",
         "store_cat1_stat_detail": "store_cat1_stat",
         "cat4_stat_detail": "cat4_stat",
@@ -451,8 +451,7 @@ def run_upgrade_after_sale_pipeline(
     date_value: str | None = None,
     after_sale_start: int | None = None,
     after_sale_end: int | None = None,
-    order_start: int | None = None,
-    order_end: int | None = None,
+    # order_start/order_end 已暂停
     store_stat_start: int | None = None,
     store_stat_end: int | None = None,
     store_cat1_stat_start: int | None = None,
@@ -498,10 +497,7 @@ def run_upgrade_after_sale_pipeline(
         if after_sale_end is not None
         else QUERY_WINDOWS["after_sale_item"]["end"]
     )
-    od_start = (
-        order_start if order_start is not None else QUERY_WINDOWS["order_item"]["start"]
-    )
-    od_end = order_end if order_end is not None else QUERY_WINDOWS["order_item"]["end"]
+    # order_item 已暂停，不再计算 od_start/od_end
     ss_start = (
         store_stat_start
         if store_stat_start is not None
@@ -567,7 +563,7 @@ def run_upgrade_after_sale_pipeline(
 
     try:
         _validate_offsets("after_sale_item", as_start, as_end)
-        _validate_offsets("order_item", od_start, od_end)
+        # order_item 已暂停
         _validate_offsets("store_stat", ss_start, ss_end)
         _validate_offsets("store_cat1_stat", sc1_start, sc1_end)
         _validate_offsets("cat4_stat", c4_start, c4_end)
@@ -580,7 +576,7 @@ def run_upgrade_after_sale_pipeline(
         return 1
 
     as_params = _build_date_params(date_value, as_start, as_end)
-    od_params = _build_date_params(date_value, od_start, od_end)
+    # order_item 已暂停
     ss_params = _build_date_params(date_value, ss_start, ss_end)
     sc1_params = _build_date_params(date_value, sc1_start, sc1_end)
     c4_params = _build_date_params(date_value, c4_start, c4_end)
@@ -590,7 +586,7 @@ def run_upgrade_after_sale_pipeline(
     ds_params = _build_date_params(date_value, ds_start, ds_end)
 
     as_window = _compute_window(as_params)
-    od_window = _compute_window(od_params)
+    # order_item 已暂停
     ss_window = _compute_window(ss_params)
     sc1_window = _compute_window(sc1_params)
     c4_window = _compute_window(c4_params)
@@ -607,14 +603,7 @@ def run_upgrade_after_sale_pipeline(
         as_window[0],
         as_window[1],
     )
-    logger.info(
-        "order_item params: date_param=%s, start=%s, end=%s, window=%s~%s",
-        od_params.sql_params()["date_param"],
-        od_start,
-        od_end,
-        od_window[0],
-        od_window[1],
-    )
+    # order_item 已暂停，不再输出日志
     logger.info(
         "store_stat params: date_param=%s, start=%s, end=%s, window=%s~%s",
         ss_params.sql_params()["date_param"],
@@ -682,13 +671,7 @@ def run_upgrade_after_sale_pipeline(
             hints=MC_HINTS,
             params=as_params.sql_params(),
         )
-        order_data = execute_all_queries(
-            mc_client,
-            [query_map["order_item"]],
-            SQL_BASE_DIR,
-            hints=MC_HINTS,
-            params=od_params.sql_params(),
-        )
+        # order_item 已暂停：不再执行该 SQL
         store_stat_data = execute_all_queries(
             mc_client,
             [query_map["store_stat"]],
@@ -740,7 +723,7 @@ def run_upgrade_after_sale_pipeline(
         )
         mc_data: dict[str, pd.DataFrame] = {}
         mc_data.update(after_sale_data)
-        mc_data.update(order_data)
+        # order_item 已暂停
         mc_data.update(store_stat_data)
         mc_data.update(store_cat1_stat_data)
         mc_data.update(cat4_stat_data)
@@ -749,12 +732,11 @@ def run_upgrade_after_sale_pipeline(
         mc_data.update(mct_stat_data)
         mc_data.update(dim_sku_data)
         logger.info(
-            "SQL results: after_sale_item=%s rows, order_item=%s rows, "
+            "SQL results: after_sale_item=%s rows, "
             "store_stat=%s rows, store_cat1_stat=%s rows, "
             "cat4_stat=%s rows, mct_cat4_stat=%s rows, sku_stat=%s rows, "
             "mct_stat=%s rows, dim_sku=%s rows",
             len(mc_data.get("after_sale_item", pd.DataFrame())),
-            len(mc_data.get("order_item", pd.DataFrame())),
             len(mc_data.get("store_stat", pd.DataFrame())),
             len(mc_data.get("store_cat1_stat", pd.DataFrame())),
             len(mc_data.get("cat4_stat", pd.DataFrame())),
@@ -776,8 +758,7 @@ def run_upgrade_after_sale_pipeline(
             mc_data["after_sale_item"] = _apply_attachment_bak_columns(
                 mc_data["after_sale_item"]
             )
-        if "order_item" in mc_data:
-            mc_data["order_item"] = normalize_order_item_df(mc_data["order_item"])
+        # order_item 已暂停
         if "store_stat" in mc_data:
             mc_data["store_stat"] = normalize_store_stat_df(mc_data["store_stat"])
         if "store_cat1_stat" in mc_data:
@@ -807,7 +788,7 @@ def run_upgrade_after_sale_pipeline(
             DATA_ROUTES,
             {
                 "after_sale_detail": as_window,
-                "order_detail": od_window,
+                # order_item 已暂停
                 "store_stat_detail": ss_window,
                 "store_cat1_stat_detail": sc1_window,
                 "cat4_stat_detail": c4_window,
@@ -871,7 +852,7 @@ def run_upgrade_after_sale_pipeline(
 
         route_to_source = {
             "after_sale_detail": "after_sale_item",
-            "order_detail": "order_item",
+            # order_item 已暂停
             "store_stat_detail": "store_stat",
             "store_cat1_stat_detail": "store_cat1_stat",
             "cat4_stat_detail": "cat4_stat",
@@ -928,12 +909,7 @@ def main() -> None:
         "--as-start", type=int, default=None, help="售后 SQL start offset"
     )
     parser.add_argument("--as-end", type=int, default=None, help="售后 SQL end offset")
-    parser.add_argument(
-        "--order-start", type=int, default=None, help="订单 SQL start offset"
-    )
-    parser.add_argument(
-        "--order-end", type=int, default=None, help="订单 SQL end offset"
-    )
+    # order_item 已暂停：移除 --order-start/--order-end 参数
     parser.add_argument(
         "--store-stat-start",
         type=int,
@@ -1040,8 +1016,7 @@ def main() -> None:
         date_value=args.date,
         after_sale_start=args.as_start,
         after_sale_end=args.as_end,
-        order_start=args.order_start,
-        order_end=args.order_end,
+        # order_item 已暂停
         store_stat_start=args.store_stat_start,
         store_stat_end=args.store_stat_end,
         store_cat1_stat_start=args.store_cat1_stat_start,
