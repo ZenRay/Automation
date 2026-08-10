@@ -33,7 +33,7 @@ def test_query_windows_contains_store_stat():
 
 
 def test_target_store_stat_field_count():
-    assert len(TARGET_STORE_STAT.field_mappings) == 52
+    assert len(TARGET_STORE_STAT.field_mappings) == 58
 
 
 def test_target_store_stat_table_name():
