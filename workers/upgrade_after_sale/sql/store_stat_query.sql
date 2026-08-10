@@ -1,3 +1,4 @@
+
 WITH dt_range AS(
     SELECT
         dummy
@@ -15,7 +16,7 @@ WITH dt_range AS(
         ,SUM(ordered_goods_amt) OVER (
             PARTITION BY customer_store_id
             ORDER BY CAST(dt AS TIMESTAMP)
-
+            
             ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
         ) AS ordered_goods_amt_m89tcd
         ,COUNT(DISTINCT t1.dt) FILTER(WHERE t1.ordered_goods_num>0) OVER(
@@ -27,7 +28,7 @@ WITH dt_range AS(
     WHERE dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 89, "dd")
                 AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
       AND mall_id = 871
-
+      
 )
 
 
@@ -49,7 +50,7 @@ WITH dt_range AS(
         ON t2.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 20, "dd")
                     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
         AND t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  0, "dd")
-
+        
     LEFT JOIN datawarehouse_max.dim_category_daily_full t3
         ON t3.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 20, "dd")
                     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
@@ -82,7 +83,7 @@ WITH dt_range AS(
         ,MAX(IF(t1.dt=t2.dt, t2.final_refund_amt_order_time, 0)) AS final_refund_amt_order_time -- `售后赔付金额`
         ,MAX(IF(t1.dt=t2.dt, t2.final_refund_amt, 0)) AS final_refund_amt -- `自然日售后赔付金额`
         ,MAX(IF(t1.dt=t2.dt, t2.commission_amt, 0)) AS commission_amt -- `平台抽佣金额`
-
+ 
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND t1.dt, t2.order_ticked_num, 0)) AS order_ticked_num_m29tcd -- `近30天订单数量`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND t1.dt, t2.order_item_ticked_num, 0)) AS order_item_ticked_num_m29tcd -- `近30天明细订单数量`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND t1.dt, t2.ordered_goods_amt, 0)) AS ordered_goods_amt_m29tcd -- `近30天下单金额`
@@ -171,7 +172,7 @@ WITH dt_range AS(
             AND t1.mall_id = 871
 
             AND NVL(t1.ordered_goods_amt, 0) + NVL(t1.final_refund_amt, 0)> 0
-
+        
         UNION ALL
         SELECT
             t1.dt -- `日期`
@@ -267,7 +268,7 @@ WITH dt_range AS(
             ,MAX(t1.uas_ticket_num) AS uas_ticket_num --`升级售后自然日单量`
             ,MAX(t1.uas_timeout_ticket_num) AS uas_timeout_ticket_num --`超时升级售后自然日单量`
             ,MAX(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), 0, "dd") AND DATEADD(DATE(t1.dt), 6, "dd") AND t2.ordered_goods_num>0, 1, 0)) AS is_ordered_cdta6d -- `是否后7日下单`
-
+            
             ,1 AS dummy
         FROM(
             SELECT
@@ -295,7 +296,7 @@ WITH dt_range AS(
                 ,SUM(t1.guo_li_payment_amount) AS uas_platform_refund_amt -- `升级售后自然日平台承担金额`
                 ,COUNT(DISTINCT t1.upgrade_no) AS uas_ticket_num -- `升级售后自然日单量`
                 ,COUNT(DISTINCT IF(t1.upgrade_type="TIMEOUT", t1.upgrade_no, NULL)) AS uas_timeout_ticket_num -- `超时升级售后自然日单量`
-
+                
             FROM datawarehouse_max.ods_css_upgrade_after_sales_order_full t1
             WHERE t1.dt = MAX_PT('datawarehouse_max.ods_css_upgrade_after_sales_order_full')
                 AND DATE(t1.create_time) BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
@@ -320,7 +321,7 @@ WITH dt_range AS(
     ) t2
         ON t2.dummy = t1.dummy
         AND t2.dt BETWEEN DATEADD(DATE(t1.dt), - 29, "dd") AND t1.dt
-
+        
     GROUP BY t1.dt
         ,t2.customer_store_id
 )
@@ -334,6 +335,8 @@ SELECT
     ,t3.bd_id AS `bd_id`
     ,t3.bd_name AS `bd姓名`
 	,t1.customer_store_id AS `店铺id`
+
+
     ,t2.ordered_goods_amt_m89tcd AS `近90天下单金额`
     ,t2.ordered_days_m89tcd AS `近90天下单天数`
 
@@ -346,7 +349,7 @@ SELECT
 	,t1.final_refund_amt_order_time AS `售后赔付金额`
 	,t1.final_refund_amt AS `自然日售后赔付金额`
 	,t1.commission_amt AS `平台抽佣金额`
-
+ 
 	,t1.order_ticked_num_m29tcd AS `近30天订单数量`
 	,t1.order_item_ticked_num_m29tcd AS `近30天明细订单数量`
 	,t1.ordered_goods_amt_m29tcd AS `近30天下单金额`
@@ -389,7 +392,7 @@ SELECT
 	,t1.ordered_days_m13tm7 AS `m13到m7下单天数`
 	,t1.uas_days_m13tm7 AS `m13到m7升级售后天数`
 	,t1.uas_rebuy_cdtatd_days_m13tm7 AS `m13到m7升级售后且7日复购天数`
-
+    
 	,t1.ordered_days_m6tcd AS `近7天下单天数`
     ,NVL(t4.ordered_cat4_num,0) AS `近14天下单品类数`
     ,NVL(t4.ordered_fruit_cat4_num,0) AS `近14天下单水果品类数`
@@ -407,7 +410,7 @@ LEFT JOIN (
         ,t1.grid_name -- `网格名称`
         ,t1.bd_id -- `bd_id`
         ,t1.bd_name -- `bd姓名`
-
+    
     FROM datawarehouse_max.dim_store_daily_full t1
     WHERE t1.dt = MAX_PT('datawarehouse_max.dim_store_daily_full')
     AND t1.mall_id = 871
@@ -423,7 +426,7 @@ LEFT JOIN (
         ,COUNT(DISTINCT IF(t1.ordered_days_m13tcd>0, t1.category_level4_id, NULL)) AS ordered_cat4_num -- `近14天下单品类数`
         ,COUNT(DISTINCT IF(t1.ordered_days_m13tcd>0 AND INSTR(t1.category_level1_name, "水果")>0, t1.category_level4_id, NULL)) AS ordered_fruit_cat4_num -- `近14天下单水果品类数`
     FROM store_cat t1
-
+    
     GROUP BY t1.customer_store_id
         ,t1.mall_id
         ,t1.dt
@@ -433,5 +436,4 @@ LEFT JOIN (
     AND t4.customer_store_id = t1.customer_store_id
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
-
 ;
