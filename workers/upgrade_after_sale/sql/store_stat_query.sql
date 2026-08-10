@@ -1,4 +1,3 @@
-
 WITH dt_range AS(
     SELECT
         dummy
@@ -8,26 +7,21 @@ WITH dt_range AS(
 )
 
 
--- 采用这种方法必然会产生断档，例如某些门店在前40天有下单但最近30天没有下单——这个问题可以接受
+
+
 ,gmv90 AS (
     SELECT
-        customer_store_id
-        ,dt
-        ,SUM(ordered_goods_amt) OVER (
-            PARTITION BY customer_store_id
-            ORDER BY CAST(dt AS TIMESTAMP)
-            
-            ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
-        ) AS ordered_goods_amt_m89tcd
-        ,COUNT(DISTINCT t1.dt) FILTER(WHERE t1.ordered_goods_num>0) OVER(
-            PARTITION BY customer_store_id
-            ORDER BY CAST(dt AS TIMESTAMP)
-            ROWS BETWEEN 89 PRECEDING AND CURRENT ROW
-        ) AS ordered_days_m89tcd
+        DATEADD(DATE(${date_param}), ${end_offset}, "dd") AS dt
+        ,customer_store_id
+        
+        ,SUM(ordered_goods_amt) AS ordered_goods_amt_m89tcd
+        ,COUNT(DISTINCT IF(t1.ordered_goods_num>0, t1.dt, NULL)) AS ordered_days_m89tcd
+        
     FROM datawarehouse_max.dws_store_mall_store_base_daily_asc t1
     WHERE dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 89, "dd")
                 AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
       AND mall_id = 871
+    GROUP BY customer_store_id
       
 )
 
@@ -130,13 +124,13 @@ WITH dt_range AS(
             AND t2.ordered_goods_num > 0, t2.dt, NULL
         )) AS ordered_days_m13tm7 -- `m13到m7下单天数`
         ,COUNT(DISTINCT IF(
-            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 7, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
             AND t2.uas_ticket_num > 0, t2.dt, NULL
-        )) AS uas_days_m13tm7 -- `m13到m7升级售后天数`
+        )) AS uas_days_m13tm3 -- `m13到m3升级售后天数`
         ,COUNT(DISTINCT IF(
-            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 7, "dd")
-            AND t2.uas_ticket_num > 0 AND t2.is_ordered_cdta6d>0, t2.dt, NULL
-        )) AS uas_rebuy_cdtatd_days_m13tm7 -- `m13到m7升级售后且7日复购天数`
+            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
+            AND t2.uas_ticket_num > 0 AND t2.is_ordered_cdta3d>0, t2.dt, NULL
+        )) AS uas_rebuy_cdta3d_days_m13tm3 -- `m13到m3升级售后且4日复购天数`
 
         ,COUNT(DISTINCT IF(
             t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt
@@ -165,6 +159,7 @@ WITH dt_range AS(
             ,0 AS uas_ticket_num -- `升级售后自然日单量`
             ,0 AS uas_timeout_ticket_num -- `超时升级售后自然日单量`
             ,0 AS is_ordered_cdta6d -- `是否后7日下单`
+            ,0 AS is_ordered_cdta3d -- `是否后3日下单`
             ,1 AS dummy
         FROM datawarehouse_max.dws_store_mall_store_base_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
@@ -197,6 +192,7 @@ WITH dt_range AS(
             ,0 AS uas_ticket_num -- `升级售后自然日单量`
             ,0 AS uas_timeout_ticket_num -- `超时升级售后自然日单量`
             ,0 AS is_ordered_cdta6d -- `是否后7日下单`
+            ,0 AS is_ordered_cdta3d -- `是否后3日下单`
             ,1 AS dummy
         FROM datawarehouse_max.dwt_order_after_sale_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
@@ -231,6 +227,7 @@ WITH dt_range AS(
             ,0 AS uas_ticket_num -- `升级售后自然日单量`
             ,0 AS uas_timeout_ticket_num -- `超时升级售后自然日单量`
             ,0 AS is_ordered_cdta6d -- `是否后7日下单`
+            ,0 AS is_ordered_cdta3d -- `是否后3日下单`
             ,1 AS dummy
         FROM datawarehouse_max.dwt_order_order_item_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset} - 30, "dd")
@@ -268,7 +265,7 @@ WITH dt_range AS(
             ,MAX(t1.uas_ticket_num) AS uas_ticket_num --`升级售后自然日单量`
             ,MAX(t1.uas_timeout_ticket_num) AS uas_timeout_ticket_num --`超时升级售后自然日单量`
             ,MAX(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), 0, "dd") AND DATEADD(DATE(t1.dt), 6, "dd") AND t2.ordered_goods_num>0, 1, 0)) AS is_ordered_cdta6d -- `是否后7日下单`
-            
+            ,MAX(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt), 0, "dd") AND DATEADD(DATE(t1.dt), 3, "dd") AND t2.ordered_goods_num>0, 1, 0)) AS is_ordered_cdta3d -- `是否后3日下单`
             ,1 AS dummy
         FROM(
             SELECT
@@ -390,12 +387,13 @@ SELECT
 	,t1.ordered_days_m29tcd AS `近30天下单天数`
 
 	,t1.ordered_days_m13tm7 AS `m13到m7下单天数`
-	,t1.uas_days_m13tm7 AS `m13到m7升级售后天数`
-	,t1.uas_rebuy_cdtatd_days_m13tm7 AS `m13到m7升级售后且7日复购天数`
+	,t1.uas_days_m13tm3 AS `m13到m3升级售后天数`
+	,t1.uas_rebuy_cdta3d_days_m13tm3 AS `m13到m3升级售后且4日复购天数`
     
 	,t1.ordered_days_m6tcd AS `近7天下单天数`
     ,NVL(t4.ordered_cat4_num,0) AS `近14天下单品类数`
     ,NVL(t4.ordered_fruit_cat4_num,0) AS `近14天下单水果品类数`
+
 FROM base t1
 LEFT JOIN gmv90 t2  
     ON t2.dt = t1.dt
@@ -436,4 +434,5 @@ LEFT JOIN (
     AND t4.customer_store_id = t1.customer_store_id
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+
 ;
