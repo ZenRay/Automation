@@ -434,5 +434,4 @@ LEFT JOIN (
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
 
-    AND t1.dt = DATEADD(DATE(${date_param}), ${end_offset}, "dd")
 ;

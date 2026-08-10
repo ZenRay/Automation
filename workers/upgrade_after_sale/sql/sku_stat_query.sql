@@ -29,6 +29,7 @@ WITH dt_range AS(
         ,t1.final_refund_amt_order_time_quality -- `品质问题售后赔付金额`
         ,t1.after_sale_num_order_time -- `售后数量`
         ,t3.after_sale_ticket_num -- `售后单数量`
+        ,t3.as_order_item_ticket_num -- `售后明细单数量`
         ,1 AS dummy
     FROM datawarehouse_max.dws_pub_mall_sku_base_daily_asc  t1
     LEFT JOIN (
@@ -54,6 +55,7 @@ WITH dt_range AS(
             DATE(t1.order_create_time) AS dt
             ,t1.sku_id
             ,COUNT(DISTINCT t1.after_sale_order_id) AS after_sale_ticket_num
+            ,COUNT(DISTINCT t1.order_item_id) AS as_order_item_ticket_num
         FROM datawarehouse_max.dwt_order_after_sale_daily_asc t1
         WHERE t1.dt BETWEEN DATEADD(${date_param}, ${start_offset} -8, "dd")
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
@@ -89,7 +91,7 @@ SELECT
     ,t2.category_level4_name AS `四级类目名称`
 
 	,IF(LENGTH(t1.operation_type)>1, t1.operation_type, NULL) AS `运营标签`
-	,IF(LENGTH(t1.filter_label)>1, t1.filter_label, NULL) AS `前端标签`
+
 	,t1.ordered_store_num AS `下单店铺数`
 	,t1.delivered_goods_amt AS `送达金额`
 	,t1.payment_amt AS `实付金额`
@@ -108,6 +110,7 @@ SELECT
 	,t1.order_item_ticket_num_m6dtcd AS `近7天明细订单数量`
 	,t1.after_sale_ticket_num_m7dtm1d AS `前7天售后单数量`
 	,t1.order_item_ticket_num_m7dtm1d AS `前7天明细订单数量`
+    ,t1.as_order_item_ticket_num_m7dtm1d AS `前7天售后明细单数量`
     ,t1.order_days_m7dtm1d AS `前7天交易天数`
 
 	,t1.after_sale_num_order_time_m8dtm5d AS `m8到m5售后数量`
@@ -128,7 +131,7 @@ FROM(
         ,t2.sku_id -- `商品id`
 
         ,MAX(IF(t1.dt=t2.dt, t2.operation_type, 0)) AS operation_type -- `运营标签`
-        ,MAX(IF(t1.dt=t2.dt, t2.filter_label, 0)) AS filter_label -- `前端标签`
+
         ,MAX(IF(t1.dt=t2.dt, t2.ordered_store_num, 0)) AS ordered_store_num -- `下单店铺数`
         ,MAX(IF(t1.dt=t2.dt, t2.delivered_goods_amt, 0)) AS delivered_goods_amt -- `送达金额`
         ,MAX(IF(t1.dt=t2.dt, t2.payment_amt, 0)) AS payment_amt -- `实付金额`
@@ -147,6 +150,8 @@ FROM(
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -6, "dd") AND t1.dt, t2.order_item_ticket_num, 0)) AS order_item_ticket_num_m6dtcd -- `近7天明细订单数量`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -7, "dd") AND DATEADD(DATE(t1.dt),  -1, "dd"), t2.after_sale_ticket_num, 0)) AS after_sale_ticket_num_m7dtm1d -- `前7天售后单数量`
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -7, "dd") AND DATEADD(DATE(t1.dt),  -1, "dd"), t2.order_item_ticket_num, 0)) AS order_item_ticket_num_m7dtm1d -- `前7天明细订单数量`
+        ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -7, "dd") AND DATEADD(DATE(t1.dt),  -1, "dd"), t2.as_order_item_ticket_num, 0)) AS as_order_item_ticket_num_m7dtm1d -- `前7天售后明细单数量`
+
         ,COUNT(DISTINCT IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -7, "dd") AND DATEADD(DATE(t1.dt),  -1, "dd") AND t2.ordered_store_num>0, t2.dt, NULL)) AS order_days_m7dtm1d -- `前7天交易天数`
 
         ,SUM(IF(t2.dt BETWEEN DATEADD(DATE(t1.dt),  -8, "dd") AND DATEADD(DATE(t1.dt),  -5, "dd"), t2.after_sale_num_order_time, 0)) AS after_sale_num_order_time_m8dtm5d -- `m8到m5售后数量`
