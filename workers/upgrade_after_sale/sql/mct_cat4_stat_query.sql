@@ -58,7 +58,7 @@ WITH dt_range AS(
                 AND DATEADD(${date_param}, ${end_offset}, "dd")
             AND t1.mall_id = 871
             AND t1.status != "CANCEL"
-            AND INSTR(t1.category_level4_name, "水果") > 0
+            AND INSTR(t1.category_level1_name, "水果") > 0
         GROUP BY DATE(t1.order_create_time)
             ,t1.merchant_id
             ,t1.back_category_id
