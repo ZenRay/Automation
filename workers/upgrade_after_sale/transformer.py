@@ -32,8 +32,9 @@ def normalize_store_stat_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     out = df.copy()
-    if "日期" in out.columns:
-        out["日期"] = pd.to_datetime(out["日期"], errors="coerce")
+    for col in ("日期", "最早下单日期", "最近下单日期"):
+        if col in out.columns:
+            out[col] = pd.to_datetime(out[col], errors="coerce")
     return out
 
 
