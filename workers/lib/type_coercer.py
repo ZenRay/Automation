@@ -314,13 +314,16 @@ class FieldTypeCoercer:
         """判断值是否为空（None / NaN / NaT / 空字符串）"""
         if value is None:
             return True
+        # pandas / numpy NaT（pd.NaT 是 NaTType，不是 pd.Timestamp）
+        try:
+            if pd.isna(value):
+                return True
+        except (TypeError, ValueError):
+            pass
         if isinstance(value, str) and value.strip() == "":
             return True
         # float NaN
         if isinstance(value, float) and np.isnan(value):
-            return True
-        # pandas Timestamp / numpy datetime64 NaT
-        if isinstance(value, (pd.Timestamp, np.datetime64)) and pd.isna(value):
             return True
         return False
 
