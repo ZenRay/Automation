@@ -468,7 +468,6 @@ TARGET_SKU_STAT = LarkTargetConfig(
         _fm("品质问题售后赔付金额", LarkFieldType.NUMBER),
         _fm("售后数量", LarkFieldType.NUMBER),
         _fm("售后单数量", LarkFieldType.NUMBER),
-        _fm("售后明细单数量", LarkFieldType.NUMBER),
         _fm("近7天下单店铺数", LarkFieldType.NUMBER),
         _fm("近7天送达金额", LarkFieldType.NUMBER),
         _fm("近7天实付金额", LarkFieldType.NUMBER),
