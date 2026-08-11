@@ -27,6 +27,21 @@ WITH dt_range AS(
 
 
 
+-- 门店下单日期
+,store_date AS(
+    SELECT
+        t1.dt
+        ,t1.mall_id
+        ,t1.customer_store_id
+        ,t1.mall_first_order_dt
+        ,t1.mall_last_order_dt
+    FROM datawarehouse_max.dws_store_mall_store_label_daily_full t1
+    WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
+            AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
+        AND t1.mall_id = 871
+
+)
+
 -- 门店品类
 ,store_cat AS(
     SELECT /*+MAPJOIN(t1) */
@@ -332,6 +347,10 @@ SELECT
     ,t3.bd_id AS `bd_id`
     ,t3.bd_name AS `bd姓名`
 	,t1.customer_store_id AS `店铺id`
+    ,t5.mall_first_order_dt AS `最早下单日期`
+    ,t5.mall_last_order_dt AS `最近下单日期`
+    ,DATEDIFF(DATE(t1.dt), DATE(t5.mall_first_order_dt)) AS `最早下单间隔天数`
+    ,DATEDIFF(DATE(t1.dt), DATE(t5.mall_last_order_dt)) AS `最近下单间隔天数`
 
 
     ,t2.ordered_goods_amt_m89tcd AS `近90天下单金额`
@@ -432,7 +451,11 @@ LEFT JOIN (
     ON t4.dt = t1.dt
     AND t4.mall_id = t1.mall_id
     AND t4.customer_store_id = t1.customer_store_id
+
+LEFT JOIN store_date t5
+    ON t5.dt = t1.dt
+    AND t5.mall_id = t1.mall_id
+    AND t5.customer_store_id = t1.customer_store_id
 WHERE t1.dt BETWEEN DATEADD(DATE(${date_param}), ${start_offset}, "dd")
     AND DATEADD(DATE(${date_param}), ${end_offset}, "dd")
-
 ;
