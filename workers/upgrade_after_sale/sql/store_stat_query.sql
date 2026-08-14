@@ -1,3 +1,4 @@
+
 WITH dt_range AS(
     SELECT
         dummy
@@ -139,13 +140,13 @@ WITH dt_range AS(
             AND t2.ordered_goods_num > 0, t2.dt, NULL
         )) AS ordered_days_m13tm7 -- `m13到m7下单天数`
         ,COUNT(DISTINCT IF(
-            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
             AND t2.uas_ticket_num > 0, t2.dt, NULL
-        )) AS uas_days_m13tm3 -- `m13到m3升级售后天数`
+        )) AS uas_days_m29tm3 -- `m29到m3升级售后天数`
         ,COUNT(DISTINCT IF(
-            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 13, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
+            t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 29, "dd") AND DATEADD(DATE(t1.dt),  - 3, "dd")
             AND t2.uas_ticket_num > 0 AND t2.is_ordered_cdta3d>0, t2.dt, NULL
-        )) AS uas_rebuy_cdta3d_days_m13tm3 -- `m13到m3升级售后且4日复购天数`
+        )) AS uas_rebuy_cdta3d_days_m29tm3 -- `m29到m3升级售后且4日复购天数`
 
         ,COUNT(DISTINCT IF(
             t2.dt BETWEEN DATEADD(DATE(t1.dt),  - 6, "dd") AND t1.dt
@@ -406,8 +407,8 @@ SELECT
 	,t1.ordered_days_m29tcd AS `近30天下单天数`
 
 	,t1.ordered_days_m13tm7 AS `m13到m7下单天数`
-	,t1.uas_days_m13tm3 AS `m13到m3升级售后天数`
-	,t1.uas_rebuy_cdta3d_days_m13tm3 AS `m13到m3升级售后且4日复购天数`
+	,t1.uas_days_m29tm3 AS `m29到m3升级售后天数`
+	,t1.uas_rebuy_cdta3d_days_m29tm3 AS `m29到m3升级售后且4日复购天数`
     
 	,t1.ordered_days_m6tcd AS `近7天下单天数`
     ,NVL(t4.ordered_cat4_num,0) AS `近14天下单品类数`
