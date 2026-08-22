@@ -105,6 +105,8 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         name="dim_sku",
         sql_file="dim_sku_query.sql",
         depends_on=[],
+        use_temp_table=True,
+        temp_table_project="datawarehouse_max_dev",
     ),
 ]
 
