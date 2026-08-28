@@ -49,7 +49,7 @@ WITH upgrade_stat AS(
             ","
             ,IF(ISNOTNULL(t2.grid_id), "代理人区域", "直营区域")
             ,IF(INSTR(t1.grid_name, "线上")>0, "线上维护", NULL)
-            ,IF(INSTR(t1.grid_name, "自营KA")>0, "KA维护", NULL)
+            ,IF(INSTR(t1.grid_name, "自营KA")+INSTR(t1.grid_name, "KA")>0, "KA维护", NULL)
         ) AS region_operation_tag -- `区域运营标签`
 
         -- FIXED: BD 信息对于线上区域是
