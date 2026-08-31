@@ -1,9 +1,3 @@
-/*
-BD+ 运营区域类型
-*/
-
-
-
 WITH upgrade_stat AS(
     SELECT
         t2.dt -- `日期`
@@ -49,7 +43,7 @@ WITH upgrade_stat AS(
             ","
             ,IF(ISNOTNULL(t2.grid_id), "代理人区域", "直营区域")
             ,IF(INSTR(t1.grid_name, "线上")>0, "线上维护", NULL)
-            ,IF(INSTR(t1.grid_name, "自营KA")+INSTR(t1.grid_name, "KA")>0, "KA维护", NULL)
+            ,IF(INSTR(t1.grid_name, "KA")>0, "KA维护", NULL)
         ) AS region_operation_tag -- `区域运营标签`
 
         -- FIXED: BD 信息对于线上区域是
@@ -237,8 +231,12 @@ SELECT
     ,MAX(IF(INSTR(t1.region_operation_tag, "代理人")>0, 1, 0)) AS `是否负责代理人`
     ,COUNT(DISTINCT IF(t1.ordered_goods_num>0, t1.customer_store_id, NULL)) AS `下单店铺数`
     ,SUM(t1.delivered_goods_amt) AS `送达金额`
-    ,SUM(IF(INSTR(t1.category_level1_name, "水果")>0, t1.delivered_goods_amt, 0)) AS `水果送达金额`
     ,SUM(t1.deliveried_gross_wgt) AS `送达重量`
+
+    ,SUM(IF(INSTR(t1.category_level1_name, "水果")>0, t1.delivered_goods_amt, 0)) AS `水果送达金额`
+    ,SUM(IF(INSTR(t1.category_level1_name, "水果")>0, t1.deliveried_gross_wgt, 0)) AS `水果送达重量`
+    ,SUM(IF(INSTR(t1.category_level1_name, "蔬菜")>0, t1.delivered_goods_amt, 0)) AS `蔬菜送达金额`
+    ,SUM(IF(INSTR(t1.category_level1_name, "蔬菜")>0, t1.deliveried_gross_wgt, 0)) AS `蔬菜送达重量`
 
     ,SUM(t1.delivered_goods_amt * IF(t1.special_operate_cat="榴莲", 0, 1)) AS `非榴莲品类送达金额`
     ,SUM(t1.total_refund_amount_upgrade * IF(t1.special_operate_cat="榴莲", 0, 1)) AS `非榴莲品类升级售后总赔付金额`
