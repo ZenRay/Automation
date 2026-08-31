@@ -103,13 +103,28 @@ TARGET_DR_BD = LarkTargetConfig(
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
+            source_col="送达重量",
+            target_field="送达重量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
             source_col="水果送达金额",
             target_field="水果送达金额",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
-            source_col="送达重量",
-            target_field="送达重量",
+            source_col="水果送达重量",
+            target_field="水果送达重量",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜送达金额",
+            target_field="蔬菜送达金额",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+        FieldMapping(
+            source_col="蔬菜送达重量",
+            target_field="蔬菜送达重量",
             lark_type=LarkFieldType.NUMBER,
         ),
         FieldMapping(
