@@ -153,7 +153,9 @@ jobs:
             mkdir -p "$LOG_DIR"
             chown -R 10001:10001 "$LOG_DIR"
 
-            # 启动 scheduler 容器（定时执行 cron_task.sh）
+            # 启动 scheduler 容器（单进程多任务定时调度）
+            #   base_data_cron.sh : 07:20 (BASE_DATA_SCHEDULE_HOUR/MIN) 门店基础数据 SQL-to-SQL ETL
+            #   cron_task.sh      : 08:20 (SCHEDULE_HOUR/MIN)           OKR / Daily Report / Upgrade After Sale
             # CRON_SKIP_TASKS: 逗号分隔的任务名，默认跳过 cr_trail（超飞书 5 万行限制）
             #                  修复后设为空字符串即可恢复全部任务
             podman run -d \
@@ -163,6 +165,8 @@ jobs:
               -e TZ=Asia/Shanghai \
               -e PYTHONLOGFORMAT=text \
               -e LOG_LEVEL=INFO \
+              -e BASE_DATA_SCHEDULE_HOUR=7 \
+              -e BASE_DATA_SCHEDULE_MIN=20 \
               -e SCHEDULE_HOUR=8 \
               -e SCHEDULE_MIN=20 \
               -e CRON_SKIP_TASKS=cr_trail \
