@@ -33,6 +33,7 @@ from .config import (
     LARK_TARGETS,
     SQL_BASE_DIR,
     DATA_ROUTES,
+    SINGLE_DAY_ROUTES,
 )
 
 logger = logging.getLogger("workers.daily_report.main")
@@ -77,14 +78,25 @@ def _apply_date_range_to_routes(
       - CleanupCondition.runtime_window(): 替换为运行时计算的 date_window
       - 其他具体条件                       : 保持原样，不覆盖（尊重配置中的显式定义）
 
-    清理窗口 = [reference_date + start_offset - buffer,
-                reference_date + end_offset]
+    清理窗口分两类：
+      - 默认（多天输出路由）= [reference_date + start_offset - buffer,
+                              reference_date + end_offset]
+      - SINGLE_DAY_ROUTES（单日输出路由，如 a3_store_report）
+        = [reference_date + end_offset, reference_date + end_offset]
+        清理范围与写入范围严格一致，仅覆盖目标单天，避免误删历史数据。
+
     双边条件确保只删除管道处理窗口内的数据，窗口外不受影响。
     """
     cleanup_start, cleanup_end = date_range.cleanup_window
+    ref = date_range.reference_date or _date.today()
+    single_day = ref + _timedelta(days=date_range.end_offset)
     logger.info(
         f"Cleanup window: {cleanup_start} ~ {cleanup_end} "
         f"(buffer={date_range.cleanup_buffer})"
+    )
+    logger.info(
+        f"Single-day cleanup routes {sorted(SINGLE_DAY_ROUTES)}: "
+        f"{single_day} ~ {single_day}"
     )
     result = []
     for route in routes:
@@ -93,12 +105,19 @@ def _apply_date_range_to_routes(
             target.cleanup_conditions is not None
             and target.cleanup_conditions.is_runtime
         ):
-            # 运行时哨兵：替换为精确窗口
-            new_cleanup = CleanupCondition.date_window(
-                "日期",
-                cleanup_start,
-                cleanup_end,
-            )
+            # 运行时哨兵：替换为精确窗口（单日路由仅清理目标当天）
+            if route.name in SINGLE_DAY_ROUTES:
+                new_cleanup = CleanupCondition.date_window(
+                    "日期",
+                    single_day,
+                    single_day,
+                )
+            else:
+                new_cleanup = CleanupCondition.date_window(
+                    "日期",
+                    cleanup_start,
+                    cleanup_end,
+                )
             new_target = dataclasses.replace(target, cleanup_conditions=new_cleanup)
             result.append(dataclasses.replace(route, target=new_target))
         else:

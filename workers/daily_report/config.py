@@ -47,6 +47,11 @@ SQL_QUERIES: list[SQLQueryConfig] = [
         sql_file="mall_stat_query.sql",
         depends_on=[],
     ),
+    SQLQueryConfig(
+        name="dr_a3_store_report",
+        sql_file="a3_store_report_query.sql",
+        depends_on=[],
+    ),
 ]
 
 # --------------------------------------------------------------------------
@@ -392,9 +397,47 @@ TARGET_DR_MALL = LarkTargetConfig(
     cleanup_conditions=CleanupCondition.runtime_window(),
 )
 
+# A3 门店业务指标（长格式：指标名称 + 指标值）
+# 源 SQL: a3_store_report_query.sql，读取 changsha_project_store_info_daily_asc
+TARGET_A3_STORE_REPORT = LarkTargetConfig(
+    name="a3_store_report",
+    url=LARK_BASE_URL,
+    table_name="A3门店业务指标数据值",
+    field_mappings=[
+        FieldMapping(
+            source_col="日期", target_field="日期", lark_type=LarkFieldType.DATE
+        ),
+        FieldMapping(
+            source_col="商城id", target_field="商城id", lark_type=LarkFieldType.NUMBER
+        ),
+        FieldMapping(
+            source_col="商城名称",
+            target_field="商城名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="门店类型",
+            target_field="门店类型",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="指标名称",
+            target_field="指标名称",
+            lark_type=LarkFieldType.TEXT,
+        ),
+        FieldMapping(
+            source_col="指标值",
+            target_field="指标值",
+            lark_type=LarkFieldType.NUMBER,
+        ),
+    ],
+    cleanup_conditions=CleanupCondition.runtime_window(),
+)
+
 LARK_TARGETS: list[LarkTargetConfig] = [
     TARGET_DR_BD,
     TARGET_DR_MALL,
+    TARGET_A3_STORE_REPORT,
 ]
 
 # --------------------------------------------------------------------------
@@ -415,4 +458,21 @@ DATA_ROUTES: list[DataRoute] = [
         transforms=[],
         validation_level="warn",
     ),
+    DataRoute(
+        name="a3_store_report",
+        target=TARGET_A3_STORE_REPORT,
+        source_ref="mc:dr_a3_store_report",
+        transforms=[],
+        validation_level="warn",
+    ),
 ]
+
+# --------------------------------------------------------------------------
+# 单日输出路由：SQL 仅写入 dt = date_param + end_offset 当天数据
+#
+# 这类路由的清理窗口必须与写入窗口一致（仅删目标单天），
+# 不能沿用全局 cleanup_window（[T-7, T] 多天窗口），
+# 否则会删 8 天只写 1 天，误删历史数据。
+# main.py 的 _apply_date_range_to_routes 会据此替换 runtime_window 哨兵。
+# --------------------------------------------------------------------------
+SINGLE_DAY_ROUTES: set[str] = {"a3_store_report"}
