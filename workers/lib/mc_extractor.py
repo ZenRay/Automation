@@ -12,6 +12,12 @@
     -> instance.open_reader(tunnel=True).to_pandas()  # Instance Tunnel
     -> 返回 {query.name -> DataFrame}
 
+调用链路（仅执行模式，execute_only=True）：
+    -> 读取 SQL 文件内容
+    -> MaxComputerClient.execute_sql(sql)   # INSERT/CREATE 等无结果集语句
+    -> instance.wait_for_success()
+    -> 返回空 DataFrame（不下载结果）
+
 调用链路（临时表模式，use_temp_table=True）：
     -> 读取 SQL 文件内容
     -> 包装为 CREATE TABLE temp AS <sql>
@@ -111,7 +117,7 @@ def _execute_single_query(
         params:       SQL 模板参数（可选），替换 SQL 文件中的 ${key} 占位符
 
     Returns:
-        pd.DataFrame：查询结果
+        pd.DataFrame：查询结果；execute_only 模式下为空 DataFrame
 
     Raises:
         FileNotFoundError: SQL 文件不存在
@@ -132,6 +138,16 @@ def _execute_single_query(
             sql_content = sql_content.replace(placeholder, value)
         logger.debug(f"SQL params rendered for '{query.name}': {list(params.keys())}")
     logger.debug(f"SQL content for '{query.name}':\n{sql_content[:200]}...")
+
+    if query.execute_only:
+        # 仅执行模式：INSERT/CREATE 等无结果集语句，只等待执行完成
+        logger.info(f"Query '{query.name}': execute-only mode (no result download)")
+        instance = client.execute_sql(sql_content, hints=hints)
+        instance.wait_for_success()
+        logger.info(
+            f"Query '{query.name}': execution completed (instance: {instance.id})"
+        )
+        return pd.DataFrame()
 
     if query.use_temp_table:
         # 临时表模式：CTAS → Table Tunnel 下载 → 清理

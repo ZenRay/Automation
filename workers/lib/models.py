@@ -555,6 +555,10 @@ class SQLQueryConfig:
                             False 时：直接通过 Instance Tunnel 下载（默认）
         temp_table_project: 临时表所在 project（如 dev 环境），None 时使用当前 project
         temp_table_schema:  临时表所在 schema（可选），None 时使用默认 schema
+        execute_only:       仅执行模式，适用于 INSERT/CREATE 等无结果集的 SQL
+                            True 时：执行 SQL 并等待完成，不下载结果（返回空 DataFrame）
+                            False 时：执行后通过 Tunnel 下载结果集（默认）
+                            注意：execute_only 与 use_temp_table 互斥，不可同时启用
 
     临时表模式说明：
         当 RAM 用户缺少源表的 odps:Download 权限时，Instance Tunnel 无法直接下载
@@ -571,6 +575,14 @@ class SQLQueryConfig:
     use_temp_table: bool = False
     temp_table_project: Optional[str] = None
     temp_table_schema: Optional[str] = None
+    execute_only: bool = False
+
+    def __post_init__(self):
+        if self.execute_only and self.use_temp_table:
+            raise ValueError(
+                f"SQLQueryConfig '{self.name}': execute_only 与 use_temp_table "
+                "互斥（仅执行模式无结果集可下载，临时表模式无意义）"
+            )
 
 
 @dataclass
