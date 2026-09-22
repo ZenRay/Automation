@@ -114,7 +114,7 @@ WITH result AS(
         ) AS metric_value -- "指标值" STRING
     FROM datawarehouse_max_dev.changsha_project_store_info_daily_asc t1
     WHERE t1.dt = DATEADD(${date_param}, ${end_offset}, "dd")
-        AND INSTR(GET_JSON_OBJECT(t1.store_acheive_type_info, "$.门店运营类型"), "KA") > 0
+        AND INSTR(GET_JSON_OBJECT(t1.store_operate_type_info, "$.门店运营类型"), "KA") > 0
     GROUP BY t1.dt -- "日期" STRING
         ,t1.mall_id -- "商城ID" BIGINT
         ,t1.mall -- "商城名称" STRING
