@@ -34,6 +34,22 @@ WITH result AS(
         ,t1.mall -- "商城名称" STRING
 
     UNION ALL
+    SELECT
+        DATEADD(${date_param}, ${end_offset}, "dd") AS dt -- "日期" STRING
+        ,t1.mall_id -- "商城ID" BIGINT
+        ,t1.mall -- "商城名称" STRING
+        ,NULL AS store_type -- "门店类型" STRING
+        ,"主力进货渠道门店数周同比" AS metric_name -- "指标名称" STRING
+        ,COUNT(DISTINCT IF(
+            t1.use_status="有效店铺" AND GET_JSON_OBJECT(t1.store_acheive_type_info, "$.是否水果主力进货渠道门店") = "是", t1.customer_store_id, NULL
+        )) AS metric_value -- "水果主力进货渠道门店数" BIGINT
+    FROM datawarehouse_max_dev.changsha_project_store_info_daily_asc t1
+    WHERE t1.dt = DATEADD(${date_param}, ${end_offset} - 7, "dd")
+    GROUP BY t1.dt -- "日期" STRING
+        ,t1.mall_id -- "商城ID" BIGINT
+        ,t1.mall -- "商城名称" STRING
+
+    UNION ALL
 
     -- 圈选客户达成等级
     SELECT
@@ -97,6 +113,7 @@ WITH result AS(
 
     -- 不同运营类型
 
+
     SELECT
         t1.dt -- "日期" STRING
         ,t1.mall_id -- "商城ID" BIGINT
@@ -118,6 +135,7 @@ WITH result AS(
     GROUP BY t1.dt -- "日期" STRING
         ,t1.mall_id -- "商城ID" BIGINT
         ,t1.mall -- "商城名称" STRING
+
 )
 
 
