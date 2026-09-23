@@ -132,13 +132,13 @@ def run_daily_report_pipeline(
     """执行日报数据处理管道
 
     Args:
-        date_range: 日期范围参数，None 时使用默认值（T-7 到 T）
+        date_range: 日期范围参数，None 时使用默认值（T-7 到 T-1）
 
     Returns:
         int: 0 表示成功，1 表示失败
     """
     if date_range is None:
-        date_range = DateRangeParams()  # 默认 T-7 到 T
+        date_range = DateRangeParams(end_offset=-1)  # 默认 T-7 到 T-1
 
     ref_date = date_range.reference_date or _date.today()
     logger.info("=" * 60)
@@ -248,7 +248,7 @@ def main():
     """入口函数，供命令行调用
 
     用法：
-        python -m workers.daily_report.main                           # 默认 T-7 ~ T（当天）
+        python -m workers.daily_report.main                           # 默认 T-7 ~ T-1（昨天）
         python -m workers.daily_report.main --date 2026-05-30         # 基准日 2026-05-30
         python -m workers.daily_report.main --date 2026-05-30 --start -14 --end 0  # 14天窗口
     """
@@ -257,7 +257,7 @@ def main():
         "--date", type=str, default=None, help="基准日期 (YYYY-MM-DD)，默认今天"
     )
     parser.add_argument("--start", type=int, default=-7, help="起始日偏移量 (默认 -7)")
-    parser.add_argument("--end", type=int, default=0, help="结束日偏移量 (默认 0)")
+    parser.add_argument("--end", type=int, default=-1, help="结束日偏移量 (默认 -1)")
     parser.add_argument(
         "--buffer", type=int, default=0, help="清理窗口额外回溯天数 (默认 0)"
     )
